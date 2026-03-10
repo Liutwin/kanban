@@ -1,0 +1,23 @@
+# Démarrer le serveur
+deno run dev
+
+
+# Exemples de tests
+
+# 1. Créer un compte
+curl -X POST http://localhost:8080/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"usr_mail":"test@mail.com","usr_pseudo":"TestUser","usr_mdp":"Password1!"}'
+
+# 2. Se connecter (récupérer le token)
+curl -X POST http://localhost:8080/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"usr_mail":"alice.martin@mail.com","usr_mdp":"Password1!"}'
+
+# 3. Utiliser le token pour accéder à une route protégée
+curl http://localhost:8080/auth/validate \
+  -H "Authorization: Bearer <TOKEN>"
+
+# 4. Proxy vers Tomcat (quand Tomcat sera prêt)
+curl http://localhost:8080/api/tableaux \
+  -H "Authorization: Bearer <TOKEN>"
