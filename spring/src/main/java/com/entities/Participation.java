@@ -11,10 +11,10 @@ import java.io.Serializable;
  * Entité JPA représentant la participation d'un utilisateur à un tableau Kanban.
  * Mappée sur la table {@code participation_ptp} en base MariaDB.
  * La clé primaire est composite : elle est constituée des clés étrangères
- * vers {@link User} et {@link Tableau}.
+ * vers {@link Utilisateur} et {@link Tableau}.
  */
 @Entity
-@Table(name = "participation_ptp")
+@jakarta.persistence.Table(name = "participation_ptp")
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
@@ -46,7 +46,7 @@ public class Participation {
     @ManyToOne
     @MapsId("userId")
     @JoinColumn(name = "usr_participant")
-    private User utilisateur;
+    private Utilisateur utilisateur;
 
     /**
      * Tableau auquel l'utilisateur participe.

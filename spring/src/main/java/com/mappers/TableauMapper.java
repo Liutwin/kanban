@@ -2,7 +2,7 @@ package com.mappers;
 
 import com.dtos.TableauDTO;
 import com.entities.Tableau;
-import com.entities.User;
+import com.entities.Utilisateur;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -40,7 +40,7 @@ public class TableauMapper {
         Tableau tableau = new Tableau();
         tableau.setId(dto.getId());
         tableau.setNom(dto.getNom());
-        User createur = new User();
+        Utilisateur createur = new Utilisateur();
         createur.setId(dto.getCreateurId());
         tableau.setCreateur(createur);
         return tableau;

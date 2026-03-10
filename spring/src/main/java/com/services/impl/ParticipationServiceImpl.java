@@ -5,7 +5,7 @@ import com.entities.Participation;
 import com.mappers.ParticipationMapper;
 import com.repositories.ParticipationRepository;
 import com.repositories.TableauRepository;
-import com.repositories.UserRepository;
+import com.repositories.UtilisateurRepository;
 import com.services.ParticipationService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -22,7 +22,7 @@ import java.util.stream.Collectors;
 public class ParticipationServiceImpl implements ParticipationService {
 
     private final ParticipationRepository participationRepository;
-    private final UserRepository userRepository;
+    private final UtilisateurRepository utilisateurRepository;
     private final TableauRepository tableauRepository;
     private final ParticipationMapper participationMapper;
 
@@ -50,7 +50,7 @@ public class ParticipationServiceImpl implements ParticipationService {
         if (participationRepository.existsByIdUserIdAndIdTableauId(dto.getUserId(), dto.getTableauId())) {
             throw new RuntimeException("Participation déjà existante");
         }
-        if (!userRepository.existsById(dto.getUserId())) {
+        if (!utilisateurRepository.existsById(dto.getUserId())) {
             throw new RuntimeException("Utilisateur introuvable : " + dto.getUserId());
         }
         if (!tableauRepository.existsById(dto.getTableauId())) {

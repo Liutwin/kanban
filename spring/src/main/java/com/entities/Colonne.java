@@ -1,5 +1,6 @@
 package com.entities;
 
+import com.repositories.ColonneRepository;
 import jakarta.persistence.*;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -14,10 +15,10 @@ import lombok.AllArgsConstructor;
  * écrit ou modifié depuis Spring.</p>
  *
  * <p>La permutation de colonnes doit passer par la procédure stockée
- * {@code deplacer_colonne} via {@link com.repositories.ColonneRepository}.</p>
+ * {@code deplacer_colonne} via {@link ColonneRepository}.</p>
  */
 @Entity
-@Table(
+@jakarta.persistence.Table(
         name = "colonne_col",
         uniqueConstraints = @UniqueConstraint(
                 name = "uq_col_numero_tab",
@@ -34,7 +35,7 @@ public class Colonne {
      */
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "col_id")
+    @jakarta.persistence.Column(name = "col_id")
     private Long id;
 
     /**
@@ -42,13 +43,13 @@ public class Colonne {
      * Géré exclusivement par le trigger {@code before_insert_colonne}
      * et la procédure {@code deplacer_colonne} — jamais écrit par JPA.
      */
-    @Column(name = "col_numero", insertable = false, updatable = false)
+    @jakarta.persistence.Column(name = "col_numero", insertable = false, updatable = false)
     private Integer numero;
 
     /**
      * Nom affiché de la colonne.
      */
-    @Column(name = "col_nom", nullable = false, length = 50)
+    @jakarta.persistence.Column(name = "col_nom", nullable = false, length = 50)
     private String nom;
 
     /**

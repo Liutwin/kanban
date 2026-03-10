@@ -12,7 +12,7 @@ import lombok.AllArgsConstructor;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class UserDTO {
+public class UtilisateurDTO {
 
     /**
      * Identifiant unique de l'utilisateur.

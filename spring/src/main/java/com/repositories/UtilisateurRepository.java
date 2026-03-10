@@ -1,16 +1,16 @@
 package com.repositories;
-import com.entities.User;
+import com.entities.Utilisateur;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 import java.util.Optional;
 
 /**
- * Repository JPA pour l'entité {@link User}.
+ * Repository JPA pour l'entité {@link Utilisateur}.
  * Fournit les opérations CRUD de base via Spring Data,
  * ainsi que des requêtes métier spécifiques aux utilisateurs.
  */
 @Repository
-public interface UserRepository extends JpaRepository<User, Long> {
+public interface UtilisateurRepository extends JpaRepository<Utilisateur, Long> {
 
     /**
      * Recherche un utilisateur par son adresse email.
@@ -18,7 +18,7 @@ public interface UserRepository extends JpaRepository<User, Long> {
      * @param email l'adresse email à rechercher
      * @return un {@link Optional} contenant l'utilisateur si trouvé
      */
-    Optional<User> findByEmail(String email);
+    Optional<Utilisateur> findByEmail(String email);
 
     /**
      * Vérifie si un email est déjà utilisé.

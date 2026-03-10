@@ -4,7 +4,7 @@ import com.dtos.TableauDTO;
 import com.entities.Tableau;
 import com.mappers.TableauMapper;
 import com.repositories.TableauRepository;
-import com.repositories.UserRepository;
+import com.repositories.UtilisateurRepository;
 import com.services.TableauService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -21,7 +21,7 @@ import java.util.stream.Collectors;
 public class TableauServiceImpl implements TableauService {
 
     private final TableauRepository tableauRepository;
-    private final UserRepository userRepository;
+    private final UtilisateurRepository utilisateurRepository;
     private final TableauMapper tableauMapper;
 
     /** {@inheritDoc} */
@@ -53,7 +53,7 @@ public class TableauServiceImpl implements TableauService {
     /** {@inheritDoc} */
     @Override
     public TableauDTO createTableau(TableauDTO dto) {
-        if (!userRepository.existsById(dto.getCreateurId())) {
+        if (!utilisateurRepository.existsById(dto.getCreateurId())) {
             throw new RuntimeException("Utilisateur introuvable : " + dto.getCreateurId());
         }
         Tableau tableau = tableauMapper.toEntity(dto);

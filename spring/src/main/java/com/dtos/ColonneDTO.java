@@ -1,11 +1,12 @@
 package com.dtos;
 
+import com.entities.Colonne;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
 
 /**
- * Objet de transfert de données pour l'entité {@link com.entities.Colonne}.
+ * Objet de transfert de données pour l'entité {@link Colonne}.
  * Expose les informations d'une colonne sans les relations JPA.
  */
 @Data

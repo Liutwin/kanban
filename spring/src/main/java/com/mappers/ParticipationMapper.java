@@ -3,7 +3,7 @@ package com.mappers;
 import com.dtos.ParticipationDTO;
 import com.entities.Participation;
 import com.entities.Tableau;
-import com.entities.User;
+import com.entities.Utilisateur;
 import org.springframework.stereotype.Component;
 
 /**
@@ -29,7 +29,7 @@ public class ParticipationMapper {
 
     /**
      * Convertit un {@link ParticipationDTO} en entité {@link Participation}.
-     * Les entités {@link User} et {@link Tableau} sont reconstruites
+     * Les entités {@link Utilisateur} et {@link Tableau} sont reconstruites
      * avec uniquement leur ID — JPA résoudra les relations en base.
      *
      * @param dto le DTO à convertir
@@ -38,13 +38,13 @@ public class ParticipationMapper {
     public Participation toEntity(ParticipationDTO dto) {
         Participation.ParticipationId id = new Participation.ParticipationId(dto.getUserId(), dto.getTableauId());
 
-        User user = new User();
-        user.setId(dto.getUserId());
+        Utilisateur utilisateur = new Utilisateur();
+        utilisateur.setId(dto.getUserId());
 
         Tableau tableau = new Tableau();
         tableau.setId(dto.getTableauId());
 
-        return new Participation(id, user, tableau,
+        return new Participation(id, utilisateur, tableau,
                 dto.getRole() != null ? dto.getRole() : Participation.Role.LECTEUR);
     }
 }

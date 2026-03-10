@@ -10,7 +10,7 @@ import lombok.AllArgsConstructor;
  * Mappée sur la table {@code tableau_tab} en base MariaDB.
  */
 @Entity
-@Table(name = "tableau_tab")
+@jakarta.persistence.Table(name = "tableau_tab")
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
@@ -32,9 +32,9 @@ public class Tableau {
 
     /**
      * Utilisateur ayant créé le tableau.
-     * Relation Many-to-One vers {@link User}.
+     * Relation Many-to-One vers {@link Utilisateur}.
      */
     @ManyToOne
     @JoinColumn(name = "usr_createur", nullable = false)
-    private User createur;
+    private Utilisateur createur;
 }

@@ -1,7 +1,7 @@
 package com.controllers;
 
-import com.dtos.UserDTO;
-import com.services.UserService;
+import com.dtos.UtilisateurDTO;
+import com.services.UtilisateurService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -19,44 +19,44 @@ import java.util.List;
 @RequestMapping("/users")
 @RequiredArgsConstructor
 @Tag(name = "Utilisateurs", description = "Gestion des comptes utilisateurs")
-public class UserController {
+public class UtilisateurController {
 
-    private final UserService userService;
+    private final UtilisateurService utilisateurService;
 
     /**
      * Récupère la liste de tous les utilisateurs.
      *
-     * @return une liste de {@link UserDTO} avec statut HTTP 200
+     * @return une liste de {@link UtilisateurDTO} avec statut HTTP 200
      */
     @Operation(summary = "Lister tous les utilisateurs")
     @GetMapping
-    public ResponseEntity<List<UserDTO>> getAllUsers() {
-        return ResponseEntity.ok(userService.getAllUsers());
+    public ResponseEntity<List<UtilisateurDTO>> getAllUsers() {
+        return ResponseEntity.ok(utilisateurService.getAllUsers());
     }
 
     /**
      * Récupère un utilisateur par son identifiant.
      *
      * @param id l'identifiant de l'utilisateur
-     * @return le {@link UserDTO} avec statut HTTP 200
+     * @return le {@link UtilisateurDTO} avec statut HTTP 200
      */
     @Operation(summary = "Récupérer un utilisateur par ID")
     @GetMapping("/{id}")
-    public ResponseEntity<UserDTO> getUserById(@PathVariable Long id) {
-        return ResponseEntity.ok(userService.getUserById(id));
+    public ResponseEntity<UtilisateurDTO> getUserById(@PathVariable Long id) {
+        return ResponseEntity.ok(utilisateurService.getUserById(id));
     }
 
     /**
      * Crée un nouvel utilisateur.
      *
      * @param dto les données du nouvel utilisateur
-     * @return le {@link UserDTO} créé avec statut HTTP 201
+     * @return le {@link UtilisateurDTO} créé avec statut HTTP 201
      */
     @Operation(summary = "Créer un utilisateur")
     @PostMapping
-    public ResponseEntity<UserDTO> createUser(@RequestBody UserDTO dto) {
+    public ResponseEntity<UtilisateurDTO> createUser(@RequestBody UtilisateurDTO dto) {
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(userService.createUser(dto));
+                .body(utilisateurService.createUser(dto));
     }
 
     /**
@@ -64,12 +64,12 @@ public class UserController {
      *
      * @param id  l'identifiant de l'utilisateur à modifier
      * @param dto les nouvelles données
-     * @return le {@link UserDTO} mis à jour avec statut HTTP 200
+     * @return le {@link UtilisateurDTO} mis à jour avec statut HTTP 200
      */
     @Operation(summary = "Mettre à jour un utilisateur")
     @PutMapping("/{id}")
-    public ResponseEntity<UserDTO> updateUser(@PathVariable Long id, @RequestBody UserDTO dto) {
-        return ResponseEntity.ok(userService.updateUser(id, dto));
+    public ResponseEntity<UtilisateurDTO> updateUser(@PathVariable Long id, @RequestBody UtilisateurDTO dto) {
+        return ResponseEntity.ok(utilisateurService.updateUser(id, dto));
     }
 
     /**
@@ -81,7 +81,7 @@ public class UserController {
     @Operation(summary = "Supprimer un utilisateur")
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteUser(@PathVariable Long id) {
-        userService.deleteUser(id);
+        utilisateurService.deleteUser(id);
         return ResponseEntity.noContent().build();
     }
 }
