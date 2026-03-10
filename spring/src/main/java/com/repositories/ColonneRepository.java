@@ -32,5 +32,5 @@ public interface ColonneRepository extends JpaRepository<Colonne, Long> {
      * @param newNum la nouvelle position cible
      */
     @Query(value = "CALL deplacer_colonne(:colId, :newNum)", nativeQuery = true)
-    void deplacerColonne(@Param("colId") Long colId, @Param("newNum") int newNum);
+    void moveColonne(@Param("colId") Long colId, @Param("newNum") int newNum);
 }

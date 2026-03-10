@@ -39,8 +39,8 @@ public class TacheServiceImpl implements TacheService {
 
     /** {@inheritDoc} */
     @Override
-    public List<TacheDTO> getTasksByAssignee(Long assigneeId) {
-        return tacheRepository.findByAssigneeId(assigneeId)
+    public List<TacheDTO> getTasksByAssigned(Long assignedId) {
+        return tacheRepository.findByAssigneeId(assignedId)
                 .stream()
                 .map(tacheMapper::toDTO)
                 .collect(Collectors.toList());
@@ -48,7 +48,7 @@ public class TacheServiceImpl implements TacheService {
 
     /** {@inheritDoc} */
     @Override
-    public List<TacheDTO> getTasksByColonneAndPriorite(Long columnId, Tache.Priority priority) {
+    public List<TacheDTO> getTasksByColumnAndPriority(Long columnId, Tache.Priority priority) {
         return tacheRepository.findByColonneIdAndPriorite(columnId, priority)
                 .stream()
                 .map(tacheMapper::toDTO)

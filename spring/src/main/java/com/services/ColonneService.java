@@ -15,7 +15,7 @@ public interface ColonneService {
      * @param tableauId l'identifiant du tableau
      * @return liste de {@link ColonneDTO} ordonnée
      */
-    List<ColonneDTO> getColonnesByTableau(Long tableauId);
+    List<ColonneDTO> getColumnsByTableau(Long tableauId);
 
     /**
      * Récupère une colonne par son identifiant.
@@ -24,7 +24,7 @@ public interface ColonneService {
      * @return le {@link ColonneDTO} correspondant
      * @throws RuntimeException si la colonne n'est pas trouvée
      */
-    ColonneDTO getColonneById(Long id);
+    ColonneDTO getColumnById(Long id);
 
     /**
      * Crée une nouvelle colonne dans un tableau.
@@ -34,7 +34,7 @@ public interface ColonneService {
      * @return le {@link ColonneDTO} créé avec son numéro assigné
      * @throws RuntimeException si le tableau n'existe pas
      */
-    ColonneDTO createColonne(ColonneDTO dto);
+    ColonneDTO createColumn(ColonneDTO dto);
 
     /**
      * Renomme une colonne existante.
@@ -44,7 +44,7 @@ public interface ColonneService {
      * @return le {@link ColonneDTO} mis à jour
      * @throws RuntimeException si la colonne n'est pas trouvée
      */
-    ColonneDTO updateColonne(Long id, ColonneDTO dto);
+    ColonneDTO updateColumn(Long id, ColonneDTO dto);
 
     /**
      * Déplace une colonne vers une nouvelle position via la procédure stockée.
@@ -53,7 +53,7 @@ public interface ColonneService {
      * @param newNum la nouvelle position cible
      * @throws RuntimeException si la colonne n'est pas trouvée
      */
-    void deplacerColonne(Long id, int newNum);
+    void moveColumn(Long id, int newNum);
 
     /**
      * Supprime une colonne par son identifiant.
@@ -61,5 +61,5 @@ public interface ColonneService {
      * @param id l'identifiant de la colonne à supprimer
      * @throws RuntimeException si la colonne n'est pas trouvée
      */
-    void deleteColonne(Long id);
+    void deleteColumn(Long id);
 }

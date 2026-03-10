@@ -20,7 +20,7 @@ public interface ParticipationRepository extends JpaRepository<Participation, Pa
      * @param userId l'identifiant de l'utilisateur
      * @return liste des participations correspondantes
      */
-    List<Participation> findByIdUserId(Long userId);
+    List<Participation> findByUtilisateurId(Long userId);
 
     /**
      * Récupère toutes les participations d'un tableau donné.
@@ -28,7 +28,7 @@ public interface ParticipationRepository extends JpaRepository<Participation, Pa
      * @param tableauId l'identifiant du tableau
      * @return liste des participations correspondantes
      */
-    List<Participation> findByIdTableauId(Long tableauId);
+    List<Participation> findByTableauId(Long tableauId);
 
     /**
      * Vérifie si un utilisateur participe déjà à un tableau donné.
@@ -37,5 +37,5 @@ public interface ParticipationRepository extends JpaRepository<Participation, Pa
      * @param tableauId l'identifiant du tableau
      * @return {@code true} si la participation existe déjà
      */
-    boolean existsByIdUserIdAndIdTableauId(Long userId, Long tableauId);
+    boolean existsByUtilisateurIdAndTableauId(Long userId, Long tableauId);
 }

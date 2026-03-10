@@ -53,9 +53,9 @@ public class TacheMapper {
         colonne.setId(dto.getColonneId());
         tache.setColonne(colonne);
 
-        Utilisateur creator = new Utilisateur();
-        creator.setId(dto.getCreateurId());
-        tache.setCreateur(creator);
+        Utilisateur createur = new Utilisateur();
+        createur.setId(dto.getCreateurId());
+        tache.setCreateur(createur);
 
         if (dto.getAssigneeId() != null) {
             Utilisateur assignee = new Utilisateur();

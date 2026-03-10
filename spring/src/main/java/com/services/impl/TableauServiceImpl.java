@@ -26,7 +26,7 @@ public class TableauServiceImpl implements TableauService {
 
     /** {@inheritDoc} */
     @Override
-    public List<TableauDTO> getAllTableaux() {
+    public List<TableauDTO> getAllTables() {
         return tableauRepository.findAll()
                 .stream()
                 .map(tableauMapper::toDTO)
@@ -35,7 +35,7 @@ public class TableauServiceImpl implements TableauService {
 
     /** {@inheritDoc} */
     @Override
-    public TableauDTO getTableauById(Long id) {
+    public TableauDTO getTableById(Long id) {
         Tableau tableau = tableauRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Tableau introuvable : " + id));
         return tableauMapper.toDTO(tableau);
@@ -43,7 +43,7 @@ public class TableauServiceImpl implements TableauService {
 
     /** {@inheritDoc} */
     @Override
-    public List<TableauDTO> getTableauxByCreateur(Long createurId) {
+    public List<TableauDTO> getTablesByCreator(Long createurId) {
         return tableauRepository.findByCreateurId(createurId)
                 .stream()
                 .map(tableauMapper::toDTO)
@@ -52,7 +52,7 @@ public class TableauServiceImpl implements TableauService {
 
     /** {@inheritDoc} */
     @Override
-    public TableauDTO createTableau(TableauDTO dto) {
+    public TableauDTO createTable(TableauDTO dto) {
         if (!utilisateurRepository.existsById(dto.getCreateurId())) {
             throw new RuntimeException("Utilisateur introuvable : " + dto.getCreateurId());
         }
@@ -62,7 +62,7 @@ public class TableauServiceImpl implements TableauService {
 
     /** {@inheritDoc} */
     @Override
-    public TableauDTO updateTableau(Long id, TableauDTO dto) {
+    public TableauDTO updateTable(Long id, TableauDTO dto) {
         Tableau tableau = tableauRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Tableau introuvable : " + id));
         tableau.setNom(dto.getNom());
@@ -71,7 +71,7 @@ public class TableauServiceImpl implements TableauService {
 
     /** {@inheritDoc} */
     @Override
-    public void deleteTableau(Long id) {
+    public void deleteTable(Long id) {
         if (!tableauRepository.existsById(id)) {
             throw new RuntimeException("Tableau introuvable : " + id);
         }

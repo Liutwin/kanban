@@ -22,10 +22,10 @@ public interface TacheService {
     /**
      * Récupère toutes les tâches assignées à un utilisateur.
      *
-     * @param assigneeId l'identifiant de l'utilisateur
+     * @param assignedId l'identifiant de l'utilisateur
      * @return liste de {@link TacheDTO}
      */
-    List<TacheDTO> getTasksByAssignee(Long assigneeId);
+    List<TacheDTO> getTasksByAssigned(Long assignedId);
 
     /**
      * Récupère les tâches d'une colonne filtrées par priorité.
@@ -34,7 +34,7 @@ public interface TacheService {
      * @param priorite  le niveau de priorité recherché
      * @return liste de {@link TacheDTO}
      */
-    List<TacheDTO> getTasksByColonneAndPriorite(Long colonneId, Tache.Priority priorite);
+    List<TacheDTO> getTasksByColumnAndPriority(Long colonneId, Tache.Priority priorite);
 
     /**
      * Récupère une tâche par son identifiant.

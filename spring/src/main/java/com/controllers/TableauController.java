@@ -31,7 +31,7 @@ public class TableauController {
     @Operation(summary = "Lister tous les tableaux")
     @GetMapping
     public ResponseEntity<List<TableauDTO>> getAllTableaux() {
-        return ResponseEntity.ok(tableauService.getAllTableaux());
+        return ResponseEntity.ok(tableauService.getAllTables());
     }
 
     /**
@@ -43,7 +43,7 @@ public class TableauController {
     @Operation(summary = "Récupérer un tableau par ID")
     @GetMapping("/{id}")
     public ResponseEntity<TableauDTO> getTableauById(@PathVariable Long id) {
-        return ResponseEntity.ok(tableauService.getTableauById(id));
+        return ResponseEntity.ok(tableauService.getTableById(id));
     }
 
     /**
@@ -55,7 +55,7 @@ public class TableauController {
     @Operation(summary = "Lister les tableaux d'un utilisateur")
     @GetMapping("/user/{createurId}")
     public ResponseEntity<List<TableauDTO>> getTableauxByCreateur(@PathVariable Long createurId) {
-        return ResponseEntity.ok(tableauService.getTableauxByCreateur(createurId));
+        return ResponseEntity.ok(tableauService.getTablesByCreator(createurId));
     }
 
     /**
@@ -68,7 +68,7 @@ public class TableauController {
     @PostMapping
     public ResponseEntity<TableauDTO> createTableau(@RequestBody TableauDTO dto) {
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(tableauService.createTableau(dto));
+                .body(tableauService.createTable(dto));
     }
 
     /**
@@ -81,7 +81,7 @@ public class TableauController {
     @Operation(summary = "Mettre à jour un tableau")
     @PutMapping("/{id}")
     public ResponseEntity<TableauDTO> updateTableau(@PathVariable Long id, @RequestBody TableauDTO dto) {
-        return ResponseEntity.ok(tableauService.updateTableau(id, dto));
+        return ResponseEntity.ok(tableauService.updateTable(id, dto));
     }
 
     /**
@@ -93,7 +93,7 @@ public class TableauController {
     @Operation(summary = "Supprimer un tableau")
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteTableau(@PathVariable Long id) {
-        tableauService.deleteTableau(id);
+        tableauService.deleteTable(id);
         return ResponseEntity.noContent().build();
     }
 }

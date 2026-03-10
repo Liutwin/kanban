@@ -32,7 +32,7 @@ public class ColonneController {
     @Operation(summary = "Lister les colonnes d'un tableau")
     @GetMapping
     public ResponseEntity<List<ColonneDTO>> getColonnes(@PathVariable Long tableauId) {
-        return ResponseEntity.ok(colonneService.getColonnesByTableau(tableauId));
+        return ResponseEntity.ok(colonneService.getColumnsByTableau(tableauId));
     }
 
     /**
@@ -45,7 +45,7 @@ public class ColonneController {
     @GetMapping("/{id}")
     public ResponseEntity<ColonneDTO> getColonne(@PathVariable Long tableauId,
                                                  @PathVariable Long id) {
-        return ResponseEntity.ok(colonneService.getColonneById(id));
+        return ResponseEntity.ok(colonneService.getColumnById(id));
     }
 
     /**
@@ -61,7 +61,7 @@ public class ColonneController {
                                                     @RequestBody ColonneDTO dto) {
         dto.setTableauId(tableauId);
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(colonneService.createColonne(dto));
+                .body(colonneService.createColumn(dto));
     }
 
     /**
@@ -76,7 +76,7 @@ public class ColonneController {
     public ResponseEntity<ColonneDTO> updateColonne(@PathVariable Long tableauId,
                                                     @PathVariable Long id,
                                                     @RequestBody ColonneDTO dto) {
-        return ResponseEntity.ok(colonneService.updateColonne(id, dto));
+        return ResponseEntity.ok(colonneService.updateColumn(id, dto));
     }
 
     /**
@@ -91,7 +91,7 @@ public class ColonneController {
     public ResponseEntity<Void> deplacerColonne(@PathVariable Long tableauId,
                                                 @PathVariable Long id,
                                                 @RequestParam int newNum) {
-        colonneService.deplacerColonne(id, newNum);
+        colonneService.moveColumn(id, newNum);
         return ResponseEntity.noContent().build();
     }
 
@@ -105,7 +105,7 @@ public class ColonneController {
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteColonne(@PathVariable Long tableauId,
                                               @PathVariable Long id) {
-        colonneService.deleteColonne(id);
+        colonneService.deleteColumn(id);
         return ResponseEntity.noContent().build();
     }
 }

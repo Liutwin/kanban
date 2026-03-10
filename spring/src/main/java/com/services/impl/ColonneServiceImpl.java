@@ -26,7 +26,7 @@ public class ColonneServiceImpl implements ColonneService {
 
     /** {@inheritDoc} */
     @Override
-    public List<ColonneDTO> getColonnesByTableau(Long tableauId) {
+    public List<ColonneDTO> getColumnsByTableau(Long tableauId) {
         return colonneRepository.findByTableauIdOrderByNumeroAsc(tableauId)
                 .stream()
                 .map(colonneMapper::toDTO)
@@ -35,7 +35,7 @@ public class ColonneServiceImpl implements ColonneService {
 
     /** {@inheritDoc} */
     @Override
-    public ColonneDTO getColonneById(Long id) {
+    public ColonneDTO getColumnById(Long id) {
         Colonne colonne = colonneRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Colonne introuvable : " + id));
         return colonneMapper.toDTO(colonne);
@@ -43,7 +43,7 @@ public class ColonneServiceImpl implements ColonneService {
 
     /** {@inheritDoc} */
     @Override
-    public ColonneDTO createColonne(ColonneDTO dto) {
+    public ColonneDTO createColumn(ColonneDTO dto) {
         if (!tableauRepository.existsById(dto.getTableauId())) {
             throw new RuntimeException("Tableau introuvable : " + dto.getTableauId());
         }
@@ -56,7 +56,7 @@ public class ColonneServiceImpl implements ColonneService {
 
     /** {@inheritDoc} */
     @Override
-    public ColonneDTO updateColonne(Long id, ColonneDTO dto) {
+    public ColonneDTO updateColumn(Long id, ColonneDTO dto) {
         Colonne colonne = colonneRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Colonne introuvable : " + id));
         colonne.setNom(dto.getNom());
@@ -65,16 +65,16 @@ public class ColonneServiceImpl implements ColonneService {
 
     /** {@inheritDoc} */
     @Override
-    public void deplacerColonne(Long id, int newNum) {
+    public void moveColumn(Long id, int newNum) {
         if (!colonneRepository.existsById(id)) {
             throw new RuntimeException("Colonne introuvable : " + id);
         }
-        colonneRepository.deplacerColonne(id, newNum);
+        colonneRepository.moveColonne(id, newNum);
     }
 
     /** {@inheritDoc} */
     @Override
-    public void deleteColonne(Long id) {
+    public void deleteColumn(Long id) {
         if (!colonneRepository.existsById(id)) {
             throw new RuntimeException("Colonne introuvable : " + id);
         }

@@ -29,7 +29,7 @@ public class ParticipationServiceImpl implements ParticipationService {
     /** {@inheritDoc} */
     @Override
     public List<ParticipationDTO> getParticipationsByUser(Long userId) {
-        return participationRepository.findByIdUserId(userId)
+        return participationRepository.findByUtilisateurId(userId)
                 .stream()
                 .map(participationMapper::toDTO)
                 .collect(Collectors.toList());
@@ -38,7 +38,7 @@ public class ParticipationServiceImpl implements ParticipationService {
     /** {@inheritDoc} */
     @Override
     public List<ParticipationDTO> getParticipationsByTableau(Long tableauId) {
-        return participationRepository.findByIdTableauId(tableauId)
+        return participationRepository.findByTableauId(tableauId)
                 .stream()
                 .map(participationMapper::toDTO)
                 .collect(Collectors.toList());
@@ -47,7 +47,7 @@ public class ParticipationServiceImpl implements ParticipationService {
     /** {@inheritDoc} */
     @Override
     public ParticipationDTO addParticipation(ParticipationDTO dto) {
-        if (participationRepository.existsByIdUserIdAndIdTableauId(dto.getUserId(), dto.getTableauId())) {
+        if (participationRepository.existsByUtilisateurIdAndTableauId(dto.getUserId(), dto.getTableauId())) {
             throw new RuntimeException("Participation déjà existante");
         }
         if (!utilisateurRepository.existsById(dto.getUserId())) {

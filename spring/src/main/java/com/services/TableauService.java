@@ -14,7 +14,7 @@ public interface TableauService {
      *
      * @return liste de {@link TableauDTO}
      */
-    List<TableauDTO> getAllTableaux();
+    List<TableauDTO> getAllTables();
 
     /**
      * Récupère un tableau par son identifiant.
@@ -23,7 +23,7 @@ public interface TableauService {
      * @return le {@link TableauDTO} correspondant
      * @throws RuntimeException si le tableau n'est pas trouvé
      */
-    TableauDTO getTableauById(Long id);
+    TableauDTO getTableById(Long id);
 
     /**
      * Récupère tous les tableaux créés par un utilisateur donné.
@@ -31,7 +31,7 @@ public interface TableauService {
      * @param createurId l'identifiant de l'utilisateur créateur
      * @return liste de {@link TableauDTO}
      */
-    List<TableauDTO> getTableauxByCreateur(Long createurId);
+    List<TableauDTO> getTablesByCreator(Long createurId);
 
     /**
      * Crée un nouveau tableau.
@@ -40,7 +40,7 @@ public interface TableauService {
      * @return le {@link TableauDTO} créé avec son ID généré
      * @throws RuntimeException si l'utilisateur créateur n'existe pas
      */
-    TableauDTO createTableau(TableauDTO dto);
+    TableauDTO createTable(TableauDTO dto);
 
     /**
      * Met à jour un tableau existant.
@@ -50,7 +50,7 @@ public interface TableauService {
      * @return le {@link TableauDTO} mis à jour
      * @throws RuntimeException si le tableau n'est pas trouvé
      */
-    TableauDTO updateTableau(Long id, TableauDTO dto);
+    TableauDTO updateTable(Long id, TableauDTO dto);
 
     /**
      * Supprime un tableau par son identifiant.
@@ -58,5 +58,5 @@ public interface TableauService {
      * @param id l'identifiant du tableau à supprimer
      * @throws RuntimeException si le tableau n'est pas trouvé
      */
-    void deleteTableau(Long id);
+    void deleteTable(Long id);
 }
