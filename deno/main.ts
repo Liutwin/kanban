@@ -6,8 +6,11 @@ import { errorMiddleware } from "./middleware/error.ts";
 import authRouter          from "./routes/auth.ts";
 import proxyRouter         from "./routes/proxy.ts";
 
+// Configuration réseau
+const PROTOCOL = "http";
 const PORT     = 8080;
 const HOSTNAME = "localhost";
+const ADDRESS = `${PROTOCOL}://${HOSTNAME}:${PORT}`;
 
 const app = new Application();
 
@@ -20,7 +23,11 @@ app.use(authRouter.routes(),  authRouter.allowedMethods());
 app.use(proxyRouter.routes(), proxyRouter.allowedMethods());
 
 app.addEventListener("listen", () =>
-  console.log(`🚀 Serveur Deno démarré sur http://${HOSTNAME}:${PORT}`)
+  console.log(`🚀 Serveur Deno démarré sur ${ADDRESS}`)
 );
 
-await app.listen({ hostname: HOSTNAME, port: PORT });
+if (import.meta.main) {
+  await app.listen({ hostname: HOSTNAME, port: PORT });
+}
+
+export { app };
