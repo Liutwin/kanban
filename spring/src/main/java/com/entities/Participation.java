@@ -69,10 +69,17 @@ public class Participation {
      */
     public enum Role {
         /** Peut uniquement consulter le tableau et ses tâches. */
-        LECTEUR,
+        LECTEUR("lecteur"),
         /** Peut créer, modifier et déplacer des tâches. */
-        EDITEUR,
+        EDITEUR("editeur"),
         /** Accès complet : gestion des membres et du tableau. */
-        ADMIN
+        ADMIN("admin");
+
+        private final String value;
+
+        Role(String value) { this.value = value; }
+
+        @Override
+        public String toString() { return value; }
     }
 }
