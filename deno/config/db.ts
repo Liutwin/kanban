@@ -1,5 +1,6 @@
 // config/db.ts
 import mysql from "npm:mysql2/promise";
+import "jsr:@std/dotenv/load";
 
 // Reprend les mêmes paramètres que ton application.properties
 export const db = await mysql.createPool({

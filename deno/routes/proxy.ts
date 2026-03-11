@@ -6,7 +6,7 @@ const TOMCAT_URL = "http://localhost:8081";
 
 const router = new Router();
 
-// ── Fonction helper : transmet la requête à Tomcat ───────────────────────
+// Fonction helper : transmet la requête à Tomcat
 async function proxyToTomcat(ctx: AuthContext, path: string) {
   const url    = `${TOMCAT_URL}${path}`;
   const method = ctx.request.method;
@@ -19,6 +19,7 @@ async function proxyToTomcat(ctx: AuthContext, path: string) {
 
   const headers = new Headers();
   headers.set("Content-Type", "application/json");
+  
   // On transmet l'identité de l'utilisateur à Tomcat via un header custom
   if (ctx.state.user) {
     headers.set("X-User-Id",     String(ctx.state.user.usr_id));

@@ -14,7 +14,7 @@ import { isLoginRequest, isRegisterRequest } from "../model/guards.ts";
 const router = new Router({ prefix: "/auth" });
 
 // Inscription
-router.post("/register", async (ctx) => {
+/*router.post("/register", async (ctx) => {
   const body = await ctx.request.body.json() as RegisterRequest;
 
   // Type guard
@@ -29,8 +29,7 @@ router.post("/register", async (ctx) => {
 
   // Vérification que le mail n'est pas déjà pris
   const [rows] = await db.query(
-    "SELECT usr_id FROM utilisateur_usr WHERE usr_mail = ?",
-    [body.usr_mail],
+    "SELECT usr_id FROM utilisateur_usr WHERE usr_mail = ?", [body.usr_mail]
   );
   if ((rows as unknown[]).length > 0) {
     throw new APIException(APIErrorCode.CONFLICT, 409, "Email déjà utilisé");
@@ -59,7 +58,7 @@ router.post("/register", async (ctx) => {
   const response: AuthResponse = { token, user };
   ctx.response.status = 201;
   ctx.response.body   = { success: true, data: response };
-});
+});*/
 
 // Authentification
 router.post("/login", async (ctx) => {
