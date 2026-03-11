@@ -1,67 +1,46 @@
+// model/types.ts – shared data types for the Kanban app
+
 export interface Utilisateur {
-  id:     number;
-  email:  string;
-  pseudo: string;
+  usr_id:     number;
+  usr_mail:   string;
+  usr_pseudo: string;
 }
 
 export interface Tableau {
-  id:         number;
-  nom:        string;
-  createurId: number;
+  tab_id:    number;
+  tab_nom:   string;
+  ptp_role?: string;
+  col_count?: number;
+  tsk_count?: number;
 }
 
 export interface Colonne {
-  id:        number;
-  numero:    number;
-  nom:       string;
-  tableauId: number;
+  col_id:     number;
+  col_numero: number;
+  col_nom:    string;
+  tab_id:     number;
+  taches?:    Tache[];
 }
-
-export type Priorite = "BASSE" | "MOYENNE" | "HAUTE";
 
 export interface Tache {
-  id:         number;
-  titre:      string;
-  details:    string | null;
-  dateLimite: string | null;
-  priority:   Priorite;
-  colonneId:  number;
-  createurId: number;
-  assigneeId: number | null;
+  tsk_id:        number;
+  tsk_titre:     string;
+  tsk_details?:  string;
+  tsk_datelimite?: string;
+  tsk_priorite:  "basse" | "moyenne" | "haute";
+  col_id:        number;
+  usr_createur:  number;
+  usr_assignee?: number;
 }
 
-export type Role = "ADMIN" | "EDITEUR" | "LECTEUR";
-
-export interface Participation {
-  userId:    number;
-  tableauId: number;
-  role:      Role;
+export interface Log {
+  log_id:           number;
+  log_type:         "creation" | "deplacement" | "modification";
+  log_date:         string;
+  log_description?: string;
+  usr_auteur?:      number;
+  usr_auteur_pseudo?: string;
+  tsk_id?:          number;
+  tab_id?:          number;
+  tab_nom?:         string;
 }
-
-export interface AuthResponse {
-  token: string;
-  user:  Utilisateur;
-}
-
-export interface LoginRequest {
-  usr_mail: string;
-  usr_mdp:  string;
-}
-
-export interface RegisterRequest {
-  usr_mail:   string;
-  usr_pseudo: string;
-  usr_mdp:    string;
-}
-
-export interface APISuccess<T> {
-  success: true;
-  data:    T;
-}
-
-export interface APIFailure {
-  success: false;
-  error: { code: string; message: string };
-}
-
-export type APIResponse<T> = APISuccess<T> | APIFailure;

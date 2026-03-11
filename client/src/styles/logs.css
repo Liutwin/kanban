@@ -1,0 +1,160 @@
+/* logs.css */
+.logs-page { display: flex; flex-direction: column; gap: 20px; }
+
+.logs-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+/* Filter tabs */
+.filter-tabs {
+  display: flex;
+  gap: 4px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 3px;
+}
+
+.filter-tab {
+  background: none;
+  border: none;
+  border-radius: 4px;
+  padding: 5px 12px;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--text-3);
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.12s, color 0.12s;
+  white-space: nowrap;
+}
+
+.filter-tab:hover  { background: var(--surface2); color: var(--text); }
+.filter-tab.active { background: var(--surface2); color: var(--text); }
+
+/* Stats row */
+.logs-stats {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.stat-chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 7px 14px;
+  font-size: 12.5px;
+}
+
+.stat-count {
+  font-family: 'Geist Mono', monospace;
+  font-weight: 600;
+  color: var(--text);
+  font-size: 14px;
+}
+
+.stat-label { color: var(--text-3); }
+
+/* Log icon types */
+.log-icon { font-size: 13px; }
+
+.log-creation     { color: #a3e635; }
+.log-deplacement  { color: #818cf8; }
+.log-modification { color: #fbbf24; }
+
+/* Timeline */
+.logs-timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.log-entry {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  padding: 12px 14px;
+  border-radius: var(--radius);
+  transition: background 0.12s;
+  border: 1px solid transparent;
+}
+
+.log-entry:hover {
+  background: var(--surface);
+  border-color: var(--border);
+}
+
+/* Bullet */
+.log-bullet {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.log-bullet.log-creation     { background: rgba(163,230,53,0.12); color: #a3e635; }
+.log-bullet.log-deplacement  { background: rgba(129,140,248,0.12); color: #818cf8; }
+.log-bullet.log-modification { background: rgba(251,191,36,0.12);  color: #fbbf24; }
+
+/* Content */
+.log-content {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.log-desc {
+  font-size: 13.5px;
+  color: var(--text);
+  font-weight: 500;
+}
+
+.log-meta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.log-author {
+  font-size: 11.5px;
+  color: var(--text-2);
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-family: 'Geist Mono', monospace;
+}
+
+.log-author-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--accent-2);
+}
+
+.log-table {
+  font-size: 11.5px;
+  color: var(--text-3);
+}
+
+.log-date {
+  font-size: 11px;
+  color: var(--text-3);
+  font-family: 'Geist Mono', monospace;
+  margin-left: auto;
+}

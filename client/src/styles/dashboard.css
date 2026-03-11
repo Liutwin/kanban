@@ -1,0 +1,192 @@
+/* dashboard.css */
+.dashboard-page { display: flex; flex-direction: column; gap: 16px; }
+
+.back-btn {
+  background: none;
+  border: none;
+  color: var(--text-3);
+  font-size: 12.5px;
+  cursor: pointer;
+  font-family: 'Geist Mono', monospace;
+  padding: 0;
+  align-self: flex-start;
+  transition: color 0.15s;
+}
+.back-btn:hover { color: var(--accent); }
+
+/* Kanban board */
+.kanban-board {
+  display: flex;
+  gap: 14px;
+  overflow-x: auto;
+  padding-bottom: 12px;
+  align-items: flex-start;
+}
+
+.kanban-board::-webkit-scrollbar { height: 5px; }
+.kanban-board::-webkit-scrollbar-track { background: var(--surface); }
+.kanban-board::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 99px; }
+
+/* Column */
+.kanban-col {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  width: 270px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  transition: border-color 0.15s;
+}
+
+.kanban-col.drag-over {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 4%, var(--surface));
+}
+
+.col-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 14px 10px;
+  border-bottom: 1px solid var(--border);
+}
+
+.col-name {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text);
+  font-family: 'Geist Mono', monospace;
+  letter-spacing: 0.03em;
+}
+
+.col-count {
+  font-size: 11px;
+  font-family: 'Geist Mono', monospace;
+  color: var(--text-3);
+  background: var(--surface2);
+  border-radius: 99px;
+  padding: 1px 7px;
+}
+
+/* Tasks */
+.col-tasks {
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 40px;
+  flex: 1;
+}
+
+/* Task card */
+.task-card {
+  background: var(--surface2);
+  border: 1px solid var(--border2);
+  border-radius: var(--radius);
+  padding: 12px;
+  cursor: grab;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  transition: border-color 0.15s, transform 0.1s;
+}
+
+.task-card:active { cursor: grabbing; transform: scale(0.98); }
+.task-card:hover  { border-color: var(--border2); }
+
+.task-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+}
+
+.task-actions {
+  display: flex;
+  gap: 4px;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.task-card:hover .task-actions { opacity: 1; }
+
+.icon-btn {
+  background: none;
+  border: 1px solid var(--border2);
+  border-radius: 4px;
+  color: var(--text-3);
+  cursor: pointer;
+  font-size: 11px;
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.15s, border-color 0.15s;
+}
+.icon-btn:hover         { color: var(--text); border-color: var(--text-3); }
+.icon-btn.danger:hover  { color: var(--danger); border-color: var(--danger); }
+
+.task-title {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+  line-height: 1.35;
+}
+
+.task-details {
+  font-size: 11.5px;
+  color: var(--text-3);
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.task-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  margin-top: 2px;
+}
+
+.task-date {
+  font-size: 11px;
+  color: var(--text-3);
+  font-family: 'Geist Mono', monospace;
+}
+
+.task-date.overdue { color: var(--danger); }
+
+.task-assignee {
+  font-size: 11px;
+  color: var(--text-3);
+  font-family: 'Geist Mono', monospace;
+}
+
+/* Add task button */
+.add-task-btn {
+  margin: 8px;
+  padding: 8px;
+  border-radius: var(--radius);
+  border: 1px dashed var(--border2);
+  background: none;
+  color: var(--text-3);
+  font-size: 12px;
+  cursor: pointer;
+  text-align: center;
+  transition: border-color 0.15s, color 0.15s;
+  font-family: inherit;
+}
+
+.add-task-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+/* Form row */
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
