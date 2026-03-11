@@ -38,16 +38,28 @@ export default function Layout({ children, title }: LayoutProps) {
         </nav>
 
         <div className="sidebar-footer">
+          {/* Infos utilisateur */}
           <div className="user-info">
-            <div className="user-avatar">
+            <div className="user-avatar" title={user?.pseudo ?? "Utilisateur"}>
               {user?.pseudo?.charAt(0).toUpperCase() ?? "?"}
             </div>
             <div className="user-details">
-              <span className="user-pseudo">{user?.pseudo ?? "Utilisateur"}</span>
-              <span className="user-mail">{user?.email ?? ""}</span>
+              <span className="user-pseudo">
+                {user?.pseudo ?? "Utilisateur"}
+              </span>
+              <span className="user-mail">
+                {user?.email ?? "—"}
+              </span>
             </div>
           </div>
-          <button className="logout-btn" onClick={handleLogout} title="Déconnexion">
+
+          {/* Bouton déconnexion */}
+          <button
+            className="logout-btn"
+            onClick={handleLogout}
+            title="Se déconnecter"
+            aria-label="Se déconnecter"
+          >
             ⏻
           </button>
         </div>
@@ -58,8 +70,11 @@ export default function Layout({ children, title }: LayoutProps) {
         <header className="top-bar">
           <h1 className="page-title">{title ?? ""}</h1>
           <div className="top-bar-right">
+            {/* Indicateur de connexion avec pseudo */}
             <span className="status-dot" />
-            <span className="status-text">connecté</span>
+            <span className="status-text">
+              {user?.pseudo ? `${user.pseudo} — connecté` : "connecté"}
+            </span>
           </div>
         </header>
         <div className="page-body">{children}</div>

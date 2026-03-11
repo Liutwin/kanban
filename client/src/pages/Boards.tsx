@@ -23,7 +23,9 @@ export default function Boards() {
   const [createError, setCreateError] = useState("");
 
   const fetchBoards = async () => {
-    if (!user) return;
+    // Guard : on n'appelle pas l'API si l'identifiant n'est pas encore disponible
+    if (!user?.id) return;
+
     setLoading(true);
     setError("");
     try {
@@ -38,7 +40,14 @@ export default function Boards() {
     }
   };
 
-  useEffect(() => { fetchBoards(); }, [user?.id]);
+  useEffect(() => {
+    if (!user?.id) {
+      // L'utilisateur n'est pas encore chargé : on attend sans afficher d'erreur
+      setLoading(false);
+      return;
+    }
+    fetchBoards();
+  }, [user?.id]);
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
