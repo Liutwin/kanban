@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import { ROUTES_AUTH } from "../config/api";
+import { extractErrorMessage } from "../utils/apiHelpers";
 import "../styles/auth.css";
 
 export default function Login() {
@@ -25,11 +26,11 @@ export default function Login() {
         body: JSON.stringify({ usr_mail: mail, usr_mdp: mdp }),
       });
       if (!res.ok) {
-        const msg = await res.text().catch(() => "");
-        throw new Error(msg || "Identifiants incorrects.");
+        const msg = await extractErrorMessage(res, "Identifiants incorrects.");
+        throw new Error(msg);
       }
-      const authResponse = await res.json();
-      login(authResponse);
+      const json = await res.json();
+      login(json.data);
       navigate("/");
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Identifiants incorrects.");

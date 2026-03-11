@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import Layout from "../components/Layout";
 import { ROUTES_API } from "../config/api";
 import { useAuth } from "../hooks/useAuth";
-import type { Tableau, Role, APIResponse } from "../model/types";
+import type { Tableau, Role, APIResponse } from "../model/interfaces";
 import "../styles/boards.css";
 
 interface TableauAvecRole extends Tableau {

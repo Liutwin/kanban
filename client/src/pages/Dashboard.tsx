@@ -3,7 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import Layout from "../components/Layout";
 import { ROUTES_API } from "../config/api";
 import { useAuth } from "../hooks/useAuth";
-import type { Tableau, Colonne, Tache, Priorite, APIResponse } from "../model/types";
+import type { Tableau, Colonne, Tache, Priorite, APIResponse } from "../model/interfaces";
 import "../styles/dashboard.css";
 
 interface ColonneAvecTaches extends Colonne {

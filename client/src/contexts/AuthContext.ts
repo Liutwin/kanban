@@ -1,5 +1,5 @@
 import { createContext } from "react";
-import type { AuthResponse } from "../model/types";
+import type { AuthResponse } from "../model/interfaces";
 
 export interface AuthContextValue {
   authResponse:    AuthResponse | null;
