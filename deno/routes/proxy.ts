@@ -1,10 +1,8 @@
-// routes/proxy.ts
 import { Router }       from "@oak/oak";
 import { authMiddleware, type AuthContext } from "../middleware/auth.ts";
-import { APIErrorCode, APIException }       from "../model/interfaces.ts";
 
-// URL du serveur Tomcat — à adapter selon votre déploiement
-const TOMCAT_URL = "http://localhost:8080";
+// URL du serveur Tomcat
+const TOMCAT_URL = "http://localhost:8081";
 
 const router = new Router();
 

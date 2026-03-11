@@ -3,13 +3,13 @@ import mysql from "npm:mysql2/promise";
 
 // Reprend les mêmes paramètres que ton application.properties
 export const db = await mysql.createPool({
-  host:     "obiwan.univ-brest.fr",
-  port:     3306,
-  database: "e22408439_db1",
-  user:     "e22408439sql",
-  password: "***REMOVED***",        // ← mettre le vrai mot de passe
+  host:     Deno.env.get("DB_HOST"),
+  port:     Number(Deno.env.get("DB_PORT")),
+  database: Deno.env.get("DB_NAME"),
+  user:     Deno.env.get("DB_USER"),
+  password: Deno.env.get("DB_PASSWORD"),
   waitForConnections: true,
-  connectionLimit: 5,
+  connectionLimit: 5
 });
 
 console.log("✅ Connexion MariaDB établie");
