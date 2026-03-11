@@ -41,6 +41,6 @@ public class Utilisateur {
      * Mot de passe hashé en SHA-256.
      * Ne doit jamais être exposé dans les réponses API.
      */
-    @Column(name = "usr_mdp", nullable = false, length = 64)
+    @Column(name = "usr_mdp", nullable = false, length = 254)
     private String password;
 }

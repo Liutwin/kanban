@@ -48,7 +48,7 @@ router.post("/register", async (ctx) => {
   });
 
   const response: AuthResponse = { token, user };
-  ctx.response.status = 201;
+  ctx.response.status = 201;console.log("✅ Connexion MariaDB établie");
   ctx.response.body   = { success: true, data: response };
 });
 
