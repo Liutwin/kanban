@@ -1,8 +1,9 @@
 // routes/auth.ts
-import { Router }       from "@oak/oak";
-import { db }           from "../config/db.ts";
+import { Router } from "@oak/oak";
+import { db }     from "../config/db.ts";
 import { createJWT, hashPassword, verifyPassword } from "../lib/jwt.ts";
-import { authMiddleware, type AuthContext }         from "../middleware/auth.ts";
+import { authMiddleware, type AuthContext }        from "../middleware/auth.ts";
+
 import {
   APIErrorCode, APIException,
   type LoginRequest, type RegisterRequest,
@@ -11,12 +12,12 @@ import {
 
 const router = new Router({ prefix: "/auth" });
 
-// ── POST /auth/register ──────────────────────────────────────────────────
+// Inscription
 router.post("/register", async (ctx) => {
   const body = await ctx.request.body.json() as RegisterRequest;
 
   if (!body.usr_mail || !body.usr_pseudo || !body.usr_mdp) {
-    throw new APIException(APIErrorCode.BAD_REQUEST, 400, "Champs manquants");
+    throw new APIException(APIErrorCode.BAD_REQUEST, 400, "Merci de remplir tous les champs");
   }
 
   // Vérifier que le mail n'est pas déjà pris

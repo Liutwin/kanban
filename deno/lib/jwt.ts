@@ -1,8 +1,7 @@
-// lib/jwt.ts
-import { jwtVerify, SignJWT }   from "npm:jose";
+import { randomBytes, scrypt } from "node:crypto";
+import { jwtVerify, SignJWT } from "@panva/jose";
 
 import { type AuthPayload, isAuthPayload } from "../model/interfaces.ts";
-import { randomBytes, scrypt } from "crypto";
 
 // Clef secrète — à externaliser en variable d'environnement plus tard
 const JWT_SECRET = "***REMOVED***";
