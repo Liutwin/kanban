@@ -13,4 +13,12 @@ export const db = await mysql.createPool({
   connectionLimit: 5
 });
 
-console.log("✅ Connexion MariaDB établie");
+// Vérifie la connexion au démarrage en empruntant une connexion du pool
+try {
+  const conn = await db.getConnection();
+  console.log("✅ Connexion MariaDB établie");
+  conn.release(); // Remet la connexion dans le pool
+} catch (err) {
+  console.error("❌ Connexion MariaDB échouée");
+  Deno.exit(1); // Inutile de démarrer si la BDD est inaccessible
+}

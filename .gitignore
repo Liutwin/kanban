@@ -95,6 +95,7 @@ spring/build/tmp/compileJava/compileTransaction/stash-dir/TacheServiceImpl.class
 spring/build/tmp/compileJava/compileTransaction/stash-dir/Utilisateur.class.uniqueId23
 spring/build/tmp/compileJava/compileTransaction/stash-dir/UtilisateurMapper.class.uniqueId16
 spring/build/tmp/compileJava/compileTransaction/stash-dir/UtilisateurRepository.class.uniqueId6
+spring/src/main/ressources/application-local.properties
 .idea/kanban-project.iml
 .idea/misc.xml
 .idea/modules.xml
