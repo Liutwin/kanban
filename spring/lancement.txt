@@ -1,0 +1,4 @@
+# Application à lancer
+./src/main/java/com/App
+
+http://localhost:8081/swagger-ui/index.html

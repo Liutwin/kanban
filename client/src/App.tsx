@@ -2,9 +2,9 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import Login       from "./pages/Login";
 import Register    from "./pages/Register";
-import Dashboard   from "./pages/Dashboard";
-import TableauPage from "./pages/TableauPage";
-import Journal     from "./pages/Journal";
+import Boards      from "./pages/Boards";
+import TablePage   from "./pages/TablePage";
+import Logs        from "./pages/Logs";
 
 export default function App() {
   return (
@@ -13,13 +13,13 @@ export default function App() {
         <Route path="/login"    element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route path="/" element={
-          <ProtectedRoute><Dashboard /></ProtectedRoute>
+          <ProtectedRoute><Boards /></ProtectedRoute>
         } />
-        <Route path="/tableaux/:id" element={
-          <ProtectedRoute><TableauPage /></ProtectedRoute>
+        <Route path="/tables/:id" element={
+          <ProtectedRoute><TablePage /></ProtectedRoute>
         } />
-        <Route path="/journal" element={
-          <ProtectedRoute><Journal /></ProtectedRoute>
+        <Route path="/logs" element={
+          <ProtectedRoute><Logs /></ProtectedRoute>
         } />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
