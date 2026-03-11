@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
-import { ROUTES_AUTH } from "../config/api";
+import { ROUTES_API } from "../config/api";
 import { extractErrorMessage } from "../utils/apiHelpers";
 import "../styles/auth.css";
 
@@ -24,7 +24,7 @@ export default function Register() {
     if (mdp.length < 8) { setError("Le mot de passe doit comporter au moins 8 caractères."); return; }
     setLoading(true);
     try {
-      const res = await fetch(ROUTES_AUTH.register, {
+      const res = await fetch(ROUTES_API.users, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ usr_pseudo: pseudo, usr_mail: mail, usr_mdp: mdp }),

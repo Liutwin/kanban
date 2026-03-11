@@ -1,6 +1,5 @@
 export const ROUTES_AUTH = {
   login:    "/auth/login",
-  register: "/auth/register",
   validate: "/auth/validate",
 } as const;
 

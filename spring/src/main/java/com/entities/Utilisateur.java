@@ -38,7 +38,7 @@ public class Utilisateur {
     private String pseudo;
 
     /**
-     * Mot de passe hashé en SHA-256.
+     * Mot de passe hashé avec crypt.
      * Ne doit jamais être exposé dans les réponses API.
      */
     @Column(name = "usr_mdp", nullable = false, length = 254)

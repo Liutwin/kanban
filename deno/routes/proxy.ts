@@ -34,9 +34,14 @@ async function proxyToTomcat(ctx: AuthContext, path: string) {
   ctx.response.headers.set("Content-Type", "application/json");
 }
 
-// ── Toutes les routes /api/* sont protégées et proxifiées ────────────────
+// Route publique : création de compte (pas de token requis)
+router.post("/api/users", async (ctx) => {
+  await proxyToTomcat(ctx, "/api/users");
+});
+
+// Toutes les autres routes /api/* sont protégées
 router.all("/api/(.*)", authMiddleware, async (ctx: AuthContext) => {
-  const path = ctx.request.url.pathname; // ex: /api/tableaux
+  const path = ctx.request.url.pathname;
   await proxyToTomcat(ctx, path);
 });
 
