@@ -4,6 +4,7 @@
   },
   "imports": {
     "@oak/oak": "jsr:@oak/oak@^17.2.0",
+    "@panva/jose": "jsr:@panva/jose@^6.2.1",
     "@tajpouria/cors": "jsr:@tajpouria/cors@^1.2.1",
     "jose": "npm:jose@^6.2.1",
     "mysql2": "npm:mysql2@^3.19.1"

@@ -67,7 +67,7 @@ export interface UtilisateurRow {
 
 export interface LoginRequest {
   usr_mail: string;
-  usr_mdp: string;   // mot de passe en clair, sera hashé
+  usr_mdp: string;
 }
 
 export interface RegisterRequest {
@@ -81,7 +81,7 @@ export interface AuthResponse {
   user: Utilisateur;
 }
 
-// Contenu du JWT (payload)
+// Contenu du JWT
 export interface AuthPayload {
   usr_id: number;
   usr_mail: string;

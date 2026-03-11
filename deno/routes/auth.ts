@@ -9,6 +9,7 @@ import {
   type LoginRequest, type RegisterRequest,
   type AuthResponse, type Utilisateur,
 } from "../model/interfaces.ts";
+import { isLoginRequest, isRegisterRequest } from "../model/guards.ts";
 
 const router = new Router({ prefix: "/auth" });
 
@@ -16,11 +17,17 @@ const router = new Router({ prefix: "/auth" });
 router.post("/register", async (ctx) => {
   const body = await ctx.request.body.json() as RegisterRequest;
 
+  // Type guard
+  if (!isRegisterRequest(body)) {
+    throw new APIException(APIErrorCode.BAD_REQUEST, 400, "Corps de requête invalide");
+  }
+
+  // Vérification des champs
   if (!body.usr_mail || !body.usr_pseudo || !body.usr_mdp) {
     throw new APIException(APIErrorCode.BAD_REQUEST, 400, "Merci de remplir tous les champs");
   }
 
-  // Vérifier que le mail n'est pas déjà pris
+  // Vérification que le mail n'est pas déjà pris
   const [rows] = await db.query(
     "SELECT usr_id FROM utilisateur_usr WHERE usr_mail = ?",
     [body.usr_mail],
@@ -29,8 +36,9 @@ router.post("/register", async (ctx) => {
     throw new APIException(APIErrorCode.CONFLICT, 409, "Email déjà utilisé");
   }
 
-  const hashedMdp = hashPassword(body.usr_mdp);
+  const hashedMdp = await hashPassword(body.usr_mdp);
 
+  // Insertion des données en BDD
   const [result] = await db.query(
     "INSERT INTO utilisateur_usr (usr_mail, usr_pseudo, usr_mdp) VALUES (?, ?, ?)",
     [body.usr_mail, body.usr_pseudo, hashedMdp],
@@ -49,18 +57,25 @@ router.post("/register", async (ctx) => {
   });
 
   const response: AuthResponse = { token, user };
-  ctx.response.status = 201;console.log("✅ Connexion MariaDB établie");
+  ctx.response.status = 201;
   ctx.response.body   = { success: true, data: response };
 });
 
-// ── POST /auth/login ─────────────────────────────────────────────────────
+// Authentification
 router.post("/login", async (ctx) => {
   const body = await ctx.request.body.json() as LoginRequest;
 
+  // Type guard
+  if (!isLoginRequest(body)) {
+    throw new APIException(APIErrorCode.BAD_REQUEST, 400, "Corps de requête invalide");
+  }
+
+  // Vérification des champs
   if (!body.usr_mail || !body.usr_mdp) {
     throw new APIException(APIErrorCode.BAD_REQUEST, 400, "Email et mot de passe requis");
   }
 
+  // Obtention des informations de l'utilisateur
   const [rows] = await db.query(
     "SELECT usr_id, usr_mail, usr_pseudo, usr_mdp FROM utilisateur_usr WHERE usr_mail = ?",
     [body.usr_mail],
@@ -68,7 +83,8 @@ router.post("/login", async (ctx) => {
 
   const userRow = (rows as Record<string, unknown>[])[0];
 
-  if (!userRow || !verifyPassword(body.usr_mdp, userRow.usr_mdp as string)) {
+  // Vérification des identifiants
+  if (!userRow || !(await verifyPassword(body.usr_mdp, userRow.usr_mdp as string))) {
     throw new APIException(APIErrorCode.UNAUTHORIZED, 401, "Identifiants incorrects");
   }
 
@@ -89,7 +105,7 @@ router.post("/login", async (ctx) => {
   ctx.response.body   = { success: true, data: response };
 });
 
-// ── GET /auth/validate ───────────────────────────────────────────────────
+// Vérifie la validité du token JWT 
 router.get("/validate", authMiddleware, (ctx: AuthContext) => {
   ctx.response.status = 200;
   ctx.response.body   = { success: true, data: ctx.state.user };
