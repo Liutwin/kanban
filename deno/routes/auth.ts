@@ -11,7 +11,7 @@ import {
 } from "../model/interfaces.ts";
 import { isLoginRequest } from "../model/guards.ts";
 
-const router = new Router({ prefix: "/auth" });
+const router = new Router({ prefix: "/api/v1/auth" });
 
 // Authentification
 router.post("/login", async (ctx) => {

@@ -55,4 +55,10 @@ public class User {
      */
     @Column(name = "usr_prenom", length = 50, nullable = true)
     private String firstName;
+
+    /**
+     * URL de l'avatar de l'utilisateur (optionnel).
+     */
+    @Column(name = "usr_avatar", length = 255, nullable = true)
+    private String avatarURL;
 }

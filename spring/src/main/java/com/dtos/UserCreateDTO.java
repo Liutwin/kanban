@@ -38,4 +38,9 @@ public class UserCreateDTO {
      * Prénom (optionnel).
      */
     private String firstName;
+
+    /**
+     * URL de l'avatar de l'utilisateur (optionnel).
+     */
+    private String avatarURL;
 }

@@ -25,7 +25,8 @@ public class UserMapper {
                 user.getEmail(),
                 user.getPseudo(),
                 user.getLastName(),
-                user.getFirstName()
+                user.getFirstName(),
+                user.getAvatarURL()
         );
     }
 
@@ -44,6 +45,7 @@ public class UserMapper {
         user.setPseudo(dto.getPseudo());
         user.setLastName(dto.getLastName());
         user.setFirstName(dto.getFirstName());
+        user.setAvatarURL(dto.getAvatarURL());
         return user;
     }
 
@@ -59,6 +61,9 @@ public class UserMapper {
         user.setEmail(dto.getEmail());
         user.setPseudo(dto.getPseudo());
         user.setPassword(dto.getPassword());
+        user.setLastName(dto.getLastName());
+        user.setFirstName(dto.getFirstName());
+        user.setAvatarURL(dto.getAvatarURL());
         return user;
     }
 }
