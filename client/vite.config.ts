@@ -6,8 +6,8 @@ export default defineConfig({
   server: {
     port: 3000,
     proxy: {
-      "/auth": "http://localhost:8080",
-      "/api":  "http://localhost:8081",
+      "/api/v1/auth": "http://localhost:8080",
+      "/api/v1":      "http://localhost:8080",
       "/ws": {
         target: "ws://localhost:8080",
         ws: true,

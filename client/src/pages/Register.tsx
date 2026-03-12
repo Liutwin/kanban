@@ -27,7 +27,7 @@ export default function Register() {
       const res = await fetch(ROUTES_API.users, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ usr_pseudo: pseudo, usr_mail: mail, usr_mdp: mdp }),
+        body: JSON.stringify({ pseudo: pseudo, email: mail, password: mdp }),
       });
       if (!res.ok) {
         const msg = await extractErrorMessage(res, "Erreur lors de la création du compte.");

@@ -1,6 +1,6 @@
 export const API_CONFIG = {
   API_PREFIX:  "/api/v1",
-  AUTH_PREFIX: "/auth",
+  AUTH_PREFIX: "/api/v1/auth",
 } as const;
 
 const BASE = API_CONFIG.API_PREFIX;
