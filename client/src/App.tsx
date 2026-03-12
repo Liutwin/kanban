@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { ProtectedRoute } from "./components/ProtectedRoute";
+import { PublicRoute } from "./components/PublicRoute";
 import Login       from "./pages/Login";
 import Register    from "./pages/Register";
 import Boards      from "./pages/Boards";
@@ -11,12 +12,12 @@ export default function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/login" element={
-            <Login />
+            <PublicRoute><Login /></PublicRoute>
         } />
         <Route path="/register" element={
-            <Register />
+            <PublicRoute><Register /></PublicRoute>
         } />
-        <Route path="/" element={
+        <Route path="/boards" element={
           <ProtectedRoute><Boards /></ProtectedRoute>
         } />
         <Route path="/tables/:id" element={
@@ -26,7 +27,7 @@ export default function App() {
           <ProtectedRoute><Logs /></ProtectedRoute>
         } />
         <Route path="*" element={
-            <Navigate to="/" replace />
+          <Navigate to="/boards" replace />
         } />
       </Routes>
     </BrowserRouter>
