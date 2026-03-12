@@ -16,7 +16,7 @@ import java.util.List;
  * Préfixe de route : {@code /tableaux/{tableauId}/colonnes}
  */
 @RestController
-@RequestMapping("/tableaux/{tableauId}/colonnes")
+@RequestMapping("/boards/{boardId}/columns")
 @RequiredArgsConstructor
 @Tag(name = "Colonnes", description = "Gestion des colonnes d'un tableau Kanban")
 public class BoardColumnController {
@@ -31,21 +31,21 @@ public class BoardColumnController {
      */
     @Operation(summary = "Lister les colonnes d'un tableau")
     @GetMapping
-    public ResponseEntity<List<BoardColumnDTO>> getColonnes(@PathVariable Long tableauId) {
+    public ResponseEntity<List<BoardColumnDTO>> getColumns(@PathVariable Long tableauId) {
         return ResponseEntity.ok(colonneService.getColumnsByTableau(tableauId));
     }
 
     /**
      * Récupère une colonne par son identifiant.
      *
-     * @param id l'identifiant de la colonne
+     * @param columnId l'identifiant de la colonne
      * @return le {@link BoardColumnDTO} avec statut HTTP 200
      */
     @Operation(summary = "Récupérer une colonne par ID")
-    @GetMapping("/{id}")
-    public ResponseEntity<BoardColumnDTO> getColonne(@PathVariable Long tableauId,
-                                                     @PathVariable Long id) {
-        return ResponseEntity.ok(colonneService.getColumnById(id));
+    @GetMapping("/{columnId}")
+    public ResponseEntity<BoardColumnDTO> getColumn(@PathVariable Long boardId,
+                                                    @PathVariable Long columnId) {
+        return ResponseEntity.ok(colonneService.getColumnById(columnId));
     }
 
     /**

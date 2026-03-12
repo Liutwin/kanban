@@ -8,7 +8,7 @@ import com.mappers.TaskMapper;
 import com.repositories.BoardColumnRepository;
 import com.repositories.TaskRepository;
 import com.repositories.UserRepository;
-import com.services.TacheService;
+import com.services.TaskService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -16,12 +16,12 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 /**
- * Implémentation de {@link TacheService}.
+ * Implémentation de {@link TaskService}.
  * Orchestre les appels aux repositories et les conversions via le mapper.
  */
 @Service
 @RequiredArgsConstructor
-public class TaskServiceImpl implements TacheService {
+public class TaskServiceImpl implements TaskService {
 
     private final TaskRepository taskRepository;
     private final BoardColumnRepository boardColumnRepository;

@@ -2,7 +2,7 @@ package com.controllers;
 
 import com.dtos.TaskDTO;
 import com.entities.Task;
-import com.services.TacheService;
+import com.services.TaskService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -17,49 +17,49 @@ import java.util.List;
  * Préfixe de route : {@code /taches}
  */
 @RestController
-@RequestMapping("/taches")
+@RequestMapping("/tasks")
 @RequiredArgsConstructor
 @Tag(name = "Tâches", description = "Gestion des tâches d'un tableau Kanban")
 public class TaskController {
 
-    private final TacheService tacheService;
+    private final TaskService taskService;
 
     /**
      * Récupère toutes les tâches d'une colonne.
      *
-     * @param colonneId l'identifiant de la colonne
+     * @param id l'identifiant de la colonne
      * @return liste de {@link TaskDTO} avec statut HTTP 200
      */
     @Operation(summary = "Lister les tâches d'une colonne")
-    @GetMapping("/colonne/{colonneId}")
-    public ResponseEntity<List<TaskDTO>> getByColonne(@PathVariable Long colonneId) {
-        return ResponseEntity.ok(tacheService.getTasksByBoardColumn(colonneId));
+    @GetMapping("/column/{id}")
+    public ResponseEntity<List<TaskDTO>> getByColumn(@PathVariable Long id) {
+        return ResponseEntity.ok(taskService.getTasksByBoardColumn(id));
     }
 
     /**
      * Récupère toutes les tâches assignées à un utilisateur.
      *
-     * @param assigneeId l'identifiant de l'utilisateur
+     * @param id l'identifiant de l'utilisateur
      * @return liste de {@link TaskDTO} avec statut HTTP 200
      */
     @Operation(summary = "Lister les tâches d'un utilisateur")
-    @GetMapping("/assignee/{assigneeId}")
-    public ResponseEntity<List<TaskDTO>> getByAssignee(@PathVariable Long assigneeId) {
-        return ResponseEntity.ok(tacheService.getTasksByAssigned(assigneeId));
+    @GetMapping("/assigned/{id}")
+    public ResponseEntity<List<TaskDTO>> getByAssigned(@PathVariable Long id) {
+        return ResponseEntity.ok(taskService.getTasksByAssigned(id));
     }
 
     /**
      * Récupère les tâches d'une colonne filtrées par priorité.
      *
-     * @param colonneId l'identifiant de la colonne
-     * @param priorite  le niveau de priorité
+     * @param id l'identifiant de la colonne
+     * @param priority  le niveau de priorité
      * @return liste de {@link TaskDTO} avec statut HTTP 200
      */
     @Operation(summary = "Lister les tâches par priorité")
-    @GetMapping("/colonne/{colonneId}/priorite/{priorite}")
-    public ResponseEntity<List<TaskDTO>> getByPriorite(@PathVariable Long colonneId,
-                                                       @PathVariable Task.Priority priorite) {
-        return ResponseEntity.ok(tacheService.getTasksByColumnAndPriority(colonneId, priorite));
+    @GetMapping("/column/{id}/priority/{priority}")
+    public ResponseEntity<List<TaskDTO>> getByPriority(@PathVariable Long id,
+                                                       @PathVariable Task.Priority priority) {
+        return ResponseEntity.ok(taskService.getTasksByColumnAndPriority(id, priority));
     }
 
     /**
@@ -71,7 +71,7 @@ public class TaskController {
     @Operation(summary = "Récupérer une tâche par ID")
     @GetMapping("/{id}")
     public ResponseEntity<TaskDTO> getById(@PathVariable Long id) {
-        return ResponseEntity.ok(tacheService.getTaskById(id));
+        return ResponseEntity.ok(taskService.getTaskById(id));
     }
 
     /**
@@ -82,9 +82,9 @@ public class TaskController {
      */
     @Operation(summary = "Créer une tâche")
     @PostMapping
-    public ResponseEntity<TaskDTO> createTache(@RequestBody TaskDTO dto) {
+    public ResponseEntity<TaskDTO> createTask(@RequestBody TaskDTO dto) {
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(tacheService.createTask(dto));
+                .body(taskService.createTask(dto));
     }
 
     /**
@@ -96,37 +96,37 @@ public class TaskController {
      */
     @Operation(summary = "Mettre à jour une tâche")
     @PutMapping("/{id}")
-    public ResponseEntity<TaskDTO> updateTache(@PathVariable Long id,
-                                               @RequestBody TaskDTO dto) {
-        return ResponseEntity.ok(tacheService.updateTask(id, dto));
+    public ResponseEntity<TaskDTO> updateTask(@PathVariable Long id,
+                                              @RequestBody TaskDTO dto) {
+        return ResponseEntity.ok(taskService.updateTask(id, dto));
     }
 
     /**
      * Déplace une tâche vers une autre colonne.
      *
      * @param id        l'identifiant de la tâche
-     * @param colonneId l'identifiant de la colonne cible
+     * @param newId l'identifiant de la colonne cible
      * @return le {@link TaskDTO} mis à jour avec statut HTTP 200
      */
     @Operation(summary = "Déplacer une tâche vers une autre colonne")
     @PatchMapping("/{id}/deplacer")
-    public ResponseEntity<TaskDTO> deplacerTache(@PathVariable Long id,
-                                                 @RequestParam Long colonneId) {
-        return ResponseEntity.ok(tacheService.moveTask(id, colonneId));
+    public ResponseEntity<TaskDTO> moveTask(@PathVariable Long id,
+                                            @RequestParam Long newId) {
+        return ResponseEntity.ok(taskService.moveTask(id, newId));
     }
 
     /**
      * Assigne une tâche à un utilisateur.
      *
      * @param id         l'identifiant de la tâche
-     * @param assigneeId l'identifiant de l'utilisateur, ou {@code null} pour retirer
+     * @param userId l'identifiant de l'utilisateur, ou {@code null} pour retirer
      * @return le {@link TaskDTO} mis à jour avec statut HTTP 200
      */
     @Operation(summary = "Assigner une tâche à un utilisateur")
     @PatchMapping("/{id}/assigner")
-    public ResponseEntity<TaskDTO> assignerTache(@PathVariable Long id,
-                                                 @RequestParam(required = false) Long assigneeId) {
-        return ResponseEntity.ok(tacheService.assignTask(id, assigneeId));
+    public ResponseEntity<TaskDTO> assignTask(@PathVariable Long id,
+                                              @RequestParam(required = false) Long userId) {
+        return ResponseEntity.ok(taskService.assignTask(id, userId));
     }
 
     /**
@@ -137,8 +137,8 @@ public class TaskController {
      */
     @Operation(summary = "Supprimer une tâche")
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> deleteTache(@PathVariable Long id) {
-        tacheService.deleteTask(id);
+    public ResponseEntity<Void> deleteTask(@PathVariable Long id) {
+        taskService.deleteTask(id);
         return ResponseEntity.noContent().build();
     }
 }

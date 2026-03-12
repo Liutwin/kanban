@@ -6,12 +6,14 @@ export const API_CONFIG = {
 const BASE = API_CONFIG.API_PREFIX;
 const AUTH = API_CONFIG.AUTH_PREFIX;
 
+// Routes pour l'authentification (serveur Deno)
 export const ROUTES_AUTH = {
   login:    `${AUTH}/login`,
   validate: `${AUTH}/validate`,
   logout:   `${AUTH}/logout`,
 } as const;
 
+// Routes pour le restant de l'API (côté Spring, en passant par le proxy Deno)
 export const ROUTES_API = {
   // ── Utilisateurs ──────────────────────────────────────────────────────────
   users:        `${BASE}/users`,

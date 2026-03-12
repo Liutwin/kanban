@@ -9,12 +9,16 @@ interface LayoutProps {
 }
 
 export default function Layout({ children, title }: LayoutProps) {
-  const { user, logout } = useAuth();
+  const { user, logout, authFetch } = useAuth();
   const navigate = useNavigate();
 
-  const handleLogout = () => {
-    logout();
-    navigate("/login");
+  const handleLogout = async () => {
+    try {
+      await authFetch(ROUTES_AUTH.logout, { method: "POST" });
+    } finally {
+      logout();
+      navigate("/login");
+    }
   };
 
   return (

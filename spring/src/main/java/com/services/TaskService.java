@@ -9,7 +9,7 @@ import java.util.List;
  * Interface du service métier pour la gestion des tâches Kanban.
  * Définit le contrat des opérations CRUD disponibles sur les tâches.
  */
-public interface TacheService {
+public interface TaskService {
 
     /**
      * Récupère toutes les tâches d'une colonne.

@@ -16,7 +16,7 @@ import java.util.List;
  * Préfixe de route : {@code /tableaux}
  */
 @RestController
-@RequestMapping("/tableaux")
+@RequestMapping("/boards")
 @RequiredArgsConstructor
 @Tag(name = "Tableaux", description = "Gestion des tableaux Kanban")
 public class BoardController {
