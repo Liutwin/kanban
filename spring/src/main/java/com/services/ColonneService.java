@@ -1,6 +1,6 @@
 package com.services;
 
-import com.dtos.ColonneDTO;
+import com.dtos.BoardColumnDTO;
 import java.util.List;
 
 /**
@@ -13,38 +13,38 @@ public interface ColonneService {
      * Récupère toutes les colonnes d'un tableau, triées par numéro.
      *
      * @param tableauId l'identifiant du tableau
-     * @return liste de {@link ColonneDTO} ordonnée
+     * @return liste de {@link BoardColumnDTO} ordonnée
      */
-    List<ColonneDTO> getColumnsByTableau(Long tableauId);
+    List<BoardColumnDTO> getColumnsByTableau(Long tableauId);
 
     /**
      * Récupère une colonne par son identifiant.
      *
      * @param id l'identifiant de la colonne
-     * @return le {@link ColonneDTO} correspondant
+     * @return le {@link BoardColumnDTO} correspondant
      * @throws RuntimeException si la colonne n'est pas trouvée
      */
-    ColonneDTO getColumnById(Long id);
+    BoardColumnDTO getColumnById(Long id);
 
     /**
      * Crée une nouvelle colonne dans un tableau.
      * Le numéro de position est attribué automatiquement par le trigger SQL.
      *
      * @param dto les données de la nouvelle colonne
-     * @return le {@link ColonneDTO} créé avec son numéro assigné
+     * @return le {@link BoardColumnDTO} créé avec son numéro assigné
      * @throws RuntimeException si le tableau n'existe pas
      */
-    ColonneDTO createColumn(ColonneDTO dto);
+    BoardColumnDTO createColumn(BoardColumnDTO dto);
 
     /**
      * Renomme une colonne existante.
      *
      * @param id  l'identifiant de la colonne
      * @param dto les nouvelles données
-     * @return le {@link ColonneDTO} mis à jour
+     * @return le {@link BoardColumnDTO} mis à jour
      * @throws RuntimeException si la colonne n'est pas trouvée
      */
-    ColonneDTO updateColumn(Long id, ColonneDTO dto);
+    BoardColumnDTO updateColumn(Long id, BoardColumnDTO dto);
 
     /**
      * Déplace une colonne vers une nouvelle position via la procédure stockée.
