@@ -1,6 +1,9 @@
 package com.services;
 
+import com.dtos.UserCreateDTO;
 import com.dtos.UserDTO;
+import com.dtos.UserPasswordDTO;
+
 import java.util.List;
 
 /**
@@ -32,7 +35,7 @@ public interface UserService {
      * @return le {@link UserDTO} créé avec son ID généré
      * @throws RuntimeException si l'email est déjà utilisé
      */
-    UserDTO createUser(UserDTO dto);
+    UserDTO createUser(UserCreateDTO dto);
 
     /**
      * Met à jour un utilisateur existant.
@@ -43,6 +46,16 @@ public interface UserService {
      * @throws RuntimeException si l'utilisateur n'est pas trouvé
      */
     UserDTO updateUser(Long id, UserDTO dto);
+
+    /**
+     * Change le mot de passe d'un utilisateur.
+     *
+     * @param id  l'identifiant de l'utilisateur
+     * @param dto contient l'ancien et le nouveau mot de passe
+     * @throws RuntimeException si l'utilisateur n'est pas trouvé
+     * @throws RuntimeException si l'ancien mot de passe est incorrect
+     */
+    void changePassword(Long id, UserPasswordDTO dto);
 
     /**
      * Supprime un utilisateur par son identifiant.

@@ -1,6 +1,8 @@
 package com.controllers;
 
+import com.dtos.UserCreateDTO;
 import com.dtos.UserDTO;
+import com.dtos.UserPasswordDTO;
 import com.services.UserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -54,7 +56,7 @@ public class UserController {
      */
     @Operation(summary = "Créer un utilisateur")
     @PostMapping
-    public ResponseEntity<UserDTO> createUser(@RequestBody UserDTO dto) {
+    public ResponseEntity<UserDTO> createUser(@RequestBody UserCreateDTO dto) {
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(userService.createUser(dto));
     }
@@ -70,6 +72,22 @@ public class UserController {
     @PutMapping("/{id}")
     public ResponseEntity<UserDTO> updateUser(@PathVariable Long id, @RequestBody UserDTO dto) {
         return ResponseEntity.ok(userService.updateUser(id, dto));
+    }
+
+
+    /**
+     * Change le mot de passe d'un utilisateur.
+     *
+     * @param id  l'identifiant de l'utilisateur
+     * @param dto contient l'ancien et le nouveau mot de passe
+     * @return statut HTTP 204 sans contenu
+     */
+    @Operation(summary = "Changer le mot de passe d'un utilisateur")
+    @PatchMapping("/{id}/password")
+    public ResponseEntity<Void> changePassword(@PathVariable Long id,
+                                               @RequestBody UserPasswordDTO dto) {
+        userService.changePassword(id, dto);
+        return ResponseEntity.noContent().build();
     }
 
     /**

@@ -28,4 +28,14 @@ public class UserDTO {
      * Pseudo affiché de l'utilisateur.
      */
     private String pseudo;
+
+    /**
+     * Nom de famille (optionnel).
+     */
+    private String lastName;
+
+    /**
+     * Prénom (optionnel).
+     */
+    private String firstName;
 }

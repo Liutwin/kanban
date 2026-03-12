@@ -1,5 +1,6 @@
 package com.mappers;
 
+import com.dtos.UserCreateDTO;
 import com.dtos.UserDTO;
 import com.entities.User;
 import org.springframework.stereotype.Component;
@@ -10,7 +11,7 @@ import org.springframework.stereotype.Component;
  * Garantit que le mot de passe n'est jamais exposé côté API.
  */
 @Component
-public class UtilisateurMapper {
+public class UserMapper {
 
     /**
      * Convertit une entité {@link User} en {@link UserDTO}.
@@ -22,7 +23,9 @@ public class UtilisateurMapper {
         return new UserDTO(
                 user.getId(),
                 user.getEmail(),
-                user.getPseudo()
+                user.getPseudo(),
+                user.getLastName(),
+                user.getFirstName()
         );
     }
 
@@ -39,6 +42,23 @@ public class UtilisateurMapper {
         user.setId(dto.getId());
         user.setEmail(dto.getEmail());
         user.setPseudo(dto.getPseudo());
+        user.setLastName(dto.getLastName());
+        user.setFirstName(dto.getFirstName());
+        return user;
+    }
+
+    /**
+     * Convertit un {@link UserCreateDTO} en entité {@link User}.
+     * Le mot de passe sera hashé séparément dans le service.
+     *
+     * @param dto le DTO de création à convertir
+     * @return l'entité correspondante
+     */
+    public User toEntityFromCreate(UserCreateDTO dto) {
+        User user = new User();
+        user.setEmail(dto.getEmail());
+        user.setPseudo(dto.getPseudo());
+        user.setPassword(dto.getPassword());
         return user;
     }
 }

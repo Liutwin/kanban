@@ -43,4 +43,16 @@ public class User {
      */
     @Column(name = "usr_mdp", nullable = false, length = 254)
     private String password;
+
+    /**
+     * Nom de famille de l'utilisateur (optionnel).
+     */
+    @Column(name = "usr_nom", length = 50, nullable = true)
+    private String lastName;
+
+    /**
+     * Prénom de l'utilisateur (optionnel).
+     */
+    @Column(name = "usr_prenom", length = 50, nullable = true)
+    private String firstName;
 }

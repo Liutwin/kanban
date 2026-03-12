@@ -1,8 +1,10 @@
 package com.services.impl;
 
+import com.dtos.UserCreateDTO;
 import com.dtos.UserDTO;
+import com.dtos.UserPasswordDTO;
 import com.entities.User;
-import com.mappers.UtilisateurMapper;
+import com.mappers.UserMapper;
 import com.repositories.UserRepository;
 import com.services.UserService;
 import lombok.RequiredArgsConstructor;
@@ -14,14 +16,14 @@ import java.util.stream.Collectors;
 /**
  * Implémentation de {@link UserService}.
  * Orchestre les appels au {@link UserRepository}
- * et les conversions via le {@link UtilisateurMapper}.
+ * et les conversions via le {@link UserMapper}.
  */
 @Service
 @RequiredArgsConstructor
 public class UserServiceImpl implements UserService {
 
     private final UserRepository userRepository;
-    private final UtilisateurMapper userMapper;
+    private final UserMapper userMapper;
 
     /**
      * {@inheritDoc}
@@ -46,11 +48,11 @@ public class UserServiceImpl implements UserService {
 
     /** {@inheritDoc} */
     @Override
-    public UserDTO createUser(UserDTO dto) {
+    public UserDTO createUser(UserCreateDTO dto) {
         if (userRepository.existsByEmail(dto.getEmail())) {
             throw new RuntimeException("Email déjà utilisé : " + dto.getEmail());
         }
-        User user = userMapper.toEntity(dto);
+        User user = userMapper.toEntityFromCreate(dto);
         return userMapper.toDTO(userRepository.save(user));
     }
 
@@ -61,7 +63,21 @@ public class UserServiceImpl implements UserService {
                 .orElseThrow(() -> new RuntimeException("Utilisateur introuvable : " + id));
         user.setEmail(dto.getEmail());
         user.setPseudo(dto.getPseudo());
+        user.setLastName(dto.getLastName());
+        user.setFirstName(dto.getFirstName());
         return userMapper.toDTO(userRepository.save(user));
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public void changePassword(Long id, UserPasswordDTO dto) {
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Utilisateur introuvable : " + id));
+        if (!user.getPassword().equals(dto.getOldPassword())) {
+            throw new RuntimeException("Ancien mot de passe incorrect");
+        }
+        user.setPassword(dto.getNewPassword());
+        userRepository.save(user);
     }
 
     /** {@inheritDoc} */
