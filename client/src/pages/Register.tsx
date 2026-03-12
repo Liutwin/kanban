@@ -2,13 +2,14 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import { ROUTES_API } from "../config/api";
-import { extractErrorMessage } from "../utils/apiHelpers";
 import "../styles/auth.css";
 
 export default function Register() {
   const { login } = useAuth();
   const navigate  = useNavigate();
 
+  const [prenom, setPrenom]   = useState("");
+  const [nom, setNom]         = useState("");
   const [pseudo, setPseudo]   = useState("");
   const [mail, setMail]       = useState("");
   const [mdp, setMdp]         = useState("");
@@ -19,20 +20,47 @@ export default function Register() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
-    if (!pseudo || !mail || !mdp || !mdp2) { setError("Tous les champs sont requis."); return; }
-    if (mdp !== mdp2) { setError("Les mots de passe ne correspondent pas."); return; }
-    if (mdp.length < 8) { setError("Le mot de passe doit comporter au moins 8 caractères."); return; }
+
+    if (!prenom || !nom || !pseudo || !mail || !mdp || !mdp2) {
+      setError("Tous les champs sont requis.");
+      return;
+    }
+    if (mdp !== mdp2) {
+      setError("Les mots de passe ne correspondent pas.");
+      return;
+    }
+    if (mdp.length < 8) {
+      setError("Le mot de passe doit comporter au moins 8 caractères.");
+      return;
+    }
+
     setLoading(true);
     try {
       const res = await fetch(ROUTES_API.users, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ pseudo: pseudo, email: mail, password: mdp }),
+        body: JSON.stringify({ prenom, nom, pseudo, email: mail, password: mdp }),
       });
+
       if (!res.ok) {
-        const msg = await extractErrorMessage(res, "Erreur lors de la création du compte.");
+        // Tente de lire le message d'erreur retourné par Spring
+        let msg = "Erreur lors de la création du compte.";
+        try {
+          const contentType = res.headers.get("content-type") ?? "";
+          if (contentType.includes("application/json")) {
+            const body = await res.json();
+            // Spring renvoie souvent { message: "..." } ou { error: "..." }
+            msg = body?.message ?? body?.error ?? body?.detail ?? JSON.stringify(body);
+          } else {
+            const text = await res.text();
+            if (text) msg = text;
+          }
+        } catch {
+          // garde le message par défaut
+        }
         throw new Error(msg);
       }
+
       const json = await res.json();
       login(json.data);
       navigate("/");
@@ -65,6 +93,33 @@ export default function Register() {
             </div>
           )}
 
+          <div className="form-row">
+            <div className="form-group">
+              <label className="form-label">Prénom</label>
+              <input
+                type="text"
+                className="form-input"
+                placeholder="Alice"
+                value={prenom}
+                onChange={e => setPrenom(e.target.value)}
+                maxLength={50}
+                autoFocus
+              />
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Nom</label>
+              <input
+                type="text"
+                className="form-input"
+                placeholder="Martin"
+                value={nom}
+                onChange={e => setNom(e.target.value)}
+                maxLength={50}
+              />
+            </div>
+          </div>
+
           <div className="form-group">
             <label className="form-label">Pseudo</label>
             <input
@@ -74,7 +129,6 @@ export default function Register() {
               value={pseudo}
               onChange={e => setPseudo(e.target.value)}
               maxLength={20}
-              autoFocus
             />
           </div>
 
