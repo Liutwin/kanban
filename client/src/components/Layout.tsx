@@ -4,6 +4,8 @@ import { useState, useEffect } from "react";
 import type { ReactNode } from "react";
 import "../styles/layout.css";
 
+import type { UserDTO } from "../model/interfaces.ts";
+
 /**
  * Props du composant Layout.
  */
@@ -12,18 +14,6 @@ interface LayoutProps {
   children: ReactNode;
   /** Titre affiché dans la barre supérieure. Si omis, aucun titre n'est affiché. */
   title?: string;
-}
-
-/**
- * Données complètes d'un utilisateur, telles que retournées par `GET /users/{id}`.
- */
-interface UserDTO {
-  id: number;
-  email: string;
-  pseudo: string;
-  lastName: string;
-  firstName: string;
-  avatarURL?: string;
 }
 
 /**
@@ -74,10 +64,19 @@ export default function Layout({ children, title }: LayoutProps) {
     authFetch(`/api/v1/users/${user.id}`)
       .then((res) => {
         if (!res.ok) throw new Error("Impossible de charger le profil utilisateur");
-        return res.json() as Promise<UserDTO>;
+        return res.json();
       })
-      .then(setUserDTO)
-      .catch(() => setUserDTO(null));
+      .then((json) => {
+        console.log("[Layout] réponse brute /users/:id →", json);
+        // Si Spring enveloppe dans { data: ... }, on extrait, sinon on prend json directement
+        const dto = (json?.data ?? json) as UserDTO;
+        console.log("[Layout] firstName:", dto.firstName, "lastName:", dto.lastName);
+        setUserDTO(dto);
+      })
+      .catch((err) => {
+        console.error("[Layout] erreur chargement profil →", err);
+        setUserDTO(null);
+      });
   }, [user?.id]);
 
   /**

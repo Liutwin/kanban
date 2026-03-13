@@ -44,3 +44,15 @@ export interface Log {
   tab_id?:          number;
   tab_nom?:         string;
 }
+
+/**
+ * Données complètes d'un utilisateur, telles que retournées par `GET /users/{id}`.
+ */
+export interface UserDTO {
+  id: number;
+  email: string;
+  pseudo: string;
+  lastName: string;
+  firstName: string;
+  avatarURL?: string;
+}

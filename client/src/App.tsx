@@ -12,10 +12,10 @@ export default function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/login" element={
-            <PublicRoute><Login /></PublicRoute>
+          <PublicRoute><Login /></PublicRoute>
         } />
         <Route path="/register" element={
-            <PublicRoute><Register /></PublicRoute>
+          <PublicRoute><Register /></PublicRoute>
         } />
         <Route path="/boards" element={
           <ProtectedRoute><Boards /></ProtectedRoute>

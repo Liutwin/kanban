@@ -1,22 +1,66 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import { ROUTES_API } from "../config/api";
 import "../styles/auth.css";
 
+/**
+ * Page d'inscription de l'application.
+ *
+ * Affiche un formulaire de création de compte demandant le prénom, le nom,
+ * le pseudo, l'adresse e-mail et le mot de passe (avec confirmation).
+ * Les validations suivantes sont effectuées côté client avant l'envoi :
+ * - tous les champs sont requis ;
+ * - les deux mots de passe doivent correspondre ;
+ * - le mot de passe doit comporter au moins 8 caractères.
+ *
+ * En cas de succès, le token JWT reçu est stocké via le contexte
+ * d'authentification et l'utilisateur est redirigé vers l'accueil.
+ *
+ * @returns La page d'inscription.
+ *
+ * @example
+ * ```tsx
+ * // Déclaration dans le routeur
+ * <Route path="/register" element={<Register />} />
+ * ```
+ */
 export default function Register() {
   const { login } = useAuth();
   const navigate  = useNavigate();
 
+  /** Prénom saisi par l'utilisateur (max 50 caractères). */
   const [prenom, setPrenom]   = useState("");
+  /** Nom de famille saisi par l'utilisateur (max 50 caractères). */
   const [nom, setNom]         = useState("");
+  /** Pseudo choisi par l'utilisateur (max 20 caractères). */
   const [pseudo, setPseudo]   = useState("");
+  /** Adresse e-mail saisie par l'utilisateur. */
   const [mail, setMail]       = useState("");
+  /** Mot de passe saisi par l'utilisateur. */
   const [mdp, setMdp]         = useState("");
+  /** Confirmation du mot de passe, doit être identique à {@link mdp}. */
   const [mdp2, setMdp2]       = useState("");
+  /** Message d'erreur à afficher dans le formulaire, vide si aucune erreur. */
   const [error, setError]     = useState("");
+  /** Indique si une requête de création de compte est en cours (désactive le bouton submit). */
   const [loading, setLoading] = useState(false);
 
+  /** Met à jour le titre de l'onglet du navigateur pour la page d'inscription. */
+  useEffect(() => {
+    document.title = "Kanban — Inscription";
+  }, []);
+
+  /**
+   * Soumet le formulaire d'inscription.
+   *
+   * Valide les champs côté client, puis envoie les données à l'API Spring
+   * (`POST /users`). En cas de succès, stocke le token JWT et redirige vers
+   * l'accueil. En cas d'échec, tente de lire le message d'erreur retourné
+   * par le serveur (JSON ou texte brut) et l'affiche dans le formulaire.
+   *
+   * @param e - L'événement de soumission du formulaire.
+   */
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
