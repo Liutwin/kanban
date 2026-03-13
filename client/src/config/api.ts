@@ -20,26 +20,26 @@ export const ROUTES_API = {
   user:         (id: number) => `${BASE}/users/${id}`,
 
   // ── Tableaux ──────────────────────────────────────────────────────────────
-  tableaux:     `${BASE}/tableaux`,
-  tableau:      (id: number) => `${BASE}/tableaux/${id}`,
-  tableauxUser: (id: number) => `${BASE}/tableaux/user/${id}`,
+  tableaux:     `${BASE}/boards`,
+  tableau:      (id: number) => `${BASE}/boards/${id}`,
+  tableauxUser: (id: number) => `${BASE}/boards/user/${id}`,
 
   // ── Colonnes ──────────────────────────────────────────────────────────────
-  colonnes:        (tabId: number)                   => `${BASE}/tableaux/${tabId}/colonnes`,
-  colonne:         (tabId: number, colId: number)    => `${BASE}/tableaux/${tabId}/colonnes/${colId}`,
-  colonneDeplacer: (tabId: number, colId: number)    => `${BASE}/tableaux/${tabId}/colonnes/${colId}/deplacer`,
+  colonnes:        (id: number)                   => `${BASE}/boards/${id}/columns`,
+  colonne:         (tabId: number, id: number)    => `${BASE}/boards/${tabId}/columns/${id}`,
+  colonneDeplacer: (tabId: number, id: number)    => `${BASE}/boards/${tabId}/columns/${id}/move`,
 
   // ── Tâches ────────────────────────────────────────────────────────────────
-  taches:            (colId: number)            => `${BASE}/taches/colonnes/${colId}`,
-  tachesPriorite:    (colId: number, p: string) => `${BASE}/taches/colonnes/${colId}/priorite/${p}`,
-  tachesAssignee:    (assigneeId: number)       => `${BASE}/taches/assignee/${assigneeId}`,
-  tache:             (id: number)               => `/${BASE}/taches/${id}`,
-  tacheDeplacer:     (id: number)               => `${BASE}/taches/${id}/deplacer`,
-  tacheAssigner:     (id: number)               => `${BASE}/taches/${id}/assigner`,
+  taches:            (id: number)                => `${BASE}/tasks/columns/${id}`,
+  tachesPriorite:    (colId: number, id: string) => `${BASE}/tasks/columns/${colId}/priority/${id}`,
+  tachesAssignee:    (id: number)                => `${BASE}/tasks/assigned/${id}`,
+  tache:             (id: number)                => `/${BASE}/tasks/${id}`,
+  tacheDeplacer:     (id: number)                => `${BASE}/tasks/${id}/move`,
+  tacheAssigner:     (id: number)                => `${BASE}/tasks/${id}/assign`,
 
   // ── Participations ────────────────────────────────────────────────────────
   participations:        `${BASE}/participations`,
-  participationsUser:    (userId: number)           => `${BASE}participations/user/${userId}`,
+  participationsUser:    (userId: number)           => `${BASE}/participations/user/${userId}`,
   participationsTableau: (tabId: number)            => `${BASE}/participations/tableau/${tabId}`,
   participation:         (uid: number, tid: number) => `${BASE}/participations/user/${uid}/tableau/${tid}`,
 } as const;
