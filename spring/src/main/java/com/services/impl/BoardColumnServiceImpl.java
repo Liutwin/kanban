@@ -26,8 +26,8 @@ public class BoardColumnServiceImpl implements BoardColumnService {
 
     /** {@inheritDoc} */
     @Override
-    public List<BoardColumnDTO> getColumnsByTableau(Long tableauId) {
-        return boardColumnRepository.findByBoardIdOrderByNumeroAsc(tableauId)
+    public List<BoardColumnDTO> getColumnsByTableau(Long boardId) {
+        return boardColumnRepository.findByBoardIdOrderByNumeroAsc(boardId)
                 .stream()
                 .map(boardColumnMapper::toDTO)
                 .collect(Collectors.toList());

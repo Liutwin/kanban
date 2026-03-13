@@ -52,13 +52,22 @@ public class BoardServiceImpl implements BoardService {
     public List<BoardDTO> getBoardsByUser(Long userId) {
         return boardRepository.findAllAccessibleByUser(userId)
                 .stream()
-                .map(boardMapper::toDTO)
+                .map(board -> {
+                    if (board.getCreator().getId().equals(userId)) {
+                        return boardMapper.toDTO(board, BoardMember.Role.ADMIN);
+                    }
+                    BoardMember.ParticipationId pid =
+                            new BoardMember.ParticipationId(userId, board.getId());
+                    BoardMember member = boardMemberRepository.findById(pid)
+                            .orElseThrow(() -> new RuntimeException("Participation introuvable"));
+                    return boardMapper.toDTO(board, member.getRole());
+                })
                 .collect(Collectors.toList());
     }
 
     /** {@inheritDoc} */
     @Override
-    public BoardDTO createTable(BoardDTO dto) {
+    public BoardDTO createBoard(BoardDTO dto) {
         if (!userRepository.existsById(dto.getCreatorId())) {
             throw new RuntimeException("Utilisateur introuvable : " + dto.getCreatorId());
         }

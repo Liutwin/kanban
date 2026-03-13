@@ -1,6 +1,7 @@
 package com.dtos;
 
 import com.entities.Task;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
@@ -19,6 +20,7 @@ public class TaskDTO {
     /**
      * Identifiant unique de la tâche.
      */
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
     private Long id;
 
     /**

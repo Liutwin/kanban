@@ -25,17 +25,17 @@ public interface BoardMemberRepository extends JpaRepository<BoardMember, BoardM
     /**
      * Récupère toutes les participations d'un tableau donné.
      *
-     * @param tableauId l'identifiant du tableau
+     * @param boardId l'identifiant du tableau
      * @return liste des participations correspondantes
      */
-    List<BoardMember> findByBoardId(Long tableauId);
+    List<BoardMember> findByBoardId(Long boardId);
 
     /**
      * Vérifie si un utilisateur participe déjà à un tableau donné.
      *
      * @param userId    l'identifiant de l'utilisateur
-     * @param tableauId l'identifiant du tableau
+     * @param boardId l'identifiant du tableau
      * @return {@code true} si la participation existe déjà
      */
-    boolean existsByUserIdAndBoardId(Long userId, Long tableauId);
+    boolean existsByUserIdAndBoardId(Long userId, Long boardId);
 }

@@ -13,7 +13,7 @@ import java.util.List;
 
 /**
  * Contrôleur REST exposant les endpoints de gestion des colonnes Kanban.
- * Préfixe de route : {@code /tableaux/{tableauId}/colonnes}
+ * Préfixe de route : {@code /boards/{id}/columns}
  */
 @RestController
 @RequestMapping("/boards/{boardId}/columns")

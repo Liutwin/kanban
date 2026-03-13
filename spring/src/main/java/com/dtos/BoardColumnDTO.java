@@ -1,6 +1,7 @@
 package com.dtos;
 
 import com.entities.BoardColumn;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
@@ -17,6 +18,7 @@ public class BoardColumnDTO {
     /**
      * Identifiant unique de la colonne.
      */
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
     private Long id;
 
     /**

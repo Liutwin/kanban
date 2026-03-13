@@ -70,7 +70,7 @@ public class BoardController {
     @PostMapping
     public ResponseEntity<BoardDTO> createBoard(@RequestBody BoardDTO dto) {
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(boardService.createTable(dto));
+                .body(boardService.createBoard(dto));
     }
 
     /**
@@ -113,7 +113,7 @@ public class BoardController {
 
     /**
      * Ajoute un membre à un tableau.
-     * Le {@code boardId} de l'URL fait foi ; le champ {@code tableauId} du corps
+     * Le {@code boardId} de l'URL fait foi ; le champ {@code boardId} du corps
      * est ignoré et écrasé par la valeur de l'URL.
      *
      * @param id  l'identifiant du tableau

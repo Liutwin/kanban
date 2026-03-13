@@ -1,6 +1,7 @@
 package com.dtos;
 
 import com.entities.File;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Data;
 
 /**
@@ -16,6 +17,7 @@ public class FileDTO {
     /**
      * Identifiant unique du document (ObjectId MongoDB sérialisé en String).
      */
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
     private String id;
 
     /**

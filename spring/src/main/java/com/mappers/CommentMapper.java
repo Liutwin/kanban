@@ -36,7 +36,6 @@ public class CommentMapper {
      */
     public Comment toEntity(CommentDTO dto) {
         Comment comment = new Comment();
-        comment.setId(dto.getId());
         comment.setContent(dto.getContent());
         comment.setDate(dto.getDate());
         comment.setTskId(dto.getTskId());

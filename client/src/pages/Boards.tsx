@@ -75,7 +75,7 @@ export default function Boards() {
     try {
       const res = await authFetch(ROUTES_API.boards, {
         method: "POST",
-        body:   JSON.stringify({ name: newName.trim() }),
+        body:   JSON.stringify({ name: newName.trim(), creatorId: user!.id }),
       });
       if (!res.ok) {
         const json = await res.json().catch(() => null);
@@ -91,6 +91,25 @@ export default function Boards() {
     }
   };
 
+  /**
+   * Supprime un tableau après confirmation.
+   * Réservé aux membres ayant le rôle ADMIN.
+   *
+   * @param e       - Événement du clic (stopPropagation pour ne pas naviguer vers le board).
+   * @param boardId - Identifiant du tableau à supprimer.
+   */
+  const handleDelete = async (e: React.MouseEvent, boardId: number) => {
+    e.stopPropagation();
+    if (!confirm("Supprimer ce tableau ? Cette action est irréversible.")) return;
+    try {
+      const res = await authFetch(ROUTES_API.board(boardId), { method: "DELETE" });
+      if (!res.ok) throw new Error(`Erreur serveur (${res.status}).`);
+      fetchBoards();
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Erreur lors de la suppression.");
+    }
+  };
+
   /** Retourne le libellé français du rôle. */
   const roleLabel = (role: Role) =>
     role === "ADMIN" ? "Admin" : role === "EDITEUR" ? "Éditeur" : "Lecteur";
@@ -103,9 +122,7 @@ export default function Boards() {
     <Layout title="Mes tableaux">
       <div className="boards-page">
         <div className="boards-toolbar">
-          <p className="boards-count">
-            {boards.length} board{boards.length !== 1 ? "x" : ""}
-          </p>
+          <h2 className="boards-title">Mes tableaux</h2>
           <button className="btn btn-primary" onClick={() => setShowModal(true)}>
             + Nouveau tableau
           </button>
@@ -146,6 +163,16 @@ export default function Boards() {
                   <span className={`role-badge ${roleClass(board.role)}`}>
                     {roleLabel(board.role)}
                   </span>
+                  {board.role === "ADMIN" && (
+                    <button
+                      className="board-delete-btn"
+                      onClick={e => handleDelete(e, board.id)}
+                      title="Supprimer le tableau"
+                      aria-label="Supprimer le tableau"
+                    >
+                      ✕
+                    </button>
+                  )}
                 </div>
                 <h2 className="board-name">{board.name}</h2>
                 <div className="board-arrow">→</div>

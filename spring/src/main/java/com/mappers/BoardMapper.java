@@ -2,6 +2,7 @@ package com.mappers;
 
 import com.dtos.BoardDTO;
 import com.entities.Board;
+import com.entities.BoardMember;
 import com.entities.User;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -20,12 +21,17 @@ public class BoardMapper {
      * @param board l'entité à convertir
      * @return le DTO correspondant
      */
-    public BoardDTO toDTO(Board board) {
+    public BoardDTO toDTO(Board board, BoardMember.Role role) {
         return new BoardDTO(
                 board.getId(),
                 board.getName(),
-                board.getCreator().getId()
+                board.getCreator().getId(),
+                role
         );
+    }
+
+    public BoardDTO toDTO(Board board) {
+        return toDTO(board, null);
     }
 
     /**
@@ -38,11 +44,10 @@ public class BoardMapper {
      */
     public Board toEntity(BoardDTO dto) {
         Board board = new Board();
-        board.setId(dto.getId());
         board.setName(dto.getName());
-        User createur = new User();
-        createur.setId(dto.getCreatorId());
-        board.setCreator(createur);
+        User creator= new User();
+        creator.setId(dto.getCreatorId());
+        board.setCreator(creator);
         return board;
     }
 }

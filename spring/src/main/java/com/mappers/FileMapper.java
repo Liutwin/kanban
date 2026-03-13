@@ -40,7 +40,6 @@ public class FileMapper {
      */
     public File toEntity(FileDTO dto) {
         File file = new File();
-        file.setId(dto.getId());
         file.setName(dto.getName());
         file.setType(dto.getType());
         file.setWay(dto.getWay());

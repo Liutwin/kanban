@@ -22,7 +22,7 @@ public class BoardMemberMapper {
     public BoardMemberDTO toDTO(BoardMember boardMember) {
         return new BoardMemberDTO(
                 boardMember.getId().getUserId(),
-                boardMember.getId().getTableauId(),
+                boardMember.getId().getBoardId(),
                 boardMember.getRole()
         );
     }

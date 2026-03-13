@@ -1,6 +1,7 @@
 package com.dtos;
 
 import com.entities.Comment;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Data;
 import java.time.Instant;
 
@@ -17,6 +18,7 @@ public class CommentDTO {
     /**
      * Identifiant unique du commentaire (ObjectId MongoDB sérialisé en String).
      */
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
     private String id;
 
     /**

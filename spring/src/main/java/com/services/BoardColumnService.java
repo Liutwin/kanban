@@ -12,10 +12,10 @@ public interface BoardColumnService {
     /**
      * Récupère toutes les colonnes d'un tableau, triées par numéro.
      *
-     * @param tableauId l'identifiant du tableau
+     * @param boardId l'identifiant du tableau
      * @return liste de {@link BoardColumnDTO} ordonnée
      */
-    List<BoardColumnDTO> getColumnsByTableau(Long tableauId);
+    List<BoardColumnDTO> getColumnsByTableau(Long boardId);
 
     /**
      * Récupère une colonne par son identifiant.

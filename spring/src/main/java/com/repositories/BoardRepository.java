@@ -25,7 +25,7 @@ public interface BoardRepository extends JpaRepository<Board, Long> {
      */
     @Query("""
         SELECT DISTINCT b FROM Board b
-        LEFT JOIN BoardMember bm ON bm.board = b AND bm.user.id = :userId
+        LEFT JOIN BoardMember bm ON bm.board.id = b.id
         WHERE b.creator.id = :userId OR bm.user.id = :userId
     """)
     List<Board> findAllAccessibleByUser(@Param("userId") Long userId);

@@ -43,7 +43,7 @@ public interface BoardService {
      * @return le {@link BoardDTO} créé avec son ID généré
      * @throws RuntimeException si l'utilisateur créateur n'existe pas
      */
-    BoardDTO createTable(BoardDTO dto);
+    BoardDTO createBoard(BoardDTO dto);
 
     /**
      * Met à jour un tableau existant.

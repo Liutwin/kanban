@@ -1,6 +1,8 @@
 package com.dtos;
 
 import com.entities.Board;
+import com.entities.BoardMember;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
@@ -17,6 +19,7 @@ public class BoardDTO {
     /**
      * Identifiant unique du tableau.
      */
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
     private Long id;
 
     /**
@@ -28,4 +31,10 @@ public class BoardDTO {
      * Identifiant de l'utilisateur créateur.
      */
     private Long creatorId;
+
+    /**
+     * Rôle de l'utilisateur.
+     */
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
+    private BoardMember.Role role;
 }

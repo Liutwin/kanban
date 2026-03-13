@@ -30,7 +30,7 @@ public class BoardMember {
     public static class ParticipationId implements Serializable {
 
         private Long userId;
-        private Long tableauId;
+        private Long boardId;
     }
 
     /**
@@ -50,10 +50,10 @@ public class BoardMember {
 
     /**
      * Tableau auquel l'utilisateur participe.
-     * La FK {@code tab_id} est mappée sur {@code id.tableauId}.
+     * La FK {@code tab_id} est mappée sur {@code id.boardId}.
      */
     @ManyToOne
-    @MapsId("tableauId")
+    @MapsId("boardId")
     @JoinColumn(name = "tab_id")
     private Board board;
 
@@ -61,7 +61,7 @@ public class BoardMember {
      * Rôle de l'utilisateur dans le tableau (ex: ADMIN, MEMBRE).
      */
     @Column(name = "ptp_role", nullable = false)
-    @Enumerated(EnumType.STRING)
+    @Convert(converter = BoardMember.RoleConverter.class)
     private Role role = Role.LECTEUR;
 
     /**
@@ -81,5 +81,23 @@ public class BoardMember {
 
         @Override
         public String toString() { return value; }
+    }
+
+    @Converter(autoApply = true)
+    public static class RoleConverter implements AttributeConverter<Role, String> {
+
+        @Override
+        public String convertToDatabaseColumn(Role role) {
+            return role == null ? null : role.toString();
+        }
+
+        @Override
+        public Role convertToEntityAttribute(String value) {
+            if (value == null) return null;
+            for (Role role : Role.values()) {
+                if (role.toString().equals(value)) return role;
+            }
+            throw new IllegalArgumentException("Rôle inconnu : " + value);
+        }
     }
 }
