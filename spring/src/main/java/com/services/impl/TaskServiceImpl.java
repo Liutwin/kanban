@@ -6,6 +6,7 @@ import com.entities.Task;
 import com.entities.User;
 import com.mappers.TaskMapper;
 import com.repositories.BoardColumnRepository;
+import com.repositories.CommentRepository;
 import com.repositories.TaskRepository;
 import com.repositories.UserRepository;
 import com.services.TaskService;
@@ -25,6 +26,7 @@ public class TaskServiceImpl implements TaskService {
 
     private final TaskRepository taskRepository;
     private final BoardColumnRepository boardColumnRepository;
+    private final CommentRepository commentRepository;
     private final UserRepository userRepository;
     private final TaskMapper taskMapper;
 
@@ -119,6 +121,7 @@ public class TaskServiceImpl implements TaskService {
         if (!taskRepository.existsById(id)) {
             throw new RuntimeException("Tâche introuvable : " + id);
         }
+        commentRepository.deleteByTskId(id);
         taskRepository.deleteById(id);
     }
 }
