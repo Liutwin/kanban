@@ -2,6 +2,8 @@ package com.repositories;
 
 import com.entities.Board;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -15,10 +17,16 @@ import java.util.List;
 public interface BoardRepository extends JpaRepository<Board, Long> {
 
     /**
-     * Récupère tous les tableaux créés par un utilisateur donné.
+     * Récupère tous les tableaux accessibles par un utilisateur :
+     * ceux qu'il a créés OU ceux dont il est membre via participation_ptp.
      *
-     * @param creatorId l'identifiant de l'utilisateur créateur
+     * @param userId l'identifiant de l'utilisateur
      * @return liste des tableaux correspondants
      */
-    List<Board> findByCreatorId(Long creatorId);
+    @Query("""
+        SELECT DISTINCT b FROM Board b
+        LEFT JOIN BoardMember bm ON bm.board = b AND bm.user.id = :userId
+        WHERE b.creator.id = :userId OR bm.user.id = :userId
+    """)
+    List<Board> findAllAccessibleByUser(@Param("userId") Long userId);
 }

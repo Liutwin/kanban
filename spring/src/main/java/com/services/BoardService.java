@@ -31,10 +31,10 @@ public interface BoardService {
     /**
      * Récupère tous les tableaux créés par un utilisateur donné.
      *
-     * @param createurId l'identifiant de l'utilisateur créateur
+     * @param userId l'identifiant de l'utilisateur
      * @return liste de {@link BoardDTO}
      */
-    List<BoardDTO> getBoardsByCreator(Long createurId);
+    List<BoardDTO> getBoardsByUser(Long userId);
 
     /**
      * Crée un nouveau tableau.

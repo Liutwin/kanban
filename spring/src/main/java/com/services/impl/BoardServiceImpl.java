@@ -49,8 +49,8 @@ public class BoardServiceImpl implements BoardService {
 
     /** {@inheritDoc} */
     @Override
-    public List<BoardDTO> getBoardsByCreator(Long createurId) {
-        return boardRepository.findByCreatorId(createurId)
+    public List<BoardDTO> getBoardsByUser(Long userId) {
+        return boardRepository.findAllAccessibleByUser(userId)
                 .stream()
                 .map(boardMapper::toDTO)
                 .collect(Collectors.toList());

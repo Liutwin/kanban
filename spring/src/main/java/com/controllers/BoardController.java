@@ -56,8 +56,8 @@ public class BoardController {
      */
     @Operation(summary = "Lister les tableaux d'un utilisateur")
     @GetMapping("/user/{id}")
-    public ResponseEntity<List<BoardDTO>> getBoardsByCreator(@PathVariable Long id) {
-        return ResponseEntity.ok(boardService.getBoardsByCreator(id));
+    public ResponseEntity<List<BoardDTO>> getBoardsByUser(@PathVariable Long id) {
+        return ResponseEntity.ok(boardService.getBoardsByUser(id));
     }
 
     /**
