@@ -1,5 +1,5 @@
 /deno/.env
-spring/build/tmp/compileJava/compileTransaction/stash-dir/UtilisateurServiceImpl.class.uniqueId21
+spring/src/main/ressources/application-local.properties
 spring/.gradle/8.12.1/checksums/checksums.lock
 spring/.gradle/8.12.1/checksums/md5-checksums.bin
 spring/.gradle/8.12.1/checksums/sha1-checksums.bin
@@ -65,6 +65,7 @@ spring/build/classes/java/main/com/services/impl/TacheServiceImpl.class
 spring/build/classes/java/main/com/services/impl/UtilisateurServiceImpl.class
 spring/build/reports/problems/problems-report.html
 spring/build/resources/main/application.properties
+spring/build/resources/main/application-local.properties
 spring/build/tmp/compileJava/previous-compilation-data.bin
 spring/build/tmp/compileJava/compileTransaction/stash-dir/Colonne.class.uniqueId7
 spring/build/tmp/compileJava/compileTransaction/stash-dir/ColonneMapper.class.uniqueId12
@@ -95,7 +96,7 @@ spring/build/tmp/compileJava/compileTransaction/stash-dir/TacheServiceImpl.class
 spring/build/tmp/compileJava/compileTransaction/stash-dir/Utilisateur.class.uniqueId23
 spring/build/tmp/compileJava/compileTransaction/stash-dir/UtilisateurMapper.class.uniqueId16
 spring/build/tmp/compileJava/compileTransaction/stash-dir/UtilisateurRepository.class.uniqueId6
-spring/src/main/ressources/application-local.properties
+spring/build/tmp/compileJava/compileTransaction/stash-dir/UtilisateurServiceImpl.class.uniqueId21
 .idea/kanban-project.iml
 .idea/misc.xml
 .idea/modules.xml
