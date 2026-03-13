@@ -23,7 +23,7 @@ public interface BoardService {
      * @return le {@link BoardDTO} correspondant
      * @throws RuntimeException si le tableau n'est pas trouvé
      */
-    BoardDTO getTableById(Long id);
+    BoardDTO getBoardById(Long id);
 
     /**
      * Récupère tous les tableaux créés par un utilisateur donné.
@@ -31,7 +31,7 @@ public interface BoardService {
      * @param createurId l'identifiant de l'utilisateur créateur
      * @return liste de {@link BoardDTO}
      */
-    List<BoardDTO> getTablesByCreator(Long createurId);
+    List<BoardDTO> getBoardsByCreator(Long createurId);
 
     /**
      * Crée un nouveau tableau.

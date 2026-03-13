@@ -35,7 +35,7 @@ public class BoardServiceImpl implements BoardService {
 
     /** {@inheritDoc} */
     @Override
-    public BoardDTO getTableById(Long id) {
+    public BoardDTO getBoardById(Long id) {
         Board board = boardRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Tableau introuvable : " + id));
         return boardMapper.toDTO(board);
@@ -43,7 +43,7 @@ public class BoardServiceImpl implements BoardService {
 
     /** {@inheritDoc} */
     @Override
-    public List<BoardDTO> getTablesByCreator(Long createurId) {
+    public List<BoardDTO> getBoardsByCreator(Long createurId) {
         return boardRepository.findByCreatorId(createurId)
                 .stream()
                 .map(boardMapper::toDTO)

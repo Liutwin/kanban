@@ -1,7 +1,7 @@
 package com.controllers;
 
 import com.dtos.BoardColumnDTO;
-import com.services.ColonneService;
+import com.services.BoardColumnService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -21,47 +21,47 @@ import java.util.List;
 @Tag(name = "Colonnes", description = "Gestion des colonnes d'un tableau Kanban")
 public class BoardColumnController {
 
-    private final ColonneService colonneService;
+    private final BoardColumnService boardColumnService;
 
     /**
      * Récupère toutes les colonnes d'un tableau, triées par numéro.
      *
-     * @param tableauId l'identifiant du tableau
+     * @param boardId l'identifiant du tableau
      * @return liste de {@link BoardColumnDTO} avec statut HTTP 200
      */
     @Operation(summary = "Lister les colonnes d'un tableau")
     @GetMapping
-    public ResponseEntity<List<BoardColumnDTO>> getColumns(@PathVariable Long tableauId) {
-        return ResponseEntity.ok(colonneService.getColumnsByTableau(tableauId));
+    public ResponseEntity<List<BoardColumnDTO>> getColumns(@PathVariable Long boardId) {
+        return ResponseEntity.ok(boardColumnService.getColumnsByTableau(boardId));
     }
 
     /**
      * Récupère une colonne par son identifiant.
      *
-     * @param columnId l'identifiant de la colonne
+     * @param id l'identifiant de la colonne
      * @return le {@link BoardColumnDTO} avec statut HTTP 200
      */
     @Operation(summary = "Récupérer une colonne par ID")
-    @GetMapping("/{columnId}")
+    @GetMapping("/{id}")
     public ResponseEntity<BoardColumnDTO> getColumn(@PathVariable Long boardId,
-                                                    @PathVariable Long columnId) {
-        return ResponseEntity.ok(colonneService.getColumnById(columnId));
+                                                    @PathVariable Long id) {
+        return ResponseEntity.ok(boardColumnService.getColumnById(id));
     }
 
     /**
      * Crée une nouvelle colonne dans un tableau.
      *
-     * @param tableauId l'identifiant du tableau
+     * @param boardId l'identifiant du tableau
      * @param dto       les données de la nouvelle colonne
      * @return le {@link BoardColumnDTO} créé avec statut HTTP 201
      */
     @Operation(summary = "Créer une colonne")
     @PostMapping
-    public ResponseEntity<BoardColumnDTO> createColonne(@PathVariable Long tableauId,
-                                                        @RequestBody BoardColumnDTO dto) {
-        dto.setTableauId(tableauId);
+    public ResponseEntity<BoardColumnDTO> createColumn(@PathVariable Long boardId,
+                                                       @RequestBody BoardColumnDTO dto) {
+        dto.setTableauId(boardId);
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(colonneService.createColumn(dto));
+                .body(boardColumnService.createColumn(dto));
     }
 
     /**
@@ -73,10 +73,10 @@ public class BoardColumnController {
      */
     @Operation(summary = "Renommer une colonne")
     @PutMapping("/{id}")
-    public ResponseEntity<BoardColumnDTO> updateColonne(@PathVariable Long tableauId,
+    public ResponseEntity<BoardColumnDTO> updateColonne(@PathVariable Long boardId,
                                                         @PathVariable Long id,
                                                         @RequestBody BoardColumnDTO dto) {
-        return ResponseEntity.ok(colonneService.updateColumn(id, dto));
+        return ResponseEntity.ok(boardColumnService.updateColumn(id, dto));
     }
 
     /**
@@ -87,11 +87,11 @@ public class BoardColumnController {
      * @return statut HTTP 204 sans contenu
      */
     @Operation(summary = "Déplacer une colonne")
-    @PatchMapping("/{id}/deplacer")
-    public ResponseEntity<Void> deplacerColonne(@PathVariable Long tableauId,
+    @PatchMapping("/{id}/move")
+    public ResponseEntity<Void> deplacerColonne(@PathVariable Long boardd,
                                                 @PathVariable Long id,
                                                 @RequestParam int newNum) {
-        colonneService.moveColumn(id, newNum);
+        boardColumnService.moveColumn(id, newNum);
         return ResponseEntity.noContent().build();
     }
 
@@ -103,9 +103,9 @@ public class BoardColumnController {
      */
     @Operation(summary = "Supprimer une colonne")
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> deleteColonne(@PathVariable Long tableauId,
+    public ResponseEntity<Void> deleteColonne(@PathVariable Long boardId,
                                               @PathVariable Long id) {
-        colonneService.deleteColumn(id);
+        boardColumnService.deleteColumn(id);
         return ResponseEntity.noContent().build();
     }
 }

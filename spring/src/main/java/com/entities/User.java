@@ -47,18 +47,18 @@ public class User {
     /**
      * Nom de famille de l'utilisateur (optionnel).
      */
-    @Column(name = "usr_nom", length = 50, nullable = true)
+    @Column(name = "usr_nom", nullable = false, length = 50)
     private String lastName;
 
     /**
      * Prénom de l'utilisateur (optionnel).
      */
-    @Column(name = "usr_prenom", length = 50, nullable = true)
+    @Column(name = "usr_prenom", nullable = false, length = 50)
     private String firstName;
 
     /**
      * URL de l'avatar de l'utilisateur (optionnel).
      */
-    @Column(name = "usr_avatar", length = 255, nullable = true)
+    @Column(name = "usr_avatar", nullable = true, length = 255)
     private String avatarURL;
 }

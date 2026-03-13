@@ -30,7 +30,7 @@ public class BoardController {
      */
     @Operation(summary = "Lister tous les tableaux")
     @GetMapping
-    public ResponseEntity<List<BoardDTO>> getAllTableaux() {
+    public ResponseEntity<List<BoardDTO>> getAllBoards() {
         return ResponseEntity.ok(boardService.getAllTables());
     }
 
@@ -42,20 +42,20 @@ public class BoardController {
      */
     @Operation(summary = "Récupérer un tableau par ID")
     @GetMapping("/{id}")
-    public ResponseEntity<BoardDTO> getTableauById(@PathVariable Long id) {
-        return ResponseEntity.ok(boardService.getTableById(id));
+    public ResponseEntity<BoardDTO> getBoardById(@PathVariable Long id) {
+        return ResponseEntity.ok(boardService.getBoardById(id));
     }
 
     /**
      * Récupère tous les tableaux d'un utilisateur donné.
      *
-     * @param createurId l'identifiant de l'utilisateur créateur
+     * @param id l'identifiant de l'utilisateur créateur
      * @return liste de {@link BoardDTO} avec statut HTTP 200
      */
     @Operation(summary = "Lister les tableaux d'un utilisateur")
-    @GetMapping("/user/{createurId}")
-    public ResponseEntity<List<BoardDTO>> getTableauxByCreateur(@PathVariable Long createurId) {
-        return ResponseEntity.ok(boardService.getTablesByCreator(createurId));
+    @GetMapping("/user/{id}")
+    public ResponseEntity<List<BoardDTO>> getBoardsByCreator(@PathVariable Long id) {
+        return ResponseEntity.ok(boardService.getBoardsByCreator(id));
     }
 
     /**
@@ -66,7 +66,7 @@ public class BoardController {
      */
     @Operation(summary = "Créer un tableau")
     @PostMapping
-    public ResponseEntity<BoardDTO> createTableau(@RequestBody BoardDTO dto) {
+    public ResponseEntity<BoardDTO> createBoard(@RequestBody BoardDTO dto) {
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(boardService.createTable(dto));
     }
@@ -80,7 +80,7 @@ public class BoardController {
      */
     @Operation(summary = "Mettre à jour un tableau")
     @PutMapping("/{id}")
-    public ResponseEntity<BoardDTO> updateTableau(@PathVariable Long id, @RequestBody BoardDTO dto) {
+    public ResponseEntity<BoardDTO> updateBoard(@PathVariable Long id, @RequestBody BoardDTO dto) {
         return ResponseEntity.ok(boardService.updateTable(id, dto));
     }
 
@@ -92,7 +92,7 @@ public class BoardController {
      */
     @Operation(summary = "Supprimer un tableau")
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> deleteTableau(@PathVariable Long id) {
+    public ResponseEntity<Void> deleteBoard(@PathVariable Long id) {
         boardService.deleteTable(id);
         return ResponseEntity.noContent().build();
     }

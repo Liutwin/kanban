@@ -7,7 +7,7 @@ import java.util.List;
  * Interface du service métier pour la gestion des colonnes Kanban.
  * Définit le contrat des opérations CRUD et de permutation des colonnes.
  */
-public interface ColonneService {
+public interface BoardColumnService {
 
     /**
      * Récupère toutes les colonnes d'un tableau, triées par numéro.

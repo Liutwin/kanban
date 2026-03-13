@@ -109,7 +109,7 @@ public class TaskController {
      * @return le {@link TaskDTO} mis à jour avec statut HTTP 200
      */
     @Operation(summary = "Déplacer une tâche vers une autre colonne")
-    @PatchMapping("/{id}/deplacer")
+    @PatchMapping("/{id}/move")
     public ResponseEntity<TaskDTO> moveTask(@PathVariable Long id,
                                             @RequestParam Long newId) {
         return ResponseEntity.ok(taskService.moveTask(id, newId));
@@ -123,7 +123,7 @@ public class TaskController {
      * @return le {@link TaskDTO} mis à jour avec statut HTTP 200
      */
     @Operation(summary = "Assigner une tâche à un utilisateur")
-    @PatchMapping("/{id}/assigner")
+    @PatchMapping("/{id}/assign")
     public ResponseEntity<TaskDTO> assignTask(@PathVariable Long id,
                                               @RequestParam(required = false) Long userId) {
         return ResponseEntity.ok(taskService.assignTask(id, userId));

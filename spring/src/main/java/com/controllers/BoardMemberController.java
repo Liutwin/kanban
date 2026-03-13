@@ -39,13 +39,13 @@ public class BoardMemberController {
     /**
      * Récupère tous les membres d'un tableau.
      *
-     * @param tableauId l'identifiant du tableau
+     * @param id l'identifiant du tableau
      * @return liste de {@link BoardMemberDTO} avec statut HTTP 200
      */
     @Operation(summary = "Lister les membres d'un tableau")
     @GetMapping("/tableau/{tableauId}")
-    public ResponseEntity<List<BoardMemberDTO>> getByTableau(@PathVariable Long tableauId) {
-        return ResponseEntity.ok(boardMemberService.getParticipationsByTableau(tableauId));
+    public ResponseEntity<List<BoardMemberDTO>> getByBoard(@PathVariable Long id) {
+        return ResponseEntity.ok(boardMemberService.getParticipationsByTableau(id));
     }
 
     /**
@@ -65,32 +65,32 @@ public class BoardMemberController {
      * Met à jour le rôle d'un membre dans un tableau.
      *
      * @param userId    l'identifiant de l'utilisateur
-     * @param tableauId l'identifiant du tableau
+     * @param boardId l'identifiant du tableau
      * @param role      le nouveau rôle
      * @return le {@link BoardMemberDTO} mis à jour avec statut HTTP 200
      */
     @Operation(summary = "Mettre à jour le rôle d'un membre")
-    @PutMapping("/user/{userId}/tableau/{tableauId}")
+    @PutMapping("/user/{userId}/tableau/{id}")
     public ResponseEntity<BoardMemberDTO> updateRole(
             @PathVariable Long userId,
-            @PathVariable Long tableauId,
+            @PathVariable Long boardId,
             @RequestParam BoardMember.Role role) {
-        return ResponseEntity.ok(boardMemberService.updateRole(userId, tableauId, role));
+        return ResponseEntity.ok(boardMemberService.updateRole(userId, boardId, role));
     }
 
     /**
      * Retire un membre d'un tableau.
      *
      * @param userId    l'identifiant de l'utilisateur
-     * @param tableauId l'identifiant du tableau
+     * @param boardId l'identifiant du tableau
      * @return statut HTTP 204 sans contenu
      */
     @Operation(summary = "Retirer un membre d'un tableau")
-    @DeleteMapping("/user/{userId}/tableau/{tableauId}")
+    @DeleteMapping("/user/{userId}/tableau/{id}")
     public ResponseEntity<Void> removeParticipation(
             @PathVariable Long userId,
-            @PathVariable Long tableauId) {
-        boardMemberService.removeParticipation(userId, tableauId);
+            @PathVariable Long boardId) {
+        boardMemberService.removeParticipation(userId, boardId);
         return ResponseEntity.noContent().build();
     }
 }

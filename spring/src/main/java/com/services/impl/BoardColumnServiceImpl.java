@@ -5,7 +5,7 @@ import com.entities.BoardColumn;
 import com.mappers.BoardColumnMapper;
 import com.repositories.BoardColumnRepository;
 import com.repositories.BoardRepository;
-import com.services.ColonneService;
+import com.services.BoardColumnService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -13,12 +13,12 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 /**
- * Implémentation de {@link ColonneService}.
+ * Implémentation de {@link BoardColumnService}.
  * Orchestre les appels au repository et les conversions via le mapper.
  */
 @Service
 @RequiredArgsConstructor
-public class BoardColumnServiceImpl implements ColonneService {
+public class BoardColumnServiceImpl implements BoardColumnService {
 
     private final BoardColumnRepository boardColumnRepository;
     private final BoardRepository boardRepository;
