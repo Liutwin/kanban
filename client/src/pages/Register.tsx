@@ -65,18 +65,24 @@ export default function Register() {
     e.preventDefault();
     setError("");
 
-    if (!prenom || !nom || !pseudo || !mail || !mdp || !mdp2) {
-      setError("Tous les champs sont requis.");
-      return;
-    }
-    if (mdp !== mdp2) {
-      setError("Les mots de passe ne correspondent pas.");
-      return;
-    }
-    if (mdp.length < 8) {
-      setError("Le mot de passe doit comporter au moins 8 caractères.");
-      return;
-    }
+    const validate = (): string | null => {
+      if (!prenom || !nom || !pseudo || !mail || !mdp || !mdp2)
+        return "Tous les champs sont requis.";
+      if (pseudo.length < 3 || pseudo.length > 20)
+        return "Le pseudo doit faire entre 3 et 20 caractères.";
+      if (!/^[a-zA-Z0-9_-]+$/.test(pseudo))
+        return "Le pseudo ne peut contenir que des lettres, chiffres, _ et -.";
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(mail))
+        return "Adresse e-mail invalide.";
+      if (mdp !== mdp2)
+        return "Les mots de passe ne correspondent pas.";
+      if (mdp.length < 8)
+        return "Le mot de passe doit comporter au moins 8 caractères.";
+      return null;
+    };
+
+    const validationError = validate();
+    if (validationError) { setError(validationError); return; }
 
     setLoading(true);
     try {

@@ -148,7 +148,6 @@ export default function Layout({ children, title }: LayoutProps) {
             <div className="user-details">
               {/* Nom et prénom récupérés via l'API, avec repli sur le pseudo */}
               <span className="user-pseudo">{fullName}</span>
-              <span className="user-mail">{user?.email ?? "—"}</span>
             </div>
           </div>
 
