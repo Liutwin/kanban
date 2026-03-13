@@ -16,7 +16,7 @@ public interface FileService {
      * @param tskId l'identifiant de la tâche (référence MariaDB)
      * @return liste de {@link FileDTO}
      */
-    List<FileDTO> getFilesByTache(Long tskId);
+    List<FileDTO> getFilesByTask(Long tskId);
 
     /**
      * Récupère toutes les pièces jointes liées à un commentaire.

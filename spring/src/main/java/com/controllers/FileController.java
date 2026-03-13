@@ -17,7 +17,7 @@ import java.util.List;
  * Les documents sont stockés dans MongoDB (collection document_doc).
  */
 @RestController
-@RequestMapping("/fichiers")
+@RequestMapping("/files")
 @RequiredArgsConstructor
 @Tag(name = "Fichiers", description = "Gestion des pièces jointes d'une tâche Kanban")
 public class FileController {
@@ -27,25 +27,25 @@ public class FileController {
     /**
      * Récupère toutes les pièces jointes d'une tâche.
      *
-     * @param tskId l'identifiant de la tâche (référence MariaDB)
+     * @param id l'identifiant de la tâche (référence MariaDB)
      * @return liste de {@link FileDTO} avec statut HTTP 200
      */
     @Operation(summary = "Lister les fichiers d'une tâche")
-    @GetMapping("/tache/{tskId}")
-    public ResponseEntity<List<FileDTO>> getByTache(@PathVariable Long tskId) {
-        return ResponseEntity.ok(fileService.getFilesByTache(tskId));
+    @GetMapping("/task/{id}")
+    public ResponseEntity<List<FileDTO>> getByTask(@PathVariable Long id) {
+        return ResponseEntity.ok(fileService.getFilesByTask(id));
     }
 
     /**
      * Récupère toutes les pièces jointes liées à un commentaire.
      *
-     * @param comId l'identifiant du commentaire (ObjectId en String)
+     * @param id l'identifiant du commentaire (ObjectId en String)
      * @return liste de {@link FileDTO} avec statut HTTP 200
      */
     @Operation(summary = "Lister les fichiers d'un commentaire")
-    @GetMapping("/commentaire/{comId}")
-    public ResponseEntity<List<FileDTO>> getByComment(@PathVariable String comId) {
-        return ResponseEntity.ok(fileService.getFilesByComment(comId));
+    @GetMapping("/comment/{id}")
+    public ResponseEntity<List<FileDTO>> getByComment(@PathVariable String id) {
+        return ResponseEntity.ok(fileService.getFilesByComment(id));
     }
 
     /**

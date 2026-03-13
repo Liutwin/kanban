@@ -30,7 +30,7 @@ public class FileServiceImpl implements FileService {
 
     /** {@inheritDoc} */
     @Override
-    public List<FileDTO> getFilesByTache(Long tskId) {
+    public List<FileDTO> getFilesByTask(Long tskId) {
         return fileRepository.findByTskId(tskId)
                 .stream().map(fileMapper::toDTO).collect(Collectors.toList());
     }
