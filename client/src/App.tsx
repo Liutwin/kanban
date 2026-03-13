@@ -20,7 +20,7 @@ export default function App() {
         <Route path="/boards" element={
           <ProtectedRoute><Boards /></ProtectedRoute>
         } />
-        <Route path="/tables/:id" element={
+        <Route path="/boards/:id" element={
           <ProtectedRoute><Dashboard /></ProtectedRoute>
         } />
         <Route path="/logs" element={

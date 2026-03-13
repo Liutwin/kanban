@@ -16,30 +16,40 @@ export const ROUTES_AUTH = {
 // Routes pour le restant de l'API (côté Spring, en passant par le proxy Deno)
 export const ROUTES_API = {
   // ── Utilisateurs ──────────────────────────────────────────────────────────
-  users:        `${BASE}/users`,
-  user:         (id: number) => `${BASE}/users/${id}`,
+  users:          `${BASE}/users`,
+  user:           (id: number) => `${BASE}/users/${id}`,
+  userPassword:   (id: number) => `${BASE}/users/${id}/password`,       // AJOUT
 
   // ── Tableaux ──────────────────────────────────────────────────────────────
-  tableaux:     `${BASE}/boards`,
-  tableau:      (id: number) => `${BASE}/boards/${id}`,
-  tableauxUser: (id: number) => `${BASE}/boards/user/${id}`,
+  tableaux:       `${BASE}/boards`,
+  tableau:        (id: number) => `${BASE}/boards/${id}`,
+  tableauxUser:   (id: number) => `${BASE}/boards/user/${id}`,
+
+  // ── Membres d'un tableau (ex-participations, fusionnées dans /boards) ──────
+  tableauMembres: (id: number)                    => `${BASE}/boards/${id}/members`,
+  tableauMembre:  (tabId: number, userId: number) => `${BASE}/boards/${tabId}/members/${userId}`,
 
   // ── Colonnes ──────────────────────────────────────────────────────────────
-  colonnes:        (id: number)                   => `${BASE}/boards/${id}/columns`,
-  colonne:         (tabId: number, id: number)    => `${BASE}/boards/${tabId}/columns/${id}`,
-  colonneDeplacer: (tabId: number, id: number)    => `${BASE}/boards/${tabId}/columns/${id}/move`,
+  colonnes:        (boardId: number)                => `${BASE}/boards/${boardId}/columns`,
+  colonne:         (boardId: number, id: number)    => `${BASE}/boards/${boardId}/columns/${id}`,
+  colonneDeplacer: (boardId: number, id: number)    => `${BASE}/boards/${boardId}/columns/${id}/move`,
 
   // ── Tâches ────────────────────────────────────────────────────────────────
-  taches:            (id: number)                => `${BASE}/tasks/columns/${id}`,
-  tachesPriorite:    (colId: number, id: string) => `${BASE}/tasks/columns/${colId}/priority/${id}`,
-  tachesAssignee:    (id: number)                => `${BASE}/tasks/assigned/${id}`,
-  tache:             (id: number)                => `/${BASE}/tasks/${id}`,
-  tacheDeplacer:     (id: number)                => `${BASE}/tasks/${id}/move`,
-  tacheAssigner:     (id: number)                => `${BASE}/tasks/${id}/assign`,
+  taches:         (colId: number)                   => `${BASE}/tasks/column/${colId}`,        // /columns/ -> /column/
+  tachesPriorite: (colId: number, p: string)        => `${BASE}/tasks/column/${colId}/priority/${p}`,
+  tachesAssignee: (userId: number)                  => `${BASE}/tasks/assigned/${userId}`,
+  tache:          (id: number)                      => `${BASE}/tasks/${id}`,                  // double / corrigé
+  tacheDeplacer:  (id: number)                      => `${BASE}/tasks/${id}/move`,
+  tacheAssigner:  (id: number)                      => `${BASE}/tasks/${id}/assign`,
 
-  // ── Participations ────────────────────────────────────────────────────────
-  participations:        `${BASE}/participations`,
-  participationsUser:    (userId: number)           => `${BASE}/participations/user/${userId}`,
-  participationsTableau: (tabId: number)            => `${BASE}/participations/tableau/${tabId}`,
-  participation:         (uid: number, tid: number) => `${BASE}/participations/user/${uid}/tableau/${tid}`,
+  // ── Commentaires (AJOUT) ──────────────────────────────────────────────────
+  commentaires:        `${BASE}/comments`,
+  commentairesTache:   (tskId: number) => `${BASE}/comments/task/${tskId}`,
+  commentaire:         (id: number)    => `${BASE}/comments/${id}`,
+
+  // ── Fichiers / pièces jointes (AJOUT) ────────────────────────────────────
+  fichiers:            `${BASE}/files`,
+  fichiersTache:       (tskId: number) => `${BASE}/files/task/${tskId}`,
+  fichiersCommentaire: (comId: number) => `${BASE}/files/comment/${comId}`,
+  fichier:             (id: number)    => `${BASE}/files/${id}`,
 } as const;
