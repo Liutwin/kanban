@@ -65,7 +65,7 @@ export default function Logs() {
     const matchSearch = !search ||
       l.description?.toLowerCase().includes(search.toLowerCase()) ||
       l.auteurPseudo?.toLowerCase().includes(search.toLowerCase()) ||
-      l.tableauNom?.toLowerCase().includes(search.toLowerCase());
+      l.boardName?.toLowerCase().includes(search.toLowerCase());
     return matchType && matchSearch;
   });
 
@@ -149,7 +149,7 @@ export default function Logs() {
                       </span>
                     )}
                     {log.tableauNom && (
-                      <span className="log-table">▦ {log.tableauNom}</span>
+                      <span className="log-table">▦ {log.boardName}</span>
                     )}
                     <span className="log-date">{formatDate(log.date)}</span>
                   </div>

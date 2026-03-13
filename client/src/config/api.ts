@@ -37,7 +37,7 @@ export const ROUTES_API = {
   // ── Tasks ─────────────────────────────────────────────────────────────────
   tasksByColumn:      (colId: number)                => `${BASE}/tasks/column/${colId}`,
   tasksByColumnAndPriority: (colId: number, p: string) => `${BASE}/tasks/column/${colId}/priority/${p}`,
-  tasksByAssignee:    (userId: number)               => `${BASE}/tasks/assigned/${userId}`,
+  tasksByAssigned:    (userId: number)               => `${BASE}/tasks/assigned/${userId}`,
   task:               (id: number)                   => `${BASE}/tasks/${id}`,
   taskMove:           (id: number)                   => `${BASE}/tasks/${id}/move`,
   taskAssign:         (id: number)                   => `${BASE}/tasks/${id}/assign`,

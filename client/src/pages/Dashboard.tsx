@@ -41,7 +41,7 @@ export default function Dashboard() {
     setError("");
     try {
       // Tableau name
-      const resTab = await authFetch(ROUTES_API.tableau(tabId));
+      const resTab = await authFetch(ROUTES_API.board(tabId));
       const jsonTab: APIResponse<Tableau> = await resTab.json();
       if (!jsonTab.success) throw new Error(jsonTab.error.message);
       setBoardName(jsonTab.data.nom);

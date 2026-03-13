@@ -8,10 +8,20 @@ import "../styles/boards.css";
 
 type Role = "ADMIN" | "EDITEUR" | "LECTEUR";
 
+/** Tableau enrichi du rôle de l'utilisateur connecté, tel que retourné par `GET /api/v1/boards/user/{id}`. */
 interface BoardWithRole extends Board {
   role: Role;
 }
 
+/**
+ * Page principale listant les tableaux Kanban de l'utilisateur connecté.
+ *
+ * Au montage, récupère les tableaux via `GET /api/v1/boards/user/{id}`.
+ * Permet de créer un nouveau tableau via une modale (`POST /api/v1/boards`),
+ * puis navigue vers `/boards/{id}` au clic sur une carte.
+ *
+ * @returns La page des tableaux, wrappée dans le composant {@link Layout}.
+ */
 export default function Boards() {
   const { authFetch, user } = useAuth();
   const navigate            = useNavigate();
@@ -24,6 +34,10 @@ export default function Boards() {
   const [creating, setCreating]       = useState(false);
   const [createError, setCreateError] = useState("");
 
+  /**
+   * Récupère la liste des tableaux de l'utilisateur connecté depuis l'API
+   * et met à jour l'état local. Ne fait rien si `user.id` n'est pas disponible.
+   */
   const fetchBoards = async () => {
     if (!user?.id) return;
     setLoading(true);
@@ -45,6 +59,14 @@ export default function Boards() {
     fetchBoards();
   }, [user?.id]);
 
+  /**
+   * Soumet le formulaire de création de tableau.
+   *
+   * Envoie un `POST /api/v1/boards` avec le nom saisi, puis ferme la modale
+   * et rafraîchit la liste en cas de succès.
+   *
+   * @param e - Événement de soumission du formulaire.
+   */
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     setCreateError("");
@@ -69,9 +91,11 @@ export default function Boards() {
     }
   };
 
+  /** Retourne le libellé français du rôle. */
   const roleLabel = (role: Role) =>
     role === "ADMIN" ? "Admin" : role === "EDITEUR" ? "Éditeur" : "Lecteur";
 
+  /** Retourne la classe CSS associée au rôle pour le badge coloré. */
   const roleClass = (role: Role) =>
     role === "ADMIN" ? "role-admin" : role === "EDITEUR" ? "role-editeur" : "role-lecteur";
 
@@ -80,7 +104,7 @@ export default function Boards() {
       <div className="boards-page">
         <div className="boards-toolbar">
           <p className="boards-count">
-            {boards.length} tableau{boards.length !== 1 ? "x" : ""}
+            {boards.length} board{boards.length !== 1 ? "x" : ""}
           </p>
           <button className="btn btn-primary" onClick={() => setShowModal(true)}>
             + Nouveau tableau
