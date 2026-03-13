@@ -53,12 +53,23 @@ export default function Login() {
     if (!mail || !mdp) { setError("Veuillez remplir tous les champs."); return; }
     setLoading(true);
     try {
-      const res = await fetch(ROUTES_AUTH.login, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ usr_mail: mail, usr_mdp: mdp }),
-      });
+      let res: Response;
+      try {
+        res = await fetch(ROUTES_AUTH.login, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ usr_mail: mail, usr_mdp: mdp }),
+        });
+      } catch {
+        throw new Error("Serveur indisponible.");
+      }
       if (!res.ok) {
+        // Un corps vide (Content-Length: 0 ou type non-JSON) trahit
+        // une réponse synthétique du proxy/navigateur, pas du serveur
+        const contentType = res.headers.get("Content-Type") ?? "";
+        if (!contentType.includes("application/json")) {
+          throw new Error("Serveur indisponible.");
+        }
         const msg = await extractErrorMessage(res, "Identifiants incorrects.");
         throw new Error(msg);
       }
@@ -66,7 +77,7 @@ export default function Login() {
       login(json.data);
       navigate("/");
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Identifiants incorrects.");
+      setError(err instanceof Error ? err.message : "Erreur du serveur.");
     } finally {
       setLoading(false);
     }
