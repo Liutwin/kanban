@@ -27,13 +27,15 @@ async function proxyToTomcat(
 
   if (ctx.state.user) {
     headers.set("X-User-Id",     String(ctx.state.user.id));
-    headers.set("X-User-Mail",   ctx.state.user.email);
-    headers.set("X-User-Pseudo", ctx.state.user.pseudo);
   }
 
+  console.log(`[proxy] → ${method} ${url}`);
   const response = await fetch(url, { method, headers, body: bodyInit });
+  console.log(`[proxy] ← ${response.status} ${url}`);
+  const responseBody = await response.text();
+  console.log(`[proxy] body:`, responseBody);
   ctx.response.status = response.status;
-  ctx.response.body   = await response.text();
+  ctx.response.body   = responseBody;
   ctx.response.headers.set("Content-Type", "application/json");
 }
 

@@ -3,10 +3,12 @@ import { useNavigate } from "react-router-dom";
 import Layout from "../components/Layout";
 import { ROUTES_API } from "../config/api";
 import { useAuth } from "../hooks/useAuth";
-import type { Tableau, Role, APIResponse } from "../model/interfaces";
+import type { Board } from "../model/interfaces";
 import "../styles/boards.css";
 
-interface TableauAvecRole extends Tableau {
+type Role = "ADMIN" | "EDITEUR" | "LECTEUR";
+
+interface BoardWithRole extends Board {
   role: Role;
 }
 
@@ -14,7 +16,7 @@ export default function Boards() {
   const { authFetch, user } = useAuth();
   const navigate            = useNavigate();
 
-  const [boards, setBoards]           = useState<TableauAvecRole[]>([]);
+  const [boards, setBoards]           = useState<BoardWithRole[]>([]);
   const [loading, setLoading]         = useState(true);
   const [error, setError]             = useState("");
   const [showModal, setShowModal]     = useState(false);
@@ -23,16 +25,14 @@ export default function Boards() {
   const [createError, setCreateError] = useState("");
 
   const fetchBoards = async () => {
-    // Guard : on n'appelle pas l'API si l'identifiant n'est pas encore disponible
     if (!user?.id) return;
-
     setLoading(true);
     setError("");
     try {
-      const res  = await authFetch(ROUTES_API.tableauxUser(user.id));
-      const json: APIResponse<TableauAvecRole[]> = await res.json();
-      if (!json.success) throw new Error(json.error.message);
-      setBoards(json.data);
+      const res = await authFetch(ROUTES_API.boardsByUser(user.id));
+      if (!res.ok) throw new Error(`Erreur serveur (${res.status}).`);
+      const data: BoardWithRole[] = await res.json();
+      setBoards(data);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Erreur lors du chargement.");
     } finally {
@@ -41,11 +41,7 @@ export default function Boards() {
   };
 
   useEffect(() => {
-    if (!user?.id) {
-      // L'utilisateur n'est pas encore chargé : on attend sans afficher d'erreur
-      setLoading(false);
-      return;
-    }
+    if (!user?.id) { setLoading(false); return; }
     fetchBoards();
   }, [user?.id]);
 
@@ -55,12 +51,14 @@ export default function Boards() {
     if (!newName.trim()) { setCreateError("Le nom est requis."); return; }
     setCreating(true);
     try {
-      const res  = await authFetch(ROUTES_API.tableaux, {
+      const res = await authFetch(ROUTES_API.boards, {
         method: "POST",
-        body:   JSON.stringify({ nom: newName.trim() }),
+        body:   JSON.stringify({ name: newName.trim() }),
       });
-      const json: APIResponse<Tableau> = await res.json();
-      if (!json.success) throw new Error(json.error.message);
+      if (!res.ok) {
+        const json = await res.json().catch(() => null);
+        throw new Error(json?.message ?? `Erreur serveur (${res.status}).`);
+      }
       setShowModal(false);
       setNewName("");
       fetchBoards();
@@ -80,7 +78,6 @@ export default function Boards() {
   return (
     <Layout title="Mes tableaux">
       <div className="boards-page">
-        {/* Toolbar */}
         <div className="boards-toolbar">
           <p className="boards-count">
             {boards.length} tableau{boards.length !== 1 ? "x" : ""}
@@ -115,10 +112,10 @@ export default function Boards() {
               <div
                 key={board.id}
                 className="board-card"
-                onClick={() => navigate(`/tables/${board.id}`)}
+                onClick={() => navigate(`/boards/${board.id}`)}
                 role="button"
                 tabIndex={0}
-                onKeyDown={e => e.key === "Enter" && navigate(`/tables/${board.id}`)}
+                onKeyDown={e => e.key === "Enter" && navigate(`/boards/${board.id}`)}
               >
                 <div className="board-card-header">
                   <span className="board-icon">▦</span>
@@ -126,7 +123,7 @@ export default function Boards() {
                     {roleLabel(board.role)}
                   </span>
                 </div>
-                <h2 className="board-name">{board.nom}</h2>
+                <h2 className="board-name">{board.name}</h2>
                 <div className="board-arrow">→</div>
               </div>
             ))}
@@ -134,7 +131,6 @@ export default function Boards() {
         )}
       </div>
 
-      {/* Create modal */}
       {showModal && (
         <div className="modal-overlay" onClick={() => setShowModal(false)}>
           <div className="modal" onClick={e => e.stopPropagation()}>

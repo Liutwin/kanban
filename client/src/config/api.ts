@@ -15,41 +15,41 @@ export const ROUTES_AUTH = {
 
 // Routes pour le restant de l'API (côté Spring, en passant par le proxy Deno)
 export const ROUTES_API = {
-  // ── Utilisateurs ──────────────────────────────────────────────────────────
-  users:          `${BASE}/users`,
-  user:           (id: number) => `${BASE}/users/${id}`,
-  userPassword:   (id: number) => `${BASE}/users/${id}/password`,       // AJOUT
+  // ── Users ─────────────────────────────────────────────────────────────────
+  users:              `${BASE}/users`,
+  user:               (id: number) => `${BASE}/users/${id}`,
+  userPassword:       (id: number) => `${BASE}/users/${id}/password`,
 
-  // ── Tableaux ──────────────────────────────────────────────────────────────
-  tableaux:       `${BASE}/boards`,
-  tableau:        (id: number) => `${BASE}/boards/${id}`,
-  tableauxUser:   (id: number) => `${BASE}/boards/user/${id}`,
+  // ── Boards ────────────────────────────────────────────────────────────────
+  boards:             `${BASE}/boards`,
+  board:              (id: number) => `${BASE}/boards/${id}`,
+  boardsByUser:       (id: number) => `${BASE}/boards/user/${id}`,
 
-  // ── Membres d'un tableau (ex-participations, fusionnées dans /boards) ──────
-  tableauMembres: (id: number)                    => `${BASE}/boards/${id}/members`,
-  tableauMembre:  (tabId: number, userId: number) => `${BASE}/boards/${tabId}/members/${userId}`,
+  // ── Board members ─────────────────────────────────────────────────────────
+  boardMembers:       (id: number)                    => `${BASE}/boards/${id}/members`,
+  boardMember:        (boardId: number, userId: number) => `${BASE}/boards/${boardId}/members/${userId}`,
 
-  // ── Colonnes ──────────────────────────────────────────────────────────────
-  colonnes:        (boardId: number)                => `${BASE}/boards/${boardId}/columns`,
-  colonne:         (boardId: number, id: number)    => `${BASE}/boards/${boardId}/columns/${id}`,
-  colonneDeplacer: (boardId: number, id: number)    => `${BASE}/boards/${boardId}/columns/${id}/move`,
+  // ── Columns ───────────────────────────────────────────────────────────────
+  columns:            (boardId: number)              => `${BASE}/boards/${boardId}/columns`,
+  column:             (boardId: number, id: number)  => `${BASE}/boards/${boardId}/columns/${id}`,
+  columnMove:         (boardId: number, id: number)  => `${BASE}/boards/${boardId}/columns/${id}/move`,
 
-  // ── Tâches ────────────────────────────────────────────────────────────────
-  taches:         (colId: number)                   => `${BASE}/tasks/column/${colId}`,        // /columns/ -> /column/
-  tachesPriorite: (colId: number, p: string)        => `${BASE}/tasks/column/${colId}/priority/${p}`,
-  tachesAssignee: (userId: number)                  => `${BASE}/tasks/assigned/${userId}`,
-  tache:          (id: number)                      => `${BASE}/tasks/${id}`,                  // double / corrigé
-  tacheDeplacer:  (id: number)                      => `${BASE}/tasks/${id}/move`,
-  tacheAssigner:  (id: number)                      => `${BASE}/tasks/${id}/assign`,
+  // ── Tasks ─────────────────────────────────────────────────────────────────
+  tasksByColumn:      (colId: number)                => `${BASE}/tasks/column/${colId}`,
+  tasksByColumnAndPriority: (colId: number, p: string) => `${BASE}/tasks/column/${colId}/priority/${p}`,
+  tasksByAssignee:    (userId: number)               => `${BASE}/tasks/assigned/${userId}`,
+  task:               (id: number)                   => `${BASE}/tasks/${id}`,
+  taskMove:           (id: number)                   => `${BASE}/tasks/${id}/move`,
+  taskAssign:         (id: number)                   => `${BASE}/tasks/${id}/assign`,
 
-  // ── Commentaires (AJOUT) ──────────────────────────────────────────────────
-  commentaires:        `${BASE}/comments`,
-  commentairesTache:   (tskId: number) => `${BASE}/comments/task/${tskId}`,
-  commentaire:         (id: number)    => `${BASE}/comments/${id}`,
+  // ── Comments ──────────────────────────────────────────────────────────────
+  comments:           `${BASE}/comments`,
+  commentsByTask:     (taskId: number) => `${BASE}/comments/task/${taskId}`,
+  comment:            (id: number)     => `${BASE}/comments/${id}`,
 
-  // ── Fichiers / pièces jointes (AJOUT) ────────────────────────────────────
-  fichiers:            `${BASE}/files`,
-  fichiersTache:       (tskId: number) => `${BASE}/files/task/${tskId}`,
-  fichiersCommentaire: (comId: number) => `${BASE}/files/comment/${comId}`,
-  fichier:             (id: number)    => `${BASE}/files/${id}`,
+  // ── Files ─────────────────────────────────────────────────────────────────
+  files:              `${BASE}/files`,
+  filesByTask:        (taskId: number) => `${BASE}/files/task/${taskId}`,
+  filesByComment:     (comId: number)  => `${BASE}/files/comment/${comId}`,
+  file:               (id: number)     => `${BASE}/files/${id}`,
 } as const;
