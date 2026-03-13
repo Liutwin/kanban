@@ -46,14 +46,16 @@ export class APIException extends Error {
 // =============================================
 
 // Ce que l'API expose au client
-export interface Utilisateur {
-  usr_id: number;
-  usr_mail: string;
-  usr_pseudo: string;
+export interface User {
+  id: number;
+  pseudo: string;
+  email: string;
+  firstName: string;
+  lastName: string;
 }
 
 // Ce qui est stocké en base (avec le mot de passe hashé)
-export interface UtilisateurRow {
+export interface UserRow {
   usr_id: number;
   usr_mail: string;
   usr_pseudo: string;
@@ -66,35 +68,29 @@ export interface UtilisateurRow {
 // =============================================
 
 export interface LoginRequest {
-  usr_mail: string;
-  usr_mdp: string;
-}
-
-export interface RegisterRequest {
-  usr_mail: string;
-  usr_pseudo: string;
-  usr_mdp: string;
+  email: string;
+  password: string;
 }
 
 export interface AuthResponse {
   token: string;
-  user: Utilisateur;
+  user: User;
 }
 
 // Contenu du JWT
 export interface AuthPayload {
-  usr_id: number;
-  usr_mail: string;
-  usr_pseudo: string;
+  id: number;
+  pseudo: string;
+  email: string;
   exp: number;
 }
 
 export function isAuthPayload(obj: unknown): obj is AuthPayload {
   return (
     typeof obj === "object" && obj !== null &&
-    "usr_id"    in obj && typeof (obj as AuthPayload).usr_id    === "number" &&
-    "usr_mail"  in obj && typeof (obj as AuthPayload).usr_mail  === "string" &&
-    "usr_pseudo"in obj && typeof (obj as AuthPayload).usr_pseudo=== "string" &&
+    "id"    in obj && typeof (obj as AuthPayload).id    === "number" &&
+    "pseudo"in obj && typeof (obj as AuthPayload).pseudo=== "string" &&
+    "email"in obj && typeof (obj as AuthPayload).email=== "string" &&
     "exp"       in obj && typeof (obj as AuthPayload).exp       === "number"
   );
 }

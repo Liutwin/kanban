@@ -1,9 +1,9 @@
 // model/types.ts – shared data types for the Kanban app
 
 export interface Utilisateur {
-  usr_id:     number;
-  usr_mail:   string;
-  usr_pseudo: string;
+  id:     number;
+  email:   string;
+  pseudo: string;
 }
 
 export interface Tableau {

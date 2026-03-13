@@ -7,7 +7,7 @@ import { authMiddleware, type AuthContext } from "../middleware/auth.ts";
 import {
   APIErrorCode, APIException,
   type LoginRequest,
-  type AuthResponse, type Utilisateur,
+  type AuthResponse, type User,
 } from "../model/interfaces.ts";
 import { isLoginRequest } from "../model/guards.ts";
 
@@ -23,33 +23,35 @@ router.post("/login", async (ctx) => {
   }
 
   // Vérification des champs
-  if (!body.usr_mail || !body.usr_mdp) {
+  if (!body.email || !body.password) {
     throw new APIException(APIErrorCode.BAD_REQUEST, 400, "Email et mot de passe requis");
   }
 
   // Obtention des informations de l'utilisateur
   const [rows] = await db.query(
-    "SELECT usr_id, usr_mail, usr_pseudo, usr_mdp FROM utilisateur_usr WHERE usr_mail = ?",
-    [body.usr_mail],
+    "SELECT usr_id, usr_mail, usr_pseudo, usr_mdp, usr_prenom, usr_nom FROM utilisateur_usr WHERE usr_mail = ?",
+    [body.email],
   );
 
   const userRow = (rows as Record<string, unknown>[])[0];
 
   // Vérification des identifiants
-  if (!userRow || !(await verifyPassword(body.usr_mdp, userRow.usr_mdp as string))) {
+  if (!userRow || !(await verifyPassword(body.password, userRow.usr_mdp as string))) {
     throw new APIException(APIErrorCode.UNAUTHORIZED, 401, "Identifiants incorrects");
   }
 
-  const user: Utilisateur = {
-    usr_id:     userRow.usr_id as number,
-    usr_mail:   userRow.usr_mail as string,
-    usr_pseudo: userRow.usr_pseudo as string,
+  const user: User = {
+    id:     userRow.usr_id as number,
+    pseudo: userRow.usr_pseudo as string,
+    email: userRow.usr_mail as string,
+    firstName: userRow.usr_nom as string,
+    lastName: userRow.usr_prenom as string
   };
 
   const token = await createJWT({
-    usr_id:     user.usr_id,
-    usr_mail:   user.usr_mail,
-    usr_pseudo: user.usr_pseudo,
+    id:     user.id,
+    pseudo: user.pseudo,
+    email: user.email
   });
 
   const response: AuthResponse = { token, user };

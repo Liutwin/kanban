@@ -26,9 +26,9 @@ async function proxyToTomcat(
   headers.set("Content-Type", "application/json");
 
   if (ctx.state.user) {
-    headers.set("X-User-Id",     String(ctx.state.user.usr_id));
-    headers.set("X-User-Mail",   ctx.state.user.usr_mail);
-    headers.set("X-User-Pseudo", ctx.state.user.usr_pseudo);
+    headers.set("X-User-Id",     String(ctx.state.user.id));
+    headers.set("X-User-Mail",   ctx.state.user.email);
+    headers.set("X-User-Pseudo", ctx.state.user.pseudo);
   }
 
   const response = await fetch(url, { method, headers, body: bodyInit });
