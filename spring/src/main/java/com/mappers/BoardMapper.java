@@ -39,9 +39,9 @@ public class BoardMapper {
     public Board toEntity(BoardDTO dto) {
         Board board = new Board();
         board.setId(dto.getId());
-        board.setName(dto.getNom());
+        board.setName(dto.getName());
         User createur = new User();
-        createur.setId(dto.getCreateurId());
+        createur.setId(dto.getCreatorId());
         board.setCreator(createur);
         return board;
     }

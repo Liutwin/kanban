@@ -36,13 +36,13 @@ public class BoardMemberMapper {
      * @return l'entité correspondante
      */
     public BoardMember toEntity(BoardMemberDTO dto) {
-        BoardMember.ParticipationId id = new BoardMember.ParticipationId(dto.getUserId(), dto.getTableauId());
+        BoardMember.ParticipationId id = new BoardMember.ParticipationId(dto.getUserId(), dto.getBoardId());
 
         User user = new User();
         user.setId(dto.getUserId());
 
         Board board = new Board();
-        board.setId(dto.getTableauId());
+        board.setId(dto.getBoardId());
 
         return new BoardMember(id, user, board,
                 dto.getRole() != null ? dto.getRole() : BoardMember.Role.LECTEUR);

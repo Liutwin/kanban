@@ -1,8 +1,12 @@
 package com.services.impl;
 
 import com.dtos.BoardDTO;
+import com.dtos.BoardMemberDTO;
 import com.entities.Board;
+import com.entities.BoardMember;
 import com.mappers.BoardMapper;
+import com.mappers.BoardMemberMapper;
+import com.repositories.BoardMemberRepository;
 import com.repositories.BoardRepository;
 import com.repositories.UserRepository;
 import com.services.BoardService;
@@ -23,6 +27,8 @@ public class BoardServiceImpl implements BoardService {
     private final BoardRepository boardRepository;
     private final UserRepository userRepository;
     private final BoardMapper boardMapper;
+    private final BoardMemberRepository boardMemberRepository;
+    private final BoardMemberMapper boardMemberMapper;
 
     /** {@inheritDoc} */
     @Override
@@ -53,8 +59,8 @@ public class BoardServiceImpl implements BoardService {
     /** {@inheritDoc} */
     @Override
     public BoardDTO createTable(BoardDTO dto) {
-        if (!userRepository.existsById(dto.getCreateurId())) {
-            throw new RuntimeException("Utilisateur introuvable : " + dto.getCreateurId());
+        if (!userRepository.existsById(dto.getCreatorId())) {
+            throw new RuntimeException("Utilisateur introuvable : " + dto.getCreatorId());
         }
         Board board = boardMapper.toEntity(dto);
         return boardMapper.toDTO(boardRepository.save(board));
@@ -65,7 +71,7 @@ public class BoardServiceImpl implements BoardService {
     public BoardDTO updateTable(Long id, BoardDTO dto) {
         Board board = boardRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Tableau introuvable : " + id));
-        board.setName(dto.getNom());
+        board.setName(dto.getName());
         return boardMapper.toDTO(boardRepository.save(board));
     }
 
@@ -76,5 +82,55 @@ public class BoardServiceImpl implements BoardService {
             throw new RuntimeException("Tableau introuvable : " + id);
         }
         boardRepository.deleteById(id);
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public List<BoardMemberDTO> getMembersByBoard(Long boardId) {
+        if (!boardRepository.existsById(boardId)) {
+            throw new RuntimeException("Tableau introuvable : " + boardId);
+        }
+        return boardMemberRepository.findByBoardId(boardId)
+                .stream()
+                .map(boardMemberMapper::toDTO)
+                .collect(Collectors.toList());
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public BoardMemberDTO addMember(Long boardId, BoardMemberDTO dto) {
+        if (!boardRepository.existsById(boardId)) {
+            throw new RuntimeException("Tableau introuvable : " + boardId);
+        }
+        if (!userRepository.existsById(dto.getUserId())) {
+            throw new RuntimeException("Utilisateur introuvable : " + dto.getUserId());
+        }
+        if (boardMemberRepository.existsByUserIdAndBoardId(dto.getUserId(), boardId)) {
+            throw new RuntimeException("Participation déjà existante");
+        }
+        // On force le boardId depuis l'URL (source de vérité)
+        dto.setBoardId(boardId);
+        return boardMemberMapper.toDTO(
+                boardMemberRepository.save(boardMemberMapper.toEntity(dto)));
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public BoardMemberDTO updateMemberRole(Long boardId, Long userId, BoardMember.Role role) {
+        BoardMember.ParticipationId pid = new BoardMember.ParticipationId(userId, boardId);
+        BoardMember member = boardMemberRepository.findById(pid)
+                .orElseThrow(() -> new RuntimeException("Participation introuvable"));
+        member.setRole(role);
+        return boardMemberMapper.toDTO(boardMemberRepository.save(member));
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public void removeMember(Long boardId, Long userId) {
+        BoardMember.ParticipationId pid = new BoardMember.ParticipationId(userId, boardId);
+        if (!boardMemberRepository.existsById(pid)) {
+            throw new RuntimeException("Participation introuvable");
+        }
+        boardMemberRepository.deleteById(pid);
     }
 }

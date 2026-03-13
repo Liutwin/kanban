@@ -82,9 +82,9 @@ public class TaskServiceImpl implements TaskService {
     public TaskDTO updateTask(Long id, TaskDTO dto) {
         Task task = taskRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Tâche introuvable : " + id));
-        task.setTitle(dto.getTitre());
+        task.setTitle(dto.getTitle());
         task.setDetails(dto.getDetails());
-        task.setDateLimite(dto.getDateLimite());
+        task.setDueDate(dto.getDueDate());
         task.setPriority(dto.getPriority() != null ? dto.getPriority() : task.getPriority());
         return taskMapper.toDTO(taskRepository.save(task));
     }

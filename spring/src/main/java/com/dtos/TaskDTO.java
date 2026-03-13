@@ -24,7 +24,7 @@ public class TaskDTO {
     /**
      * Titre de la tâche.
      */
-    private String titre;
+    private String title;
 
     /**
      * Description détaillée de la tâche.
@@ -34,7 +34,7 @@ public class TaskDTO {
     /**
      * Date limite d'accomplissement.
      */
-    private LocalDateTime dateLimite;
+    private LocalDateTime dueDate;
 
     /**
      * Niveau de priorité de la tâche.
@@ -54,5 +54,5 @@ public class TaskDTO {
     /**
      * Identifiant de l'utilisateur assigné, peut être null.
      */
-    private Long assigneeId;
+    private Long assignedId;
 }

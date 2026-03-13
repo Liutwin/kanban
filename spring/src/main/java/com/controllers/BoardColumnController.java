@@ -59,7 +59,7 @@ public class BoardColumnController {
     @PostMapping
     public ResponseEntity<BoardColumnDTO> createColumn(@PathVariable Long boardId,
                                                        @RequestBody BoardColumnDTO dto) {
-        dto.setTableauId(boardId);
+        dto.setBoardId(boardId);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(boardColumnService.createColumn(dto));
     }

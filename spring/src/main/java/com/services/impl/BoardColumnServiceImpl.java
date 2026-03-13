@@ -44,8 +44,8 @@ public class BoardColumnServiceImpl implements BoardColumnService {
     /** {@inheritDoc} */
     @Override
     public BoardColumnDTO createColumn(BoardColumnDTO dto) {
-        if (!boardRepository.existsById(dto.getTableauId())) {
-            throw new RuntimeException("Tableau introuvable : " + dto.getTableauId());
+        if (!boardRepository.existsById(dto.getBoardId())) {
+            throw new RuntimeException("Tableau introuvable : " + dto.getBoardId());
         }
         BoardColumn boardColumn = boardColumnMapper.toEntity(dto);
         BoardColumn saved = boardColumnRepository.save(boardColumn);
@@ -59,7 +59,7 @@ public class BoardColumnServiceImpl implements BoardColumnService {
     public BoardColumnDTO updateColumn(Long id, BoardColumnDTO dto) {
         BoardColumn boardColumn = boardColumnRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Colonne introuvable : " + id));
-        boardColumn.setName(dto.getNom());
+        boardColumn.setName(dto.getName());
         return boardColumnMapper.toDTO(boardColumnRepository.save(boardColumn));
     }
 

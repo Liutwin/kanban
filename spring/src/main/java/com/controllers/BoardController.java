@@ -1,6 +1,8 @@
 package com.controllers;
 
 import com.dtos.BoardDTO;
+import com.dtos.BoardMemberDTO;
+import com.entities.BoardMember;
 import com.services.BoardService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -94,6 +96,69 @@ public class BoardController {
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteBoard(@PathVariable Long id) {
         boardService.deleteTable(id);
+        return ResponseEntity.noContent().build();
+    }
+
+    /**
+     * Récupère la liste des membres d'un tableau.
+     *
+     * @param id l'identifiant du tableau
+     * @return liste de {@link BoardMemberDTO} avec statut HTTP 200
+     */
+    @Operation(summary = "Lister les membres d'un tableau")
+    @GetMapping("/{id}/members")
+    public ResponseEntity<List<BoardMemberDTO>> getMembers(@PathVariable Long id) {
+        return ResponseEntity.ok(boardService.getMembersByBoard(id));
+    }
+
+    /**
+     * Ajoute un membre à un tableau.
+     * Le {@code boardId} de l'URL fait foi ; le champ {@code tableauId} du corps
+     * est ignoré et écrasé par la valeur de l'URL.
+     *
+     * @param id  l'identifiant du tableau
+     * @param dto les données du nouveau membre (userId + role)
+     * @return le {@link BoardMemberDTO} créé avec statut HTTP 201
+     */
+    @Operation(summary = "Ajouter un membre à un tableau")
+    @PostMapping("/{id}/members")
+    public ResponseEntity<BoardMemberDTO> addMember(
+            @PathVariable Long id,
+            @RequestBody BoardMemberDTO dto) {
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(boardService.addMember(id, dto));
+    }
+
+    /**
+     * Met à jour le rôle d'un membre dans un tableau.
+     *
+     * @param id     l'identifiant du tableau
+     * @param userId l'identifiant de l'utilisateur
+     * @param role   le nouveau rôle
+     * @return le {@link BoardMemberDTO} mis à jour avec statut HTTP 200
+     */
+    @Operation(summary = "Mettre à jour le rôle d'un membre")
+    @PutMapping("/{id}/members/{userId}")
+    public ResponseEntity<BoardMemberDTO> updateMemberRole(
+            @PathVariable Long id,
+            @PathVariable Long userId,
+            @RequestParam BoardMember.Role role) {
+        return ResponseEntity.ok(boardService.updateMemberRole(id, userId, role));
+    }
+
+    /**
+     * Retire un membre d'un tableau.
+     *
+     * @param id     l'identifiant du tableau
+     * @param userId l'identifiant de l'utilisateur à retirer
+     * @return statut HTTP 204 sans contenu
+     */
+    @Operation(summary = "Retirer un membre d'un tableau")
+    @DeleteMapping("/{id}/members/{userId}")
+    public ResponseEntity<Void> removeMember(
+            @PathVariable Long id,
+            @PathVariable Long userId) {
+        boardService.removeMember(id, userId);
         return ResponseEntity.noContent().build();
     }
 }

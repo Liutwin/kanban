@@ -22,7 +22,7 @@ public class BoardMemberDTO {
     /**
      * Identifiant du tableau concerné.
      */
-    private Long tableauId;
+    private Long boardId;
 
     /**
      * Rôle de l'utilisateur dans le tableau.

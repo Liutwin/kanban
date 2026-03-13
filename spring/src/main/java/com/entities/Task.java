@@ -46,7 +46,7 @@ public class Task {
      * Date limite d'accomplissement de la tâche, optionnelle.
      */
     @jakarta.persistence.Column(name = "tsk_datelimite")
-    private LocalDateTime dateLimite;
+    private LocalDateTime dueDate;
 
     /**
      * Niveau de priorité de la tâche.
@@ -54,7 +54,7 @@ public class Task {
      */
     @Convert(converter = Task.Priority.PriorityConverter.class)
     @jakarta.persistence.Column(name = "tsk_priorite", nullable = false, length = 10)
-    private Priority priority = Priority.MOYENNE;
+    private Priority priority = Priority.MEDIUM;
 
     /**
      * Colonne dans laquelle se trouve la tâche.
@@ -86,9 +86,9 @@ public class Task {
      */
     public enum Priority {
 
-        BASSE("basse"),
-        MOYENNE("moyenne"),
-        HAUTE("haute");
+        LOW("basse"),
+        MEDIUM("moyenne"),
+        HIGH("haute");
 
         private final String value;
 

@@ -27,10 +27,10 @@ public class BoardColumnDTO {
     /**
      * Nom affiché de la colonne.
      */
-    private String nom;
+    private String name;
 
     /**
      * Identifiant du tableau auquel appartient la colonne.
      */
-    private Long tableauId;
+    private Long boardId;
 }

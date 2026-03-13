@@ -38,10 +38,10 @@ public class BoardColumnMapper {
     public BoardColumn toEntity(BoardColumnDTO dto) {
         BoardColumn boardColumn = new BoardColumn();
         boardColumn.setId(dto.getId());
-        boardColumn.setName(dto.getNom());
+        boardColumn.setName(dto.getName());
         // numero intentionnellement omis : géré par le trigger before_insert_colonne
         Board board = new Board();
-        board.setId(dto.getTableauId());
+        board.setId(dto.getBoardId());
         boardColumn.setBoard(board);
         return boardColumn;
     }

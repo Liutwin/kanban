@@ -22,10 +22,10 @@ public class BoardDTO {
     /**
      * Nom du tableau.
      */
-    private String nom;
+    private String name;
 
     /**
      * Identifiant de l'utilisateur créateur.
      */
-    private Long createurId;
+    private Long creatorId;
 }

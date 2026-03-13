@@ -24,7 +24,7 @@ public class TaskMapper {
                 task.getId(),
                 task.getTitle(),
                 task.getDetails(),
-                task.getDateLimite(),
+                task.getDueDate(),
                 task.getPriority(),
                 task.getBoardColumn().getId(),
                 task.getCreator().getId(),
@@ -44,10 +44,10 @@ public class TaskMapper {
     public Task toEntity(TaskDTO dto) {
         Task task = new Task();
         task.setId(dto.getId());
-        task.setTitle(dto.getTitre());
+        task.setTitle(dto.getTitle());
         task.setDetails(dto.getDetails());
-        task.setDateLimite(dto.getDateLimite());
-        task.setPriority(dto.getPriority() != null ? dto.getPriority() : Task.Priority.MOYENNE);
+        task.setDueDate(dto.getDueDate());
+        task.setPriority(dto.getPriority() != null ? dto.getPriority() : Task.Priority.MEDIUM);
 
         BoardColumn boardColumn = new BoardColumn();
         boardColumn.setId(dto.getBoardColumnId());
@@ -57,9 +57,9 @@ public class TaskMapper {
         createur.setId(dto.getCreatorId());
         task.setCreator(createur);
 
-        if (dto.getAssigneeId() != null) {
+        if (dto.getAssignedId() != null) {
             User assignee = new User();
-            assignee.setId(dto.getAssigneeId());
+            assignee.setId(dto.getAssignedId());
             task.setAssigned(assignee);
         }
 
