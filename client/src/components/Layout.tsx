@@ -93,7 +93,9 @@ export default function Layout({ children, title }: LayoutProps) {
    * Priorité : première lettre du prénom > première lettre du pseudo > "?".
    */
   const avatarInitial =
-    (userDTO?.firstName?.charAt(0) ?? user?.pseudo?.charAt(0) ?? "?").toUpperCase();
+  userDTO?.firstName && userDTO?.lastName
+    ? `${userDTO.firstName.charAt(0)}${userDTO.lastName.charAt(0)}`.toUpperCase()
+    : (user?.pseudo?.charAt(0) ?? "?").toUpperCase();
 
   /**
    * Gère la déconnexion de l'utilisateur :

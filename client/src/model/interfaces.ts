@@ -2,8 +2,6 @@
 
 export interface Utilisateur {
   id:     number;
-  email:   string;
-  pseudo: string;
 }
 
 export interface Tableau {

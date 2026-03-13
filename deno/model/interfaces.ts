@@ -68,7 +68,7 @@ export interface UserRow {
 // =============================================
 
 export interface LoginRequest {
-  email: string;
+  pseudo: string;
   password: string;
 }
 
@@ -80,8 +80,6 @@ export interface AuthResponse {
 // Contenu du JWT
 export interface AuthPayload {
   id: number;
-  pseudo: string;
-  email: string;
   exp: number;
 }
 
@@ -89,8 +87,6 @@ export function isAuthPayload(obj: unknown): obj is AuthPayload {
   return (
     typeof obj === "object" && obj !== null &&
     "id"    in obj && typeof (obj as AuthPayload).id    === "number" &&
-    "pseudo"in obj && typeof (obj as AuthPayload).pseudo=== "string" &&
-    "email"in obj && typeof (obj as AuthPayload).email=== "string" &&
     "exp"       in obj && typeof (obj as AuthPayload).exp       === "number"
   );
 }

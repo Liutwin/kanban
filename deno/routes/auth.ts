@@ -23,21 +23,21 @@ router.post("/login", async (ctx) => {
   }
 
   // Vérification des champs
-  if (!body.email || !body.password) {
-    throw new APIException(APIErrorCode.BAD_REQUEST, 400, "Email et mot de passe requis");
+  if (!body.pseudo || !body.password) {
+    throw new APIException(APIErrorCode.BAD_REQUEST, 400, "Pseudo et mot de passe requis");
   }
 
   // Obtention des informations de l'utilisateur
   const [rows] = await db.query(
-    "SELECT usr_id, usr_mail, usr_pseudo, usr_mdp, usr_prenom, usr_nom FROM utilisateur_usr WHERE usr_mail = ?",
-    [body.email],
+    "SELECT usr_id, usr_mail, usr_pseudo, usr_mdp, usr_prenom, usr_nom FROM utilisateur_usr WHERE usr_pseudo = ?",
+    [body.pseudo],
   );
 
   const userRow = (rows as Record<string, unknown>[])[0];
 
   // Vérification des identifiants
   if (!userRow || !(await verifyPassword(body.password, userRow.usr_mdp as string))) {
-    throw new APIException(APIErrorCode.UNAUTHORIZED, 401, "Identifiants incorrects");
+    throw new APIException(APIErrorCode.UNAUTHORIZED, 401, "Identifiants incorrects.");
   }
 
   const user: User = {
@@ -49,9 +49,7 @@ router.post("/login", async (ctx) => {
   };
 
   const token = await createJWT({
-    id:     user.id,
-    pseudo: user.pseudo,
-    email: user.email
+    id:     user.id
   });
 
   const response: AuthResponse = { token, user };

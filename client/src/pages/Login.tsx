@@ -8,7 +8,7 @@ import "../styles/auth.css";
 /**
  * Page de connexion de l'application.
  *
- * Affiche un formulaire demandant l'adresse e-mail et le mot de passe de
+ * Affiche un formulaire demandant le pseudo et le mot de passe de
  * l'utilisateur. En cas de succès, le token JWT reçu est stocké via le
  * contexte d'authentification et l'utilisateur est redirigé vers l'accueil.
  *
@@ -24,8 +24,8 @@ export default function Login() {
   const { login } = useAuth();
   const navigate  = useNavigate();
 
-  /** Adresse e-mail saisie par l'utilisateur. */
-  const [mail, setMail]       = useState("");
+  /** Pseudo saisi par l'utilisateur. */
+  const [pseudo, setPseudo]   = useState("");
   /** Mot de passe saisi par l'utilisateur. */
   const [mdp, setMdp]         = useState("");
   /** Message d'erreur à afficher sous le formulaire, vide si aucune erreur. */
@@ -50,7 +50,7 @@ export default function Login() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
-    if (!mail || !mdp) { setError("Veuillez remplir tous les champs."); return; }
+    if (!pseudo || !mdp) { setError("Veuillez remplir tous les champs."); return; }
     setLoading(true);
     try {
       let res: Response;
@@ -58,7 +58,7 @@ export default function Login() {
         res = await fetch(ROUTES_AUTH.login, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email: mail, password: mdp }),
+          body: JSON.stringify({ pseudo: pseudo, password: mdp }),
         });
       } catch {
         throw new Error("Serveur indisponible.");
@@ -107,14 +107,14 @@ export default function Login() {
           )}
 
           <div className="form-group">
-            <label className="form-label">Adresse e-mail</label>
+            <label className="form-label">Pseudo</label>
             <input
-              type="email"
+              type="text"
               className="form-input"
-              placeholder="alice@example.com"
-              value={mail}
-              onChange={e => setMail(e.target.value)}
-              autoComplete="email"
+              placeholder="alice"
+              value={pseudo}
+              onChange={e => setPseudo(e.target.value)}
+              autoComplete="username"
               autoFocus
             />
           </div>
