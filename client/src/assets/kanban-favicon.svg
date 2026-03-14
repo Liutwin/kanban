@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
+  <!-- Background rounded square -->
+  <rect width="32" height="32" rx="7" fill="#7c6ff0"/>
+
+  <!-- Subtle gradient overlay for depth -->
+  <rect width="32" height="32" rx="7" fill="url(#g)" opacity="0.3"/>
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#b0a6ff"/>
+      <stop offset="100%" stop-color="#1c1b1f"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Outer hex ring -->
+  <polyline points="16,3 25,8 25,18" fill="none" stroke="white" stroke-width="1.2" stroke-linecap="round" opacity="0.5"/>
+  <polyline points="25,18 16,23 7,18" fill="none" stroke="white" stroke-width="1.2" stroke-linecap="round" opacity="0.3"/>
+  <polyline points="7,18 7,8 16,3"   fill="none" stroke="white" stroke-width="1.2" stroke-linecap="round" opacity="0.4"/>
+
+  <!-- Inner hex -->
+  <polygon points="16,6 22,10 22,18 16,22 10,18 10,10" fill="white" opacity="0.12"/>
+
+  <!-- Kanban bars -->
+  <rect x="10" y="11" width="3" height="10" rx="1" fill="white" opacity="0.45"/>
+  <rect x="14" y="9"  width="3" height="12" rx="1" fill="white" opacity="0.95"/>
+  <rect x="18" y="13" width="3" height="8"  rx="1" fill="white" opacity="0.6"/>
+
+  <!-- Top vertex dot -->
+  <circle cx="16" cy="3" r="1.5" fill="white" opacity="0.9"/>
+  <circle cx="16" cy="23" r="1.5" fill="white" opacity="0.6"/>
+</svg>
