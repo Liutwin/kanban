@@ -33,7 +33,7 @@ public class TaskServiceImpl implements TaskService {
     /** {@inheritDoc} */
     @Override
     public List<TaskDTO> getTasksByBoardColumn(Long columnId) {
-        return taskRepository.findByAssignedId(columnId)
+        return taskRepository.findByBoardColumnId(columnId)  // ← CORRECT
                 .stream()
                 .map(taskMapper::toDTO)
                 .collect(Collectors.toList());
