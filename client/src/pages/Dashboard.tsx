@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { extractErrorMessage } from "../utils/apiHelpers";
 import Layout from "../components/Layout";
 import { ROUTES_API } from "../config/api";
 import { useAuth } from "../hooks/useAuth";
@@ -21,7 +22,7 @@ interface ColumnWithTasks extends Column {
  */
 export default function Dashboard() {
   const { id }        = useParams<{ id: string }>();
-  const boardId       = Number(id);
+  const boardId       = parseInt(id ?? "", 10); // parseInt s'arrête au premier tiret : "7-mon-projet" → 7
   const { authFetch, user } = useAuth();
   const navigate      = useNavigate();
 
@@ -66,12 +67,12 @@ export default function Dashboard() {
     setError("");
     try {
       const resBoard = await authFetch(ROUTES_API.board(boardId));
-      if (!resBoard.ok) throw new Error(`Erreur serveur (${resBoard.status}).`);
+      if (!resBoard.ok) throw new Error(await extractErrorMessage(resBoard));
       const board: Board = await resBoard.json();
       setBoardName(board.name);
 
       const resCols = await authFetch(ROUTES_API.columns(boardId));
-      if (!resCols.ok) throw new Error(`Erreur serveur (${resCols.status}).`);
+      if (!resCols.ok) throw new Error(await extractErrorMessage(resCols));
       const cols: Column[] = await resCols.json();
 
       const colsWithTasks: ColumnWithTasks[] = await Promise.all(
@@ -138,10 +139,7 @@ export default function Dashboard() {
       const res = editTask
         ? await authFetch(ROUTES_API.task(editTask.id), { method: "PUT",  body: JSON.stringify(body) })
         : await authFetch(ROUTES_API.tasks,             { method: "POST", body: JSON.stringify(body) });
-      if (!res.ok) {
-        const json = await res.json().catch(() => null);
-        throw new Error(json?.message ?? `Erreur serveur (${res.status}).`);
-      }
+      if (!res.ok) throw new Error(await extractErrorMessage(res));
       const savedTask: Task = await res.json();
       setColumns(cols => cols.map(c => {
         if (editTask) {
@@ -190,10 +188,7 @@ export default function Dashboard() {
         method: "POST",
         body: JSON.stringify({ name: colName.trim() }),
       });
-      if (!res.ok) {
-        const json = await res.json().catch(() => null);
-        throw new Error(json?.message ?? `Erreur serveur (${res.status}).`);
-      }
+      if (!res.ok) throw new Error(await extractErrorMessage(res));
       const newCol: Column = await res.json();
       setColumns(cols => [...cols, { ...newCol, tasks: [] }]);
       setColModal(false);

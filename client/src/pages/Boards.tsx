@@ -4,6 +4,8 @@ import Layout from "../components/Layout";
 import { ROUTES_API } from "../config/api";
 import { useAuth } from "../hooks/useAuth";
 import type { Board } from "../model/interfaces";
+import { extractErrorMessage } from "../utils/apiHelpers";
+import { toSlug } from "../utils/slug";
 import "../styles/boards.css";
 
 type Role = "admin" | "editeur" | "lecteur";
@@ -44,7 +46,7 @@ export default function Boards() {
     setError("");
     try {
       const res = await authFetch(ROUTES_API.boardsByUser(user.id));
-      if (!res.ok) throw new Error(`Erreur serveur (${res.status}).`);
+      if (!res.ok) throw new Error(await extractErrorMessage(res));
       const data: BoardWithRole[] = await res.json();
       setBoards(data);
     } catch (e: unknown) {
@@ -77,10 +79,7 @@ export default function Boards() {
         method: "POST",
         body:   JSON.stringify({ name: newName.trim(), creatorId: user!.id }),
       });
-      if (!res.ok) {
-        const json = await res.json().catch(() => null);
-        throw new Error(json?.message ?? `Erreur serveur (${res.status}).`);
-      }
+      if (!res.ok) throw new Error(await extractErrorMessage(res));
       setShowModal(false);
       setNewName("");
       fetchBoards();
@@ -103,7 +102,7 @@ export default function Boards() {
     if (!confirm("Supprimer ce tableau ? Cette action est irréversible.")) return;
     try {
       const res = await authFetch(ROUTES_API.board(boardId), { method: "DELETE" });
-      if (!res.ok) throw new Error(`Erreur serveur (${res.status}).`);
+      if (!res.ok) throw new Error(await extractErrorMessage(res));
       fetchBoards();
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Erreur lors de la suppression.");
@@ -153,10 +152,10 @@ export default function Boards() {
               <div
                 key={board.id}
                 className="board-card"
-                onClick={() => navigate(`/boards/${board.id}`)}
+                onClick={() => navigate(`/boards/${board.id}-${toSlug(board.name)}`)}
                 role="button"
                 tabIndex={0}
-                onKeyDown={e => e.key === "Enter" && navigate(`/boards/${board.id}`)}
+                onKeyDown={e => e.key === "Enter" && navigate(`/boards/${board.id}-${toSlug(board.name)}`)}
               >
                 <div className="board-card-header">
                   <span className="board-icon">▦</span>
