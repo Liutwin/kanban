@@ -6,6 +6,7 @@ import Register    from "./pages/Register";
 import Boards      from "./pages/Boards";
 import Dashboard   from "./pages/Dashboard";
 import Logs        from "./pages/Logs";
+import Admin       from "./pages/Admin";
 
 export default function App() {
   return (
@@ -25,6 +26,9 @@ export default function App() {
         } />
         <Route path="/logs" element={
           <ProtectedRoute><Logs /></ProtectedRoute>
+        } />
+        <Route path="/admin" element={
+          <ProtectedRoute><Admin /></ProtectedRoute>
         } />
         <Route path="*" element={
           <Navigate to="/boards" replace />

@@ -52,6 +52,7 @@ export interface User {
   email: string;
   firstName: string;
   lastName: string;
+  isAdmin:   boolean;
 }
 
 // Ce qui est stocké en base (avec le mot de passe hashé)

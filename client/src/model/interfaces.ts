@@ -12,6 +12,7 @@ export interface User {
   firstName:  string;
   lastName:   string;
   avatarURL?: string;
+  isAdmin:   boolean;
 }
 
 /** Token JWT + infos utilisateur, retournés dans le champ `data` de `POST /api/v1/auth/login`. */

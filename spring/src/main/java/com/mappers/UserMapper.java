@@ -26,7 +26,8 @@ public class UserMapper {
                 user.getPseudo(),
                 user.getLastName(),
                 user.getFirstName(),
-                user.getAvatarURL()
+                user.getAvatarURL(),
+                user.isAdmin()
         );
     }
 
@@ -46,6 +47,7 @@ public class UserMapper {
         user.setLastName(dto.getLastName());
         user.setFirstName(dto.getFirstName());
         user.setAvatarURL(dto.getAvatarURL());
+        user.setAdmin(dto.isAdmin());
         return user;
     }
 

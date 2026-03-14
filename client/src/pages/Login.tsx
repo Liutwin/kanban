@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import { ROUTES_AUTH } from "../config/api";
 import { extractErrorMessage } from "../utils/apiHelpers";
+import AuthIcon from '../assets/kanban-icon-auth.svg';
 import "../styles/auth.css";
 
 /**
@@ -86,15 +87,10 @@ export default function Login() {
 
   return (
     <div className="auth-shell">
-      <div className="auth-deco" aria-hidden>
-        <span className="deco-hex">⬡</span>
-        <span className="deco-hex small">⬡</span>
-        <span className="deco-hex tiny">⬡</span>
-      </div>
 
       <div className="auth-card">
         <div className="auth-header">
-          <span className="auth-logo">⬡</span>
+          <img src={AuthIcon} alt="Kanban" width="32" height="32" />
           <h1 className="auth-title">KANBAN</h1>
           <p className="auth-sub">Connectez-vous à votre espace</p>
         </div>

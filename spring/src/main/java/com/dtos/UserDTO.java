@@ -1,5 +1,6 @@
 package com.dtos;
 
+import com.entities.User;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -45,4 +46,9 @@ public class UserDTO {
      * URL de l'avatar de l'utilisateur (optionnel).
      */
     private String avatarURL;
+
+    /**
+     * Indique si l'utilisateur est administrateur de l'application.
+     */
+    private boolean isAdmin;
 }

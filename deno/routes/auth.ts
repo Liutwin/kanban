@@ -29,7 +29,7 @@ router.post("/login", async (ctx) => {
 
   // Obtention des informations de l'utilisateur
   const [rows] = await db.query(
-    "SELECT usr_id, usr_mail, usr_pseudo, usr_mdp, usr_prenom, usr_nom FROM utilisateur_usr WHERE usr_pseudo = ?",
+    "SELECT usr_id, usr_mail, usr_pseudo, usr_mdp, usr_prenom, usr_nom, usr_admin FROM utilisateur_usr WHERE usr_pseudo = ?",
     [body.pseudo],
   );
 
@@ -45,11 +45,15 @@ router.post("/login", async (ctx) => {
     pseudo: userRow.usr_pseudo as string,
     email: userRow.usr_mail as string,
     firstName: userRow.usr_nom as string,
-    lastName: userRow.usr_prenom as string
+    lastName: userRow.usr_prenom as string,
+    isAdmin:   (userRow.usr_admin as Uint8Array)[0] === 1
   };
 
+  console.log("[login] user construit →", user);
+  console.log("[login] userRow →", userRow);
+
   const token = await createJWT({
-    id:     user.id
+    id: user.id
   });
 
   const response: AuthResponse = { token, user };

@@ -5,6 +5,7 @@ import type { ReactNode } from "react";
 import "../styles/layout.css";
 
 import type { UserDTO } from "../model/interfaces.ts";
+import SidebarIcon from '../assets/kanban-icon-sidebar.svg';
 
 /**
  * Props du composant Layout.
@@ -117,7 +118,9 @@ export default function Layout({ children, title }: LayoutProps) {
       {/* Barre latérale */}
       <aside className="sidebar">
         <div className="sidebar-brand">
-          <span className="brand-icon">⬡</span>
+          <span className="brand-icon">
+            <img src={SidebarIcon} alt="" width="22" height="22" />
+          </span>
           <span className="brand-name">KANBAN</span>
         </div>
 
@@ -137,6 +140,15 @@ export default function Layout({ children, title }: LayoutProps) {
             <span className="nav-icon">≡</span>
             <span>Journal</span>
           </NavLink>
+          {user?.isAdmin && (
+            <NavLink
+              to="/admin"
+              className={({ isActive }) => `nav-item ${isActive ? "active" : ""}`}
+            >
+              <span className="nav-icon">⚙</span>
+              <span>Administration</span>
+            </NavLink>
+          )}
         </nav>
 
         <div className="sidebar-footer">
@@ -158,7 +170,12 @@ export default function Layout({ children, title }: LayoutProps) {
             title="Se déconnecter"
             aria-label="Se déconnecter"
           >
-            ⏻
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+              <polyline points="16 17 21 12 16 7"/>
+              <line x1="21" y1="12" x2="9" y2="12"/>
+            </svg>
           </button>
         </div>
       </aside>

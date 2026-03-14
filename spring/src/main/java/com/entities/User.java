@@ -42,7 +42,7 @@ public class User {
      * Ne doit jamais être exposé dans les réponses API.
      */
     @Column(name = "usr_mdp", nullable = false, length = 254)
-    private String password;
+    private String password;/**
 
     /**
      * Nom de famille de l'utilisateur (optionnel).
@@ -59,6 +59,14 @@ public class User {
     /**
      * URL de l'avatar de l'utilisateur (optionnel).
      */
-    @Column(name = "usr_avatar", nullable = true, length = 255)
+    @Column(name = "usr_avatar", length = 255)
     private String avatarURL;
+
+    /**
+     * Indique si l'utilisateur possède les droits d'administration.
+     * {@code true} pour un administrateur, {@code false} pour un utilisateur standard.
+     * Valeur par défaut : {@code false}.
+     */
+    @Column(name = "usr_admin", nullable = false)
+    private boolean isAdmin = false;
 }
