@@ -68,10 +68,8 @@ export default function Layout({ children, title }: LayoutProps) {
         return res.json();
       })
       .then((json) => {
-        console.log("[Layout] réponse brute /users/:id →", json);
         // Si Spring enveloppe dans { data: ... }, on extrait, sinon on prend json directement
         const dto = (json?.data ?? json) as UserDTO;
-        console.log("[Layout] firstName:", dto.firstName, "lastName:", dto.lastName);
         setUserDTO(dto);
       })
       .catch((err) => {
@@ -82,21 +80,16 @@ export default function Layout({ children, title }: LayoutProps) {
 
   /**
    * Retourne le nom complet de l'utilisateur (prénom + nom).
-   * Repli sur le pseudo, puis sur "Utilisateur" si les données ne sont pas encore chargées.
+   * Repli sur "Utilisateur" si les données ne sont pas encore chargées.
    */
-  const fullName =
-    userDTO?.firstName && userDTO?.lastName
-      ? `${userDTO.firstName} ${userDTO.lastName}`
-      : (user?.pseudo ?? "Utilisateur");
+const fullName =
+  `${userDTO?.firstName ?? user?.firstName ?? ""}${userDTO?.firstName ?? user?.firstName ? " " : ""}${userDTO?.lastName ?? user?.lastName ?? ""}`.trim() || "Utilisateur";
 
   /**
-   * Lettre initiale affichée dans l'avatar.
-   * Priorité : première lettre du prénom > première lettre du pseudo > "?".
+   * Lettres des initiales affichée dans l'avatar en cas d'absence de celui-ci.
    */
-  const avatarInitial =
-  userDTO?.firstName && userDTO?.lastName
-    ? `${userDTO.firstName.charAt(0)}${userDTO.lastName.charAt(0)}`.toUpperCase()
-    : (user?.pseudo?.charAt(0) ?? "?").toUpperCase();
+const avatarInitial =
+  `${(userDTO?.firstName ?? user?.firstName)?.charAt(0) ?? ""}${(userDTO?.lastName ?? user?.lastName)?.charAt(0) ?? ""}`.toUpperCase() || "?";
 
   /**
    * Gère la déconnexion de l'utilisateur :
@@ -167,14 +160,12 @@ export default function Layout({ children, title }: LayoutProps) {
         </nav>
 
         <div className="sidebar-footer">
-          {/* Infos utilisateur */}
           <div className="user-info">
             <div className="user-avatar" title={fullName}>
               {avatarInitial}
             </div>
             <div className="user-details">
-              {/* Nom et prénom récupérés via l'API, avec repli sur le pseudo */}
-              <span className="user-pseudo">{fullName}</span>
+              <span className="user-name">{fullName}</span>
             </div>
           </div>
 

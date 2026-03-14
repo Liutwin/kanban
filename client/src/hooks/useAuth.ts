@@ -7,7 +7,6 @@ export function useAuth() {
 
   const login  = (r: AuthResponse) => setAuthResponse(r);
   const logout = () => setAuthResponse(null);
-  console.log("[useAuth] user →", authResponse?.user);
 
   const authFetch = async (
     input: RequestInfo,

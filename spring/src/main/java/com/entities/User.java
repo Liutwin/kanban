@@ -32,12 +32,6 @@ public class User {
     private String email;
 
     /**
-     * Pseudo affiché de l'utilisateur dans l'interface.
-     */
-    @Column(name = "usr_pseudo", nullable = false, length = 20)
-    private String pseudo;
-
-    /**
      * Mot de passe hashé avec crypt.
      * Ne doit jamais être exposé dans les réponses API.
      */
@@ -59,7 +53,7 @@ public class User {
     /**
      * URL de l'avatar de l'utilisateur (optionnel).
      */
-    @Column(name = "usr_avatar", length = 255)
+    @Column(name = "usr_avatar")
     private String avatarURL;
 
     /**

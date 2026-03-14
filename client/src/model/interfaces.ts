@@ -8,7 +8,6 @@
 export interface User {
   id:         number;
   email:      string;
-  pseudo:     string;
   firstName:  string;
   lastName:   string;
   avatarURL?: string;
@@ -23,7 +22,7 @@ export interface AuthResponse {
 
 /** Corps de requête de `POST /api/v1/auth/login`. */
 export interface LoginRequest {
-  pseudo:   string;
+  email:    string;
   password: string;
 }
 
@@ -108,7 +107,6 @@ export interface Log {
   date:         string;
   description?: string;
   authorId?:    number;
-  authorPseudo?: string;
   taskId?:      number;
   boardId?:     number;
   boardName?:   string;
@@ -117,7 +115,6 @@ export interface Log {
 /** Corps de requête de `POST /api/v1/users`. */
 export interface UserCreate {
   email:      string;
-  pseudo:     string;
   password:   string;
   lastName:   string;
   firstName:  string;

@@ -12,7 +12,6 @@ interface LogEntry {
   date:        string;
   description: string;
   auteurId:    number | null;
-  auteurPseudo?: string;
   tacheId:     number | null;
   tableauId:   number | null;
   tableauNom?: string;

@@ -20,11 +20,6 @@ public class UserCreateDTO {
     private String email;
 
     /**
-     * Pseudo affiché de l'utilisateur.
-     */
-    private String pseudo;
-
-    /**
      * Mot de passe en clair — sera hashé avant persistance.
      */
     private String password;

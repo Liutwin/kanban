@@ -28,11 +28,6 @@ public class UserDTO {
     private String email;
 
     /**
-     * Pseudo affiché de l'utilisateur.
-     */
-    private String pseudo;
-
-    /**
      * Nom de famille (optionnel).
      */
     private String lastName;

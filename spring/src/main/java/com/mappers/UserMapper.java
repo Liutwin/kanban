@@ -23,7 +23,6 @@ public class UserMapper {
         return new UserDTO(
                 user.getId(),
                 user.getEmail(),
-                user.getPseudo(),
                 user.getLastName(),
                 user.getFirstName(),
                 user.getAvatarURL(),
@@ -43,7 +42,6 @@ public class UserMapper {
         User user = new User();
         user.setId(dto.getId());
         user.setEmail(dto.getEmail());
-        user.setPseudo(dto.getPseudo());
         user.setLastName(dto.getLastName());
         user.setFirstName(dto.getFirstName());
         user.setAvatarURL(dto.getAvatarURL());
@@ -61,7 +59,6 @@ public class UserMapper {
     public User toEntityFromCreate(UserCreateDTO dto) {
         User user = new User();
         user.setEmail(dto.getEmail());
-        user.setPseudo(dto.getPseudo());
         user.setPassword(dto.getPassword());
         user.setLastName(dto.getLastName());
         user.setFirstName(dto.getFirstName());

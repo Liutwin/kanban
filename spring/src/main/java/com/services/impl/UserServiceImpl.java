@@ -46,12 +46,22 @@ public class UserServiceImpl implements UserService {
         return userMapper.toDTO(user);
     }
 
+    /** Fonction utilitaire pour mettre la première lettre en majuscule **/
+    private String capitalize(String s) {
+        if (s == null || s.isBlank()) return s;
+        return Character.toUpperCase(s.charAt(0)) + s.substring(1);
+    }
+
     /** {@inheritDoc} */
     @Override
     public UserDTO createUser(UserCreateDTO dto) {
         if (userRepository.existsByEmail(dto.getEmail())) {
             throw new RuntimeException("Email déjà utilisé : " + dto.getEmail());
         }
+
+        dto.setFirstName(capitalize(dto.getFirstName()));
+        dto.setLastName(capitalize(dto.getLastName()));
+
         User user = userMapper.toEntityFromCreate(dto);
         return userMapper.toDTO(userRepository.save(user));
     }
@@ -62,7 +72,6 @@ public class UserServiceImpl implements UserService {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Utilisateur introuvable : " + id));
         user.setEmail(dto.getEmail());
-        user.setPseudo(dto.getPseudo());
         user.setLastName(dto.getLastName());
         user.setFirstName(dto.getFirstName());
         return userMapper.toDTO(userRepository.save(user));

@@ -2,13 +2,14 @@ import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import { ROUTES_API } from "../config/api";
+import AuthIcon from '../assets/kanban-icon-auth.svg';
 import "../styles/auth.css";
 
 /**
  * Page d'inscription de l'application.
  *
  * Affiche un formulaire de création de compte demandant le prénom, le nom,
- * le pseudo, l'adresse e-mail et le mot de passe (avec confirmation).
+ * l'adresse e-mail et le mot de passe (avec confirmation).
  * Les validations suivantes sont effectuées côté client avant l'envoi :
  * - tous les champs sont requis ;
  * - les deux mots de passe doivent correspondre ;
@@ -30,21 +31,19 @@ export default function Register() {
   const navigate  = useNavigate();
 
   /** Prénom saisi par l'utilisateur (max 50 caractères). */
-  const [prenom, setPrenom]   = useState("");
+  const [firstName, setFirstName] = useState("");
   /** Nom de famille saisi par l'utilisateur (max 50 caractères). */
-  const [nom, setNom]         = useState("");
-  /** Pseudo choisi par l'utilisateur (max 20 caractères). */
-  const [pseudo, setPseudo]   = useState("");
+  const [lastName, setLastName]   = useState("");
   /** Adresse e-mail saisie par l'utilisateur. */
-  const [mail, setMail]       = useState("");
+  const [email, setEmail]         = useState("");
   /** Mot de passe saisi par l'utilisateur. */
-  const [mdp, setMdp]         = useState("");
-  /** Confirmation du mot de passe, doit être identique à {@link mdp}. */
-  const [mdp2, setMdp2]       = useState("");
+  const [password, setPassword]   = useState("");
+  /** Confirmation du mot de passe, doit être identique à {@link password}. */
+  const [password2, setPassword2] = useState("");
   /** Message d'erreur à afficher dans le formulaire, vide si aucune erreur. */
-  const [error, setError]     = useState("");
+  const [error, setError]         = useState("");
   /** Indique si une requête de création de compte est en cours (désactive le bouton submit). */
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading]     = useState(false);
 
   /** Met à jour le titre de l'onglet du navigateur pour la page d'inscription. */
   useEffect(() => {
@@ -66,17 +65,17 @@ export default function Register() {
     setError("");
 
     const validate = (): string | null => {
-      if (!prenom || !nom || !pseudo || !mail || !mdp || !mdp2)
+      if (!firstName.trim())
+        return "Le prénom est requis.";
+      if (!lastName.trim())
+        return "Le nom est requis.";
+      if (!email || !password || !password2)
         return "Tous les champs sont requis.";
-      if (pseudo.length < 3 || pseudo.length > 20)
-        return "Le pseudo doit faire entre 3 et 20 caractères.";
-      if (!/^[a-zA-Z0-9_-]+$/.test(pseudo))
-        return "Le pseudo ne peut contenir que des lettres, chiffres, _ et -.";
-      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(mail))
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
         return "Adresse e-mail invalide.";
-      if (mdp !== mdp2)
+      if (password !== password2)
         return "Les mots de passe ne correspondent pas.";
-      if (mdp.length < 8)
+      if (password.length < 8)
         return "Le mot de passe doit comporter au moins 8 caractères.";
       return null;
     };
@@ -89,7 +88,13 @@ export default function Register() {
       const res = await fetch(ROUTES_API.users, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prenom, nom, pseudo, email: mail, password: mdp }),
+        // Les noms des champs doivent correspondre exactement au DTO Spring (UserCreateDTO)
+        body: JSON.stringify({
+          email,
+          password,
+          firstName,
+          lastName,
+        }),
       });
 
       if (!res.ok) {
@@ -112,8 +117,7 @@ export default function Register() {
       }
 
       const json = await res.json();
-      login(json.data);
-      navigate("/");
+      navigate("/login", { state: { message: "Compte créé avec succès, connectez-vous." } });
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Erreur lors de la création du compte.");
     } finally {
@@ -123,15 +127,10 @@ export default function Register() {
 
   return (
     <div className="auth-shell">
-      <div className="auth-deco" aria-hidden>
-        <span className="deco-hex">⬡</span>
-        <span className="deco-hex small">⬡</span>
-        <span className="deco-hex tiny">⬡</span>
-      </div>
 
       <div className="auth-card">
         <div className="auth-header">
-          <span className="auth-logo">⬡</span>
+            <img src={AuthIcon} alt="Kanban" width="32" height="32" />
           <h1 className="auth-title">KANBAN</h1>
           <p className="auth-sub">Créer votre compte</p>
         </div>
@@ -145,74 +144,79 @@ export default function Register() {
 
           <div className="form-row">
             <div className="form-group">
-              <label className="form-label">Prénom</label>
+              <label className="form-label">
+                Prénom <span className="required" aria-hidden>*</span>
+              </label>
               <input
                 type="text"
                 className="form-input"
                 placeholder="Alice"
-                value={prenom}
-                onChange={e => setPrenom(e.target.value)}
+                value={firstName}
+                onChange={e => setFirstName(e.target.value.replace(/^\p{L}/u, c => c.toUpperCase()))}
                 maxLength={50}
+                required
                 autoFocus
               />
             </div>
 
             <div className="form-group">
-              <label className="form-label">Nom</label>
+              <label className="form-label">
+                Nom <span className="required" aria-hidden>*</span>
+              </label>
               <input
                 type="text"
                 className="form-input"
                 placeholder="Martin"
-                value={nom}
-                onChange={e => setNom(e.target.value)}
+                value={lastName}
+                onChange={e => setLastName(e.target.value.replace(/^\p{L}/u, c => c.toUpperCase()))}
                 maxLength={50}
+                required
               />
             </div>
           </div>
 
           <div className="form-group">
-            <label className="form-label">Pseudo</label>
-            <input
-              type="text"
-              className="form-input"
-              placeholder="AliceM"
-              value={pseudo}
-              onChange={e => setPseudo(e.target.value)}
-              maxLength={20}
-            />
-          </div>
-
-          <div className="form-group">
-            <label className="form-label">Adresse e-mail</label>
+            <label className="form-label">
+              Adresse e-mail <span className="required" aria-hidden>*</span>
+            </label>
             <input
               type="email"
               className="form-input"
               placeholder="alice@example.com"
-              value={mail}
-              onChange={e => setMail(e.target.value)}
+              value={email}
+              onChange={e => setEmail(e.target.value)}
               autoComplete="email"
+              required
             />
           </div>
 
           <div className="form-group">
-            <label className="form-label">Mot de passe</label>
+            <label className="form-label">
+              Mot de passe <span className="required" aria-hidden>*</span>
+            </label>
             <input
               type="password"
               className="form-input"
               placeholder="••••••••"
-              value={mdp}
-              onChange={e => setMdp(e.target.value)}
+              value={password}
+              onChange={e => setPassword(e.target.value)}
+              autoComplete="new-password"
+              required
             />
           </div>
 
           <div className="form-group">
-            <label className="form-label">Confirmer le mot de passe</label>
+            <label className="form-label">
+              Confirmer le mot de passe <span className="required" aria-hidden>*</span>
+            </label>
             <input
               type="password"
               className="form-input"
               placeholder="••••••••"
-              value={mdp2}
-              onChange={e => setMdp2(e.target.value)}
+              value={password2}
+              onChange={e => setPassword2(e.target.value)}
+              autoComplete="new-password"
+              required
             />
           </div>
 

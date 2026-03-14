@@ -23,14 +23,14 @@ router.post("/login", async (ctx) => {
   }
 
   // Vérification des champs
-  if (!body.pseudo || !body.password) {
+  if (!body.email || !body.password) {
     throw new APIException(APIErrorCode.BAD_REQUEST, 400, "Pseudo et mot de passe requis");
   }
 
   // Obtention des informations de l'utilisateur
   const [rows] = await db.query(
-    "SELECT usr_id, usr_mail, usr_pseudo, usr_mdp, usr_prenom, usr_nom, usr_admin FROM utilisateur_usr WHERE usr_pseudo = ?",
-    [body.pseudo],
+    "SELECT usr_id, usr_mail, usr_mdp, usr_prenom, usr_nom, usr_admin FROM utilisateur_usr WHERE usr_mail = ?",
+    [body.email],
   );
 
   const userRow = (rows as Record<string, unknown>[])[0];
@@ -42,15 +42,11 @@ router.post("/login", async (ctx) => {
 
   const user: User = {
     id:     userRow.usr_id as number,
-    pseudo: userRow.usr_pseudo as string,
     email: userRow.usr_mail as string,
-    firstName: userRow.usr_nom as string,
-    lastName: userRow.usr_prenom as string,
+    firstName: userRow.usr_prenom as string,
+    lastName: userRow.usr_nom as string,
     isAdmin:   (userRow.usr_admin as Uint8Array)[0] === 1
   };
-
-  console.log("[login] user construit →", user);
-  console.log("[login] userRow →", userRow);
 
   const token = await createJWT({
     id: user.id

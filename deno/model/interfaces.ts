@@ -48,7 +48,6 @@ export class APIException extends Error {
 // Ce que l'API expose au client
 export interface User {
   id: number;
-  pseudo: string;
   email: string;
   firstName: string;
   lastName: string;
@@ -59,7 +58,6 @@ export interface User {
 export interface UserRow {
   usr_id: number;
   usr_mail: string;
-  usr_pseudo: string;
   usr_mdp: string;
   [key: string]: unknown;
 }
@@ -69,7 +67,7 @@ export interface UserRow {
 // =============================================
 
 export interface LoginRequest {
-  pseudo: string;
+  email: string;
   password: string;
 }
 

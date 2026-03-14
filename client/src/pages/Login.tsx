@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import { ROUTES_AUTH } from "../config/api";
 import { extractErrorMessage } from "../utils/apiHelpers";
@@ -9,7 +9,7 @@ import "../styles/auth.css";
 /**
  * Page de connexion de l'application.
  *
- * Affiche un formulaire demandant le pseudo et le mot de passe de
+ * Affiche un formulaire demandant l'email et le mot de passe de
  * l'utilisateur. En cas de succès, le token JWT reçu est stocké via le
  * contexte d'authentification et l'utilisateur est redirigé vers l'accueil.
  *
@@ -24,9 +24,16 @@ import "../styles/auth.css";
 export default function Login() {
   const { login } = useAuth();
   const navigate  = useNavigate();
+  const location  = useLocation();
 
-  /** Pseudo saisi par l'utilisateur. */
-  const [pseudo, setPseudo]   = useState("");
+  /**
+ * Message de succès transmis via le state de navigation (ex. : après une
+ * inscription réussie). Affiché en haut du formulaire si présent.
+ */
+  const successMessage = (location.state as { message?: string })?.message;
+
+  /** Email saisi par l'utilisateur. */
+  const [email, setEmail]   = useState("");
   /** Mot de passe saisi par l'utilisateur. */
   const [mdp, setMdp]         = useState("");
   /** Message d'erreur à afficher sous le formulaire, vide si aucune erreur. */
@@ -51,7 +58,7 @@ export default function Login() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
-    if (!pseudo || !mdp) { setError("Veuillez remplir tous les champs."); return; }
+    if (!email || !mdp) { setError("Veuillez remplir tous les champs."); return; }
     setLoading(true);
     try {
       let res: Response;
@@ -59,7 +66,7 @@ export default function Login() {
         res = await fetch(ROUTES_AUTH.login, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ pseudo: pseudo, password: mdp }),
+          body: JSON.stringify({ email: email, password: mdp }),
         });
       } catch {
         throw new Error("Serveur indisponible.");
@@ -96,6 +103,11 @@ export default function Login() {
         </div>
 
         <form onSubmit={handleSubmit} className="auth-form">
+          {successMessage && (
+            <div className="alert alert-success">
+              <span>✓</span> {successMessage}
+            </div>
+          )}
           {error && (
             <div className="alert alert-error">
               <span>⚠</span> {error}
@@ -103,13 +115,13 @@ export default function Login() {
           )}
 
           <div className="form-group">
-            <label className="form-label">Pseudo</label>
+            <label className="form-label">Email</label>
             <input
               type="text"
               className="form-input"
-              placeholder="alice"
-              value={pseudo}
-              onChange={e => setPseudo(e.target.value)}
+              placeholder="alice@example.com"
+              value={email}
+              onChange={e => setEmail(e.target.value)}
               autoComplete="username"
               autoFocus
             />

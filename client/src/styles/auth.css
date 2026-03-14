@@ -189,6 +189,12 @@
   color: #f28b82;
 }
 
+.alert-success {
+  background: rgba(129,201,149,0.1);
+  border: 1px solid rgba(129,201,149,0.25);
+  color: #81c995;
+}
+
 /* ── Lien bas de page ─────────────────────────────────────── */
 .auth-link {
   margin-top: 24px;
