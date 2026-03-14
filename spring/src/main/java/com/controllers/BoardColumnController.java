@@ -13,7 +13,7 @@ import java.util.List;
 
 /**
  * Contrôleur REST exposant les endpoints de gestion des colonnes Kanban.
- * Préfixe de route : {@code /boards/{id}/columns}
+ * Préfixe de route : {@code /boards/{boardId}/columns}
  */
 @RestController
 @RequestMapping("/boards/{boardId}/columns")
@@ -38,7 +38,8 @@ public class BoardColumnController {
     /**
      * Récupère une colonne par son identifiant.
      *
-     * @param id l'identifiant de la colonne
+     * @param boardId l'identifiant du tableau
+     * @param id      l'identifiant de la colonne
      * @return le {@link BoardColumnDTO} avec statut HTTP 200
      */
     @Operation(summary = "Récupérer une colonne par ID")
@@ -52,7 +53,7 @@ public class BoardColumnController {
      * Crée une nouvelle colonne dans un tableau.
      *
      * @param boardId l'identifiant du tableau
-     * @param dto       les données de la nouvelle colonne
+     * @param dto     les données de la nouvelle colonne
      * @return le {@link BoardColumnDTO} créé avec statut HTTP 201
      */
     @Operation(summary = "Créer une colonne")
@@ -67,30 +68,32 @@ public class BoardColumnController {
     /**
      * Renomme une colonne existante.
      *
-     * @param id  l'identifiant de la colonne
-     * @param dto les nouvelles données
+     * @param boardId l'identifiant du tableau
+     * @param id      l'identifiant de la colonne
+     * @param dto     les nouvelles données
      * @return le {@link BoardColumnDTO} mis à jour avec statut HTTP 200
      */
     @Operation(summary = "Renommer une colonne")
     @PutMapping("/{id}")
-    public ResponseEntity<BoardColumnDTO> updateColonne(@PathVariable Long boardId,
-                                                        @PathVariable Long id,
-                                                        @RequestBody BoardColumnDTO dto) {
+    public ResponseEntity<BoardColumnDTO> updateColumn(@PathVariable Long boardId,
+                                                       @PathVariable Long id,
+                                                       @RequestBody BoardColumnDTO dto) {
         return ResponseEntity.ok(boardColumnService.updateColumn(id, dto));
     }
 
     /**
      * Déplace une colonne vers une nouvelle position.
      *
-     * @param id     l'identifiant de la colonne à déplacer
-     * @param newNum la nouvelle position cible
+     * @param boardId l'identifiant du tableau
+     * @param id      l'identifiant de la colonne à déplacer
+     * @param newNum  la nouvelle position cible
      * @return statut HTTP 204 sans contenu
      */
     @Operation(summary = "Déplacer une colonne")
     @PatchMapping("/{id}/move")
-    public ResponseEntity<Void> deplacerColonne(@PathVariable Long boardd,
-                                                @PathVariable Long id,
-                                                @RequestParam int newNum) {
+    public ResponseEntity<Void> moveColumn(@PathVariable Long boardId,
+                                           @PathVariable Long id,
+                                           @RequestParam int newNum) {
         boardColumnService.moveColumn(id, newNum);
         return ResponseEntity.noContent().build();
     }
@@ -98,13 +101,14 @@ public class BoardColumnController {
     /**
      * Supprime une colonne par son identifiant.
      *
-     * @param id l'identifiant de la colonne à supprimer
+     * @param boardId l'identifiant du tableau
+     * @param id      l'identifiant de la colonne à supprimer
      * @return statut HTTP 204 sans contenu
      */
     @Operation(summary = "Supprimer une colonne")
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> deleteColonne(@PathVariable Long boardId,
-                                              @PathVariable Long id) {
+    public ResponseEntity<Void> deleteColumn(@PathVariable Long boardId,
+                                             @PathVariable Long id) {
         boardColumnService.deleteColumn(id);
         return ResponseEntity.noContent().build();
     }

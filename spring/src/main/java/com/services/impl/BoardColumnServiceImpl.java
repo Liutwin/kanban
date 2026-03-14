@@ -6,6 +6,7 @@ import com.mappers.BoardColumnMapper;
 import com.repositories.BoardColumnRepository;
 import com.repositories.BoardRepository;
 import com.services.BoardColumnService;
+import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -74,10 +75,17 @@ public class BoardColumnServiceImpl implements BoardColumnService {
 
     /** {@inheritDoc} */
     @Override
+    @Transactional
     public void deleteColumn(Long id) {
-        if (!boardColumnRepository.existsById(id)) {
-            throw new RuntimeException("Colonne introuvable : " + id);
-        }
+        BoardColumn col = boardColumnRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Colonne introuvable : " + id));
+
+        Long tabId      = col.getBoard().getId();
+        int  deletedNum = col.getNumero();
+
+        boardColumnRepository.setShiftFlag();
         boardColumnRepository.deleteById(id);
+        boardColumnRepository.shiftColumnsAfterDelete(tabId, deletedNum);
+        boardColumnRepository.clearShiftFlag();
     }
 }

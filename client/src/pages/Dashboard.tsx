@@ -43,6 +43,12 @@ export default function Dashboard() {
   const [dragTask, setDragTask] = useState<Task | null>(null);
   const [dragOver, setDragOver] = useState<number | null>(null);
 
+  // Colonnes
+  const [colModal, setColModal]   = useState(false);
+  const [colName, setColName]     = useState("");
+  const [colError, setColError]   = useState("");
+  const [colSaving, setColSaving] = useState(false);
+
   /* ── Chargement ──────────────────────────────────────────── */
 
   /**
@@ -147,6 +153,43 @@ export default function Dashboard() {
     fetchBoard();
   };
 
+  /* ── Colonnes ────────────────────────────────────────────── */
+
+  /** Crée une nouvelle colonne dans le tableau courant. */
+  const handleCreateColumn = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setColError("");
+    if (!colName.trim()) { setColError("Le nom est requis."); return; }
+    setColSaving(true);
+    try {
+      const res = await authFetch(ROUTES_API.columns(boardId), {
+        method: "POST",
+        body: JSON.stringify({ name: colName.trim() }),
+      });
+      if (!res.ok) {
+        const json = await res.json().catch(() => null);
+        throw new Error(json?.message ?? `Erreur serveur (${res.status}).`);
+      }
+      setColModal(false);
+      setColName("");
+      fetchBoard();
+    } catch (e: unknown) {
+      setColError(e instanceof Error ? e.message : "Erreur.");
+    } finally {
+      setColSaving(false);
+    }
+  };
+
+  /**
+   * Supprime une colonne après confirmation.
+   * @param colId - Identifiant de la colonne à supprimer.
+   */
+  const handleDeleteColumn = async (colId: number) => {
+    if (!confirm("Supprimer cette colonne et toutes ses tâches ?")) return;
+    await authFetch(ROUTES_API.column(boardId, colId), { method: "DELETE" });
+    fetchBoard();
+  };
+
   /* ── Drag & drop ─────────────────────────────────────────── */
 
   /**
@@ -211,7 +254,14 @@ export default function Dashboard() {
               >
                 <div className="col-header">
                   <span className="col-name">{col.name}</span>
-                  <span className="col-count">{col.tasks.length}</span>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    <span className="col-count">{col.tasks.length}</span>
+                    <button
+                      className="icon-btn danger"
+                      title="Supprimer la colonne"
+                      onClick={() => handleDeleteColumn(col.id)}
+                    >✕</button>
+                  </div>
                 </div>
 
                 <div className="col-tasks">
@@ -256,6 +306,11 @@ export default function Dashboard() {
                 </button>
               </div>
             ))}
+
+            {/* Bouton nouvelle colonne */}
+            <button className="kanban-col-new" onClick={() => { setColName(""); setColError(""); setColModal(true); }}>
+              + Nouvelle colonne
+            </button>
           </div>
         )}
       </div>
@@ -304,6 +359,35 @@ export default function Dashboard() {
                 <button type="button" className="btn btn-ghost" onClick={() => setTaskModal(null)}>Annuler</button>
                 <button type="submit" className="btn btn-primary" disabled={saving}>
                   {saving ? "Sauvegarde…" : editTask ? "Enregistrer" : "Créer"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+      {/* Modale création de colonne */}
+      {colModal && (
+        <div className="modal-overlay" onClick={() => setColModal(false)}>
+          <div className="modal" style={{ maxWidth: 360 }} onClick={e => e.stopPropagation()}>
+            <h2 className="modal-title">Nouvelle colonne</h2>
+            <form onSubmit={handleCreateColumn} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              {colError && <div className="alert alert-error">⚠ {colError}</div>}
+              <div className="form-group">
+                <label className="form-label">Nom</label>
+                <input
+                  className="form-input"
+                  type="text"
+                  placeholder="Ex : En révision…"
+                  value={colName}
+                  maxLength={50}
+                  autoFocus
+                  onChange={e => setColName(e.target.value)}
+                />
+              </div>
+              <div className="modal-actions">
+                <button type="button" className="btn btn-ghost" onClick={() => setColModal(false)}>Annuler</button>
+                <button type="submit" className="btn btn-primary" disabled={colSaving}>
+                  {colSaving ? "Création…" : "Créer"}
                 </button>
               </div>
             </form>
