@@ -1,5 +1,7 @@
 package com.entities;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonValue;
 import jakarta.persistence.*;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -96,6 +98,22 @@ public class Task {
             this.value = value;
         }
 
+        /** Sérialise l'enum en sa valeur string minuscule pour JSON et BDD. */
+        @JsonValue
+        public String getValue() {
+            return value;
+        }
+
+        /** Désérialise une valeur string JSON minuscule vers l'enum correspondant. */
+        @JsonCreator
+        public static Priority fromValue(String value) {
+            if (value == null) return null;
+            for (Priority p : Priority.values()) {
+                if (p.value.equals(value)) return p;
+            }
+            throw new IllegalArgumentException("Priorité inconnue : " + value);
+        }
+
         /**
          * Converter JPA pour persister les valeurs en minuscules
          * conformément au schéma SQL.
@@ -123,11 +141,7 @@ public class Task {
              */
             @Override
             public Priority convertToEntityAttribute(String value) {
-                if (value == null) return null;
-                for (Priority p : Priority.values()) {
-                    if (p.value.equals(value)) return p;
-                }
-                throw new IllegalArgumentException("Priorité inconnue : " + value);
+                return fromValue(value);
             }
         }
     }

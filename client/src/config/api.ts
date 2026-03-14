@@ -38,6 +38,7 @@ export const ROUTES_API = {
   tasksByColumn:      (colId: number)                => `${BASE}/tasks/column/${colId}`,
   tasksByColumnAndPriority: (colId: number, p: string) => `${BASE}/tasks/column/${colId}/priority/${p}`,
   tasksByAssigned:    (userId: number)               => `${BASE}/tasks/assigned/${userId}`,
+  tasks:              `${BASE}/tasks`,
   task:               (id: number)                   => `${BASE}/tasks/${id}`,
   taskMove:           (id: number)                   => `${BASE}/tasks/${id}/move`,
   taskAssign:         (id: number)                   => `${BASE}/tasks/${id}/assign`,

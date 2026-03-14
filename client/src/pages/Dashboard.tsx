@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import Layout from "../components/Layout";
 import { ROUTES_API } from "../config/api";
@@ -22,7 +22,7 @@ interface ColumnWithTasks extends Column {
 export default function Dashboard() {
   const { id }        = useParams<{ id: string }>();
   const boardId       = Number(id);
-  const { authFetch } = useAuth();
+  const { authFetch, user } = useAuth();
   const navigate      = useNavigate();
 
   const [boardName, setBoardName] = useState("");
@@ -39,9 +39,15 @@ export default function Dashboard() {
   const [saving, setSaving]       = useState(false);
   const [taskError, setTaskError] = useState("");
 
-  // Drag & drop
+  // Drag & drop tâches
   const [dragTask, setDragTask] = useState<Task | null>(null);
   const [dragOver, setDragOver] = useState<number | null>(null);
+  const dragTaskRef = useRef<Task | null>(null);
+
+  // Drag & drop colonnes
+  const [dragCol, setDragCol]         = useState<ColumnWithTasks | null>(null);
+  const [dragColOver, setDragColOver] = useState<number | null>(null);
+  const dragColRef = useRef<ColumnWithTasks | null>(null);
 
   // Colonnes
   const [colModal, setColModal]   = useState(false);
@@ -112,6 +118,7 @@ export default function Dashboard() {
 
   /**
    * Crée ou modifie une tâche selon que `editTask` est défini ou non.
+   * Met à jour le state localement sans recharger le tableau entier.
    * @param e - Événement de soumission du formulaire.
    */
   const handleSaveTask = async (e: React.FormEvent) => {
@@ -126,16 +133,26 @@ export default function Dashboard() {
         dueDate:       taskForm.dueDate || null,
         priority:      taskForm.priority,
         boardColumnId: taskModal!.colId,
+        creatorId:     user!.id,
       };
       const res = editTask
-        ? await authFetch(ROUTES_API.task(editTask.id),               { method: "PUT",  body: JSON.stringify(body) })
-        : await authFetch(ROUTES_API.tasksByColumn(taskModal!.colId), { method: "POST", body: JSON.stringify(body) });
+        ? await authFetch(ROUTES_API.task(editTask.id), { method: "PUT",  body: JSON.stringify(body) })
+        : await authFetch(ROUTES_API.tasks,             { method: "POST", body: JSON.stringify(body) });
       if (!res.ok) {
         const json = await res.json().catch(() => null);
         throw new Error(json?.message ?? `Erreur serveur (${res.status}).`);
       }
+      const savedTask: Task = await res.json();
+      setColumns(cols => cols.map(c => {
+        if (editTask) {
+          // Modification : remplacer la tâche existante
+          return { ...c, tasks: c.tasks.map(t => t.id === savedTask.id ? savedTask : t) };
+        } else {
+          // Création : ajouter la tâche à la bonne colonne
+          return c.id === taskModal!.colId ? { ...c, tasks: [...c.tasks, savedTask] } : c;
+        }
+      }));
       setTaskModal(null);
-      fetchBoard();
     } catch (e: unknown) {
       setTaskError(e instanceof Error ? e.message : "Erreur.");
     } finally {
@@ -145,17 +162,24 @@ export default function Dashboard() {
 
   /**
    * Supprime une tâche après confirmation.
+   * Met à jour le state localement sans recharger le tableau entier.
    * @param taskId - Identifiant de la tâche à supprimer.
    */
   const handleDeleteTask = async (taskId: number) => {
     if (!confirm("Supprimer cette tâche ?")) return;
-    await authFetch(ROUTES_API.task(taskId), { method: "DELETE" });
-    fetchBoard();
+    const res = await authFetch(ROUTES_API.task(taskId), { method: "DELETE" });
+    if (res.ok) {
+      setColumns(cols => cols.map(c => ({ ...c, tasks: c.tasks.filter(t => t.id !== taskId) })));
+    } else {
+      fetchBoard();
+    }
   };
 
   /* ── Colonnes ────────────────────────────────────────────── */
 
-  /** Crée une nouvelle colonne dans le tableau courant. */
+  /** Crée une nouvelle colonne dans le tableau courant.
+   *  Met à jour le state localement sans recharger le tableau entier.
+   */
   const handleCreateColumn = async (e: React.FormEvent) => {
     e.preventDefault();
     setColError("");
@@ -170,9 +194,10 @@ export default function Dashboard() {
         const json = await res.json().catch(() => null);
         throw new Error(json?.message ?? `Erreur serveur (${res.status}).`);
       }
+      const newCol: Column = await res.json();
+      setColumns(cols => [...cols, { ...newCol, tasks: [] }]);
       setColModal(false);
       setColName("");
-      fetchBoard();
     } catch (e: unknown) {
       setColError(e instanceof Error ? e.message : "Erreur.");
     } finally {
@@ -182,12 +207,17 @@ export default function Dashboard() {
 
   /**
    * Supprime une colonne après confirmation.
+   * Met à jour le state localement sans recharger le tableau entier.
    * @param colId - Identifiant de la colonne à supprimer.
    */
   const handleDeleteColumn = async (colId: number) => {
     if (!confirm("Supprimer cette colonne et toutes ses tâches ?")) return;
-    await authFetch(ROUTES_API.column(boardId, colId), { method: "DELETE" });
-    fetchBoard();
+    const res = await authFetch(ROUTES_API.column(boardId, colId), { method: "DELETE" });
+    if (res.ok) {
+      setColumns(cols => cols.filter(c => c.id !== colId));
+    } else {
+      fetchBoard();
+    }
   };
 
   /* ── Drag & drop ─────────────────────────────────────────── */
@@ -195,20 +225,62 @@ export default function Dashboard() {
   /**
    * Déplace la tâche en cours de drag vers la colonne cible
    * via `PATCH /api/v1/tasks/{id}/move`.
+   * Met à jour le state localement sans recharger le tableau entier.
    *
    * @param targetColId - Identifiant de la colonne de destination.
    */
-  const handleDrop = async (targetColId: number) => {
-    if (!dragTask || dragTask.boardColumnId === targetColId) {
+  const handleDrop = (targetColId: number, task: Task) => {
+    if (task.boardColumnId === targetColId) {
       setDragTask(null); setDragOver(null); return;
     }
-    await authFetch(ROUTES_API.taskMove(dragTask.id), {
-      method: "PATCH",
-      body:   JSON.stringify({ boardColumnId: targetColId }),
-    });
+    const movedTask = { ...task, boardColumnId: targetColId };
+    setColumns(cols => cols.map(c => {
+      if (c.id === task.boardColumnId) return { ...c, tasks: c.tasks.filter(t => t.id !== task.id) };
+      if (c.id === targetColId)        return { ...c, tasks: [...c.tasks, movedTask] };
+      return c;
+    }));
     setDragTask(null);
     setDragOver(null);
-    fetchBoard();
+    setTimeout(async () => {
+      const res = await authFetch(`${ROUTES_API.taskMove(task.id)}?newId=${targetColId}`, {
+        method: "PATCH",
+        body:   "{}",
+      });
+      if (!res.ok) fetchBoard();
+    }, 0);
+  };
+
+  /* ── Drag & drop colonnes ────────────────────────────────── */
+
+  /**
+   * Déplace la colonne en cours de drag vers la position de la colonne cible
+   * via `PATCH /api/v1/boards/{boardId}/columns/{id}/move?newNum={num}`.
+   * Met à jour le state localement sans recharger le tableau entier.
+   *
+   * @param targetCol - Colonne sur laquelle on lâche.
+   */
+  const handleColDrop = async (targetCol: ColumnWithTasks) => {
+    const col = dragColRef.current;
+    console.log("handleColDrop appelé, col:", col?.id, "→ target:", targetCol.id);
+    if (!col || col.id === targetCol.id) {
+      setDragCol(null); setDragColOver(null); return;
+    }
+    const newNum = targetCol.numero;
+    setColumns(cols => {
+      const oldIdx        = cols.findIndex(c => c.id === col.id);
+      const targetOrigIdx = cols.findIndex(c => c.id === targetCol.id);
+      const reordered     = cols.filter(c => c.id !== col.id);
+      const targetIdx     = reordered.findIndex(c => c.id === targetCol.id);
+      const insertAt      = oldIdx < targetOrigIdx ? targetIdx + 1 : targetIdx;
+      reordered.splice(insertAt, 0, { ...col, numero: newNum });
+      return reordered.map((c, i) => ({ ...c, numero: i + 1 }));
+    });
+    setDragCol(null);
+    setDragColOver(null);
+    const res = await authFetch(`${ROUTES_API.columnMove(boardId, col.id)}?newNum=${newNum}`, {
+      method: "PATCH",
+    });
+    if (!res.ok) fetchBoard();
   };
 
   /* ── Helpers ─────────────────────────────────────────────── */
@@ -247,12 +319,18 @@ export default function Dashboard() {
             {columns.map(col => (
               <div
                 key={col.id}
-                className={`kanban-col ${dragOver === col.id ? "drag-over" : ""}`}
-                onDragOver={e => { e.preventDefault(); setDragOver(col.id); }}
-                onDragLeave={() => setDragOver(null)}
-                onDrop={() => handleDrop(col.id)}
+                className={`kanban-col ${dragOver === col.id ? "drag-over" : ""} ${dragColOver === col.id && !dragTask ? "drag-over" : ""}`}
+                onDragOver={e => { e.preventDefault(); dragTaskRef.current ? setDragOver(col.id) : setDragColOver(col.id); }}
+                onDragLeave={() => { setDragOver(null); setDragColOver(null); }}
+                onDrop={e => { e.preventDefault(); console.log("DROP sur col", col.id, "dragTaskRef:", dragTaskRef.current?.id, "dragColRef:", dragColRef.current?.id); dragTaskRef.current ? handleDrop(col.id, dragTaskRef.current) : handleColDrop(col); }}
               >
-                <div className="col-header">
+                <div
+                  className="col-header"
+                  draggable
+                  onDragStart={e => { e.stopPropagation(); dragTaskRef.current = null; setDragTask(null); dragColRef.current = col; setDragCol(col); console.log("DRAGSTART col", col.id); }}
+                  onDragEnd={() => { dragColRef.current = null; setDragCol(null); setDragColOver(null); }}
+                  style={{ cursor: "grab" }}
+                >
                   <span className="col-name">{col.name}</span>
                   <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                     <span className="col-count">{col.tasks.length}</span>
@@ -264,14 +342,19 @@ export default function Dashboard() {
                   </div>
                 </div>
 
-                <div className="col-tasks">
+                <div className="col-tasks"
+                  onDragOver={e => e.preventDefault()}
+                  onDrop={e => e.preventDefault()}
+                >
                   {col.tasks.map(task => (
                     <div
                       key={task.id}
                       className="task-card"
                       draggable
-                      onDragStart={() => setDragTask(task)}
-                      onDragEnd={() => { setDragTask(null); setDragOver(null); }}
+                      onDragStart={e => { e.stopPropagation(); dragTaskRef.current = task; setDragTask(task); }}
+                      onDragEnd={() => { dragTaskRef.current = null; setDragTask(null); setDragOver(null); }}
+                      onDragOver={e => e.preventDefault()}
+                      onDrop={e => e.preventDefault()}
                     >
                       <div className="task-header">
                         <span className={`badge ${priorityClass(task.priority)}`}>

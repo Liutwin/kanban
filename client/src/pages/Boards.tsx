@@ -6,7 +6,7 @@ import { useAuth } from "../hooks/useAuth";
 import type { Board } from "../model/interfaces";
 import "../styles/boards.css";
 
-type Role = "ADMIN" | "EDITEUR" | "LECTEUR";
+type Role = "admin" | "editeur" | "lecteur";
 
 /** Tableau enrichi du rôle de l'utilisateur connecté, tel que retourné par `GET /api/v1/boards/user/{id}`. */
 interface BoardWithRole extends Board {
@@ -112,11 +112,11 @@ export default function Boards() {
 
   /** Retourne le libellé français du rôle. */
   const roleLabel = (role: Role) =>
-    role === "ADMIN" ? "Admin" : role === "EDITEUR" ? "Éditeur" : "Lecteur";
+    role === "admin" ? "Admin" : role === "editeur" ? "Éditeur" : "Lecteur";
 
   /** Retourne la classe CSS associée au rôle pour le badge coloré. */
   const roleClass = (role: Role) =>
-    role === "ADMIN" ? "role-admin" : role === "EDITEUR" ? "role-editeur" : "role-lecteur";
+    role === "admin" ? "role-admin" : role === "editeur" ? "role-editeur" : "role-lecteur";
 
   return (
     <Layout title="Mes tableaux">
@@ -163,7 +163,7 @@ export default function Boards() {
                   <span className={`role-badge ${roleClass(board.role)}`}>
                     {roleLabel(board.role)}
                   </span>
-                  {board.role === "ADMIN" && (
+                  {board.role === "admin" && (
                     <button
                       className="board-delete-btn"
                       onClick={e => handleDelete(e, board.id)}

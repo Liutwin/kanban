@@ -31,8 +31,9 @@ async function proxyToTomcat(
 
   let bodyInit: BodyInit | undefined;
   if (["POST", "PUT", "PATCH"].includes(method)) {
-    bodyInit = overrideBody ?? await ctx.request.body.text();
-    console.log("bodyInit envoyé à Spring:", bodyInit);
+    const text = overrideBody ?? await ctx.request.body.text();
+    console.log("bodyInit envoyé à Spring:", text);
+    bodyInit = text.length > 0 ? text : undefined;
   }
 
   const headers = new Headers();
@@ -80,7 +81,7 @@ router.post("/users", async (ctx) => {
  * retournée directement sans atteindre Tomcat.
  */
 router.all("/(.*)", authMiddleware, async (ctx: AuthContext) => {
-  const path = ctx.request.url.pathname;
+  const path = ctx.request.url.pathname + ctx.request.url.search;
   await proxyToTomcat(ctx, path);
 });
 

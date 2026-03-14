@@ -1,5 +1,7 @@
 package com.entities;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonValue;
 import jakarta.persistence.*;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -79,8 +81,19 @@ public class BoardMember {
 
         Role(String value) { this.value = value; }
 
-        @Override
-        public String toString() { return value; }
+        /** Sérialise l'enum en sa valeur string minuscule pour JSON. */
+        @JsonValue
+        public String getValue() { return value; }
+
+        /** Désérialise une valeur string JSON minuscule vers l'enum correspondant. */
+        @JsonCreator
+        public static Role fromValue(String value) {
+            if (value == null) return null;
+            for (Role role : Role.values()) {
+                if (role.value.equals(value)) return role;
+            }
+            throw new IllegalArgumentException("Rôle inconnu : " + value);
+        }
     }
 
     @Converter(autoApply = true)
@@ -88,16 +101,12 @@ public class BoardMember {
 
         @Override
         public String convertToDatabaseColumn(Role role) {
-            return role == null ? null : role.toString();
+            return role == null ? null : role.getValue();
         }
 
         @Override
         public Role convertToEntityAttribute(String value) {
-            if (value == null) return null;
-            for (Role role : Role.values()) {
-                if (role.toString().equals(value)) return role;
-            }
-            throw new IllegalArgumentException("Rôle inconnu : " + value);
+            return Role.fromValue(value);
         }
     }
 }
