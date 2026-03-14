@@ -6,7 +6,9 @@ import Register    from "./pages/Register";
 import Boards      from "./pages/Boards";
 import Dashboard   from "./pages/Dashboard";
 import Logs        from "./pages/Logs";
+import MyTasks from "./pages/MyTasks";
 import Admin       from "./pages/Admin";
+import Profile from "./pages/Profile";
 
 export default function App() {
   return (
@@ -26,6 +28,12 @@ export default function App() {
         } />
         <Route path="/logs" element={
           <ProtectedRoute><Logs /></ProtectedRoute>
+        } />
+        <Route path="/profile" element={
+          <ProtectedRoute><Profile /></ProtectedRoute>
+        } />
+        <Route path="/my-tasks" element={
+          <ProtectedRoute><MyTasks /></ProtectedRoute>
         } />
         <Route path="/admin" element={
           <ProtectedRoute><Admin /></ProtectedRoute>

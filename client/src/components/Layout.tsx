@@ -134,11 +134,26 @@ export default function Layout({ children, title }: LayoutProps) {
             <span>Tableaux</span>
           </NavLink>
           <NavLink
+            to="/my-tasks"
+            className={({ isActive }) => `nav-item ${isActive ? "active" : ""}`}
+          >
+            <span className="nav-icon">✓</span>
+            <span>Mes tâches</span>
+          </NavLink>
+          <NavLink
             to="/logs"
             className={({ isActive }) => `nav-item ${isActive ? "active" : ""}`}
           >
             <span className="nav-icon">≡</span>
             <span>Journal</span>
+          </NavLink>
+          <span className="nav-section-label" style={{ marginTop: "12px" }}>Compte</span>
+          <NavLink
+            to="/profile"
+            className={({ isActive }) => `nav-item ${isActive ? "active" : ""}`}
+          >
+            <span className="nav-icon">◎</span>
+            <span>Mon profil</span>
           </NavLink>
           {user?.isAdmin && (
             <NavLink
