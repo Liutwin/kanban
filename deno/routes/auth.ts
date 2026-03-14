@@ -45,7 +45,7 @@ router.post("/login", async (ctx) => {
     email: userRow.usr_mail as string,
     firstName: userRow.usr_prenom as string,
     lastName: userRow.usr_nom as string,
-    isAdmin:   (userRow.usr_admin as Uint8Array)[0] === 1
+    isAdmin:   userRow.usr_admin === 1
   };
 
   const token = await createJWT({

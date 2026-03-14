@@ -5,6 +5,7 @@ import type { ReactNode } from "react";
 import "../styles/layout.css";
 
 import type { UserDTO } from "../model/interfaces.ts";
+import { ROUTES_AUTH } from "../config/api";
 import SidebarIcon from '../assets/kanban-icon-sidebar.svg';
 
 /**

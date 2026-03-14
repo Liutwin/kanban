@@ -32,6 +32,7 @@ public interface BoardColumnRepository extends JpaRepository<BoardColumn, Long> 
      * @param colId  l'identifiant de la colonne à déplacer
      * @param newNum la nouvelle position cible
      */
+    @Modifying
     @Query(value = "CALL deplacer_colonne(:colId, :newNum)", nativeQuery = true)
     void moveBoardColumn(@Param("colId") Long colId, @Param("newNum") int newNum);
 

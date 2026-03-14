@@ -19,6 +19,10 @@ import java.util.List;
  * <p>L'en-tête {@code X-User-Id} injecté par le proxy Deno est transmis
  * au service à chaque opération afin de vérifier que l'utilisateur
  * authentifié est bien membre du tableau auquel appartient la tâche.</p>
+ *
+ * <p>Les réponses en liste retournent les tâches triées par
+ * {@code tsk_position} croissant, reflétant l'ordre d'affichage
+ * défini dans la colonne.</p>
  */
 @RestController
 @RequestMapping("/tasks")
@@ -29,14 +33,14 @@ public class TaskController {
     private final TaskService taskService;
 
     /**
-     * Récupère toutes les tâches d'une colonne.
+     * Récupère toutes les tâches d'une colonne, triées par position croissante.
      *
      * <p>Retourne HTTP 403 si l'utilisateur n'est pas membre du tableau
      * auquel appartient la colonne.</p>
      *
      * @param id          l'identifiant de la colonne
-     * @param requesterId l'identifiant de l'utilisateur connecté, fourni par Deno
-     *                    via l'en-tête {@code X-User-Id}
+     * @param requesterId l'identifiant de l'utilisateur connecté, fourni par
+     *                    Deno via l'en-tête {@code X-User-Id}
      * @return liste de {@link TaskDTO} avec statut HTTP 200
      */
     @Operation(summary = "Lister les tâches d'une colonne")
@@ -63,15 +67,16 @@ public class TaskController {
     }
 
     /**
-     * Récupère les tâches d'une colonne filtrées par priorité.
+     * Récupère les tâches d'une colonne filtrées par priorité,
+     * triées par position croissante.
      *
      * <p>Retourne HTTP 403 si l'utilisateur n'est pas membre du tableau
      * auquel appartient la colonne.</p>
      *
      * @param id          l'identifiant de la colonne
      * @param priority    le niveau de priorité recherché
-     * @param requesterId l'identifiant de l'utilisateur connecté, fourni par Deno
-     *                    via l'en-tête {@code X-User-Id}
+     * @param requesterId l'identifiant de l'utilisateur connecté, fourni par
+     *                    Deno via l'en-tête {@code X-User-Id}
      * @return liste de {@link TaskDTO} avec statut HTTP 200
      */
     @Operation(summary = "Lister les tâches par priorité")
@@ -90,8 +95,8 @@ public class TaskController {
      * auquel appartient la tâche.</p>
      *
      * @param id          l'identifiant de la tâche
-     * @param requesterId l'identifiant de l'utilisateur connecté, fourni par Deno
-     *                    via l'en-tête {@code X-User-Id}
+     * @param requesterId l'identifiant de l'utilisateur connecté, fourni par
+     *                    Deno via l'en-tête {@code X-User-Id}
      * @return le {@link TaskDTO} avec statut HTTP 200
      */
     @Operation(summary = "Récupérer une tâche par ID")
@@ -105,13 +110,18 @@ public class TaskController {
     /**
      * Crée une nouvelle tâche.
      *
+     * <p>La position de la tâche dans sa colonne est calculée automatiquement
+     * par le trigger SQL {@code before_insert_tache} : la tâche est placée
+     * en fin de colonne ({@code MAX(tsk_position) + 1}).</p>
+     *
      * <p>Retourne HTTP 403 si l'utilisateur n'est pas membre du tableau
      * auquel appartient la colonne cible.</p>
      *
      * @param dto         les données de la nouvelle tâche
-     * @param requesterId l'identifiant de l'utilisateur connecté, fourni par Deno
-     *                    via l'en-tête {@code X-User-Id}
-     * @return le {@link TaskDTO} créé avec statut HTTP 201
+     * @param requesterId l'identifiant de l'utilisateur connecté, fourni par
+     *                    Deno via l'en-tête {@code X-User-Id}
+     * @return le {@link TaskDTO} créé avec son identifiant et sa position
+     *         générés, avec statut HTTP 201
      */
     @Operation(summary = "Créer une tâche")
     @PostMapping
@@ -123,15 +133,16 @@ public class TaskController {
     }
 
     /**
-     * Met à jour une tâche existante.
+     * Met à jour les champs métier d'une tâche existante (titre, détails,
+     * date limite, priorité). Ne modifie ni la colonne ni la position.
      *
      * <p>Retourne HTTP 403 si l'utilisateur n'est pas membre du tableau
      * auquel appartient la tâche.</p>
      *
      * @param id          l'identifiant de la tâche
      * @param dto         les nouvelles données
-     * @param requesterId l'identifiant de l'utilisateur connecté, fourni par Deno
-     *                    via l'en-tête {@code X-User-Id}
+     * @param requesterId l'identifiant de l'utilisateur connecté, fourni par
+     *                    Deno via l'en-tête {@code X-User-Id}
      * @return le {@link TaskDTO} mis à jour avec statut HTTP 200
      */
     @Operation(summary = "Mettre à jour une tâche")
@@ -144,15 +155,29 @@ public class TaskController {
     }
 
     /**
-     * Déplace une tâche vers une autre colonne du même tableau.
+     * Déplace une tâche vers une autre colonne du même tableau, ou la
+     * réordonne au sein de sa colonne courante.
      *
-     * <p>Retourne HTTP 403 si l'utilisateur n'est pas membre du tableau.
-     * Retourne HTTP 400 si la colonne cible appartient à un tableau différent.</p>
+     * <ul>
+     *   <li>Si {@code newId} diffère de la colonne courante :
+     *       déplacement inter-colonnes — la tâche est placée en fin de la
+     *       colonne cible et {@code position} est ignoré.</li>
+     *   <li>Si {@code newId} est la colonne courante :
+     *       réordonnancement intra-colonne — les tâches voisines sont
+     *       décalées pour que la tâche occupe {@code position}.</li>
+     * </ul>
      *
-     * @param id          l'identifiant de la tâche
-     * @param newId       l'identifiant de la colonne cible
-     * @param requesterId l'identifiant de l'utilisateur connecté, fourni par Deno
-     *                    via l'en-tête {@code X-User-Id}
+     * <p>Retourne HTTP 400 si la colonne cible appartient à un tableau
+     * différent. Retourne HTTP 403 si l'utilisateur n'est pas membre du
+     * tableau.</p>
+     *
+     * @param id          l'identifiant de la tâche à déplacer
+     * @param newId       l'identifiant de la colonne cible (peut être la
+     *                    colonne courante)
+     * @param position    la position cible dans la colonne (0-based) ;
+     *                    ignorée si la colonne change
+     * @param requesterId l'identifiant de l'utilisateur connecté, fourni par
+     *                    Deno via l'en-tête {@code X-User-Id}
      * @return le {@link TaskDTO} mis à jour avec statut HTTP 200
      */
     @Operation(summary = "Déplacer une tâche vers une autre colonne")
@@ -160,21 +185,25 @@ public class TaskController {
     public ResponseEntity<TaskDTO> moveTask(
             @PathVariable Long id,
             @RequestParam Long newId,
+            @RequestParam(defaultValue = "0") int position,
             @RequestHeader("X-User-Id") Long requesterId) {
-        return ResponseEntity.ok(taskService.moveTask(id, newId, requesterId));
+        return ResponseEntity.ok(taskService.moveTask(id, newId, position, requesterId));
     }
 
     /**
      * Assigne une tâche à un utilisateur.
      *
-     * <p>Retourne HTTP 403 si l'utilisateur connecté n'est pas membre du tableau
-     * auquel appartient la tâche.</p>
+     * <p>Passer {@code userId=null} (ou omettre le paramètre) retire
+     * l'assignation courante.</p>
+     *
+     * <p>Retourne HTTP 403 si l'utilisateur connecté n'est pas membre du
+     * tableau auquel appartient la tâche.</p>
      *
      * @param id          l'identifiant de la tâche
      * @param userId      l'identifiant de l'utilisateur à assigner,
      *                    {@code null} pour retirer l'assignation
-     * @param requesterId l'identifiant de l'utilisateur connecté, fourni par Deno
-     *                    via l'en-tête {@code X-User-Id}
+     * @param requesterId l'identifiant de l'utilisateur connecté, fourni par
+     *                    Deno via l'en-tête {@code X-User-Id}
      * @return le {@link TaskDTO} mis à jour avec statut HTTP 200
      */
     @Operation(summary = "Assigner une tâche à un utilisateur")
@@ -187,14 +216,14 @@ public class TaskController {
     }
 
     /**
-     * Supprime une tâche par son identifiant.
+     * Supprime une tâche et tous ses commentaires associés.
      *
      * <p>Retourne HTTP 403 si l'utilisateur n'est pas membre du tableau
      * auquel appartient la tâche.</p>
      *
      * @param id          l'identifiant de la tâche à supprimer
-     * @param requesterId l'identifiant de l'utilisateur connecté, fourni par Deno
-     *                    via l'en-tête {@code X-User-Id}
+     * @param requesterId l'identifiant de l'utilisateur connecté, fourni par
+     *                    Deno via l'en-tête {@code X-User-Id}
      * @return statut HTTP 204 sans contenu
      */
     @Operation(summary = "Supprimer une tâche")

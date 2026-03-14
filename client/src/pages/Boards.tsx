@@ -3,9 +3,9 @@ import { useNavigate } from "react-router-dom";
 import Layout from "../components/Layout";
 import { ROUTES_API } from "../config/api";
 import { useAuth } from "../hooks/useAuth";
-import type { Board } from "../model/interfaces";
 import { extractErrorMessage } from "../utils/apiHelpers";
 import { toSlug } from "../utils/slug";
+import type { Board } from "../model/interfaces";
 import "../styles/boards.css";
 
 type Role = "admin" | "editeur" | "lecteur";
@@ -152,10 +152,10 @@ export default function Boards() {
               <div
                 key={board.id}
                 className="board-card"
-                onClick={() => navigate(`/boards/${board.id}-${toSlug(board.name)}`)}
+                onClick={() => navigate(`/boards/${board.id}-${toSlug(board.name)}`, { state: { role: board.role } })}
                 role="button"
                 tabIndex={0}
-                onKeyDown={e => e.key === "Enter" && navigate(`/boards/${board.id}-${toSlug(board.name)}`)}
+                onKeyDown={e => e.key === "Enter" && navigate(`/boards/${board.id}-${toSlug(board.name)}`, { state: { role: board.role } })}
               >
                 <div className="board-card-header">
                   <span className="board-icon">▦</span>

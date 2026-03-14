@@ -79,7 +79,7 @@ export default function Login() {
           throw new Error("Serveur indisponible.");
         }
         // L'erreur suivante est récupérée sur deno/middleware/auth.ts
-        const msg = await extractErrorMessage(res, "Identifiants incorrects.");
+        const msg = await extractErrorMessage(res);
         throw new Error(msg);
       }
       const json = await res.json();

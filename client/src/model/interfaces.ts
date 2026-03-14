@@ -76,6 +76,7 @@ export interface Task {
   boardColumnId: number;
   creatorId:     number;
   assignedId?:   number;
+  position:      number;
 }
 
 export type Priority = "basse" | "moyenne" | "haute";

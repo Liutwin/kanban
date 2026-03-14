@@ -330,3 +330,27 @@
   background: var(--accent-tonal);
   transition: all 0.15s ease;
 }
+
+/* ── Drag & drop tâches ───────────────────────────────────── */
+
+/* Tâche en cours de drag : opacité réduite pour signaler l'origine */
+.task-card.dragging {
+  opacity: 0.35;
+  transform: scale(0.97);
+  box-shadow: none;
+  border-style: dashed;
+  border-color: var(--border2);
+}
+
+/* Indicateur d'insertion : ligne bleue au-dessus de la tâche survolée */
+.task-card.drag-over-task {
+  border-top: 2px solid var(--accent);
+  margin-top: -2px; /* compense l'épaisseur pour ne pas faire sauter le layout */
+  border-radius: var(--radius);
+}
+
+/* Colonne vide survolée : zone de drop bien visible */
+.kanban-col.drag-over .col-tasks {
+  background: var(--accent-tonal);
+  border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+}

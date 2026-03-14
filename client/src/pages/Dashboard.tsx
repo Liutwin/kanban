@@ -41,8 +41,10 @@ export default function Dashboard() {
   const [taskError, setTaskError] = useState("");
 
   // Drag & drop tâches
-  const [dragTask, setDragTask] = useState<Task | null>(null);
-  const [dragOver, setDragOver] = useState<number | null>(null);
+  const [dragTask, setDragTask]         = useState<Task | null>(null);
+  const [dragOver, setDragOver]         = useState<number | null>(null);
+  /** Identifiant de la tâche survolée lors d'un drag : permet d'insérer la tâche déplacée AVANT elle. */
+  const [dragOverTask, setDragOverTask] = useState<number | null>(null);
   const dragTaskRef = useRef<Task | null>(null);
 
   // Drag & drop colonnes
@@ -218,31 +220,74 @@ export default function Dashboard() {
   /* ── Drag & drop ─────────────────────────────────────────── */
 
   /**
-   * Déplace la tâche en cours de drag vers la colonne cible
-   * via `PATCH /api/v1/tasks/{id}/move`.
-   * Met à jour le state localement sans recharger le tableau entier.
+   * Déplace la tâche en cours de drag via `PATCH /api/v1/tasks/{id}/move`.
+   * Gère deux cas :
    *
-   * @param targetColId - Identifiant de la colonne de destination.
+   * **Inter-colonnes** (`targetColId !== task.boardColumnId`) :
+   * La tâche est retirée de sa colonne d'origine et insérée à `targetIndex`
+   * dans la colonne cible (ou en fin si aucune tâche n'est survolée).
+   *
+   * **Intra-colonne** (`targetColId === task.boardColumnId`) :
+   * Les tâches situées entre l'ancienne et la nouvelle position sont décalées
+   * de ±1, en miroir de l'algorithme `deplacer_colonne` côté SQL.
+   *
+   * Le state est mis à jour de façon optimiste avant l'appel réseau.
+   * En cas d'échec, `fetchBoard` resynchronise depuis le serveur.
+   *
+   * @param targetColId  - Identifiant de la colonne de destination.
+   * @param task         - Tâche en cours de déplacement.
+   * @param targetTaskId - Tâche survolée au lâcher : la tâche déplacée
+   *                       s'insère AVANT elle. Absent = insertion en fin de colonne.
    */
-  const handleDrop = (targetColId: number, task: Task) => {
-    if (task.boardColumnId === targetColId) {
-      setDragTask(null); setDragOver(null); return;
+  const handleDrop = (targetColId: number, task: Task, targetTaskId?: number) => {
+    const sameColumn = task.boardColumnId === targetColId;
+
+    const targetCol = columns.find(c => c.id === targetColId)!;
+
+    // Calcul de position AVANT la mise à jour optimiste du state,
+    // sur la liste des tâches telle qu'elle est au moment du drop.
+    // Pour l'intra-colonne : on exclut la tâche elle-même du décompte
+    // afin d'obtenir un index dans [0 .. nbTâches-1].
+    const tasksWithoutDragged = sameColumn
+      ? targetCol.tasks.filter(t => t.id !== task.id)
+      : targetCol.tasks;
+    const targetIndex = targetTaskId != null
+      ? tasksWithoutDragged.findIndex(t => t.id === targetTaskId)
+      : tasksWithoutDragged.length;
+    const position = targetIndex < 0 ? tasksWithoutDragged.length : targetIndex;
+
+    if (sameColumn && position === task.position) {
+      setDragTask(null); setDragOver(null); setDragOverTask(null); return;
     }
-    const movedTask = { ...task, boardColumnId: targetColId };
+
     setColumns(cols => cols.map(c => {
-      if (c.id === task.boardColumnId) return { ...c, tasks: c.tasks.filter(t => t.id !== task.id) };
-      if (c.id === targetColId)        return { ...c, tasks: [...c.tasks, movedTask] };
+      if (sameColumn && c.id === targetColId) {
+        // position est déjà calculé sur la liste sans la tâche draguée,
+        // donc on peut insérer directement sans correction d'index
+        const reordered = c.tasks.filter(t => t.id !== task.id);
+        reordered.splice(position, 0, { ...task, position });
+        return { ...c, tasks: reordered.map((t, i) => ({ ...t, position: i })) };
+      }
+      if (!sameColumn) {
+        if (c.id === task.boardColumnId)
+          return { ...c, tasks: c.tasks.filter(t => t.id !== task.id) };
+        if (c.id === targetColId) {
+          const inserted = [...c.tasks];
+          inserted.splice(position, 0, { ...task, boardColumnId: targetColId, position });
+          return { ...c, tasks: inserted.map((t, i) => ({ ...t, position: i })) };
+        }
+      }
       return c;
     }));
+
     setDragTask(null);
     setDragOver(null);
-    setTimeout(async () => {
-      const res = await authFetch(`${ROUTES_API.taskMove(task.id)}?newId=${targetColId}`, {
-        method: "PATCH",
-        body:   "{}",
-      });
-      if (!res.ok) fetchBoard();
-    }, 0);
+    setDragOverTask(null);
+
+    authFetch(
+      `${ROUTES_API.taskMove(task.id)}?newId=${targetColId}&position=${position}`,
+      { method: "PATCH", body: "{}" }
+    );
   };
 
   /* ── Drag & drop colonnes ────────────────────────────────── */
@@ -254,17 +299,20 @@ export default function Dashboard() {
    *
    * @param targetCol - Colonne sur laquelle on lâche.
    */
-  const handleColDrop = async (targetCol: ColumnWithTasks) => {
+  const handleColDrop = (targetCol: ColumnWithTasks) => {
+    // On capture dragColRef.current immédiatement : onDragEnd peut
+    // s'être déclenché avant onDrop sur certains navigateurs et
+    // avoir remis dragColRef.current à null.
     const col = dragColRef.current;
-    console.log("handleColDrop appelé, col:", col?.id, "→ target:", targetCol.id);
     if (!col || col.id === targetCol.id) {
       setDragCol(null); setDragColOver(null); return;
     }
+    const colId  = col.id;
     const newNum = targetCol.numero;
     setColumns(cols => {
-      const oldIdx        = cols.findIndex(c => c.id === col.id);
+      const oldIdx        = cols.findIndex(c => c.id === colId);
       const targetOrigIdx = cols.findIndex(c => c.id === targetCol.id);
-      const reordered     = cols.filter(c => c.id !== col.id);
+      const reordered     = cols.filter(c => c.id !== colId);
       const targetIdx     = reordered.findIndex(c => c.id === targetCol.id);
       const insertAt      = oldIdx < targetOrigIdx ? targetIdx + 1 : targetIdx;
       reordered.splice(insertAt, 0, { ...col, numero: newNum });
@@ -272,10 +320,12 @@ export default function Dashboard() {
     });
     setDragCol(null);
     setDragColOver(null);
-    const res = await authFetch(`${ROUTES_API.columnMove(boardId, col.id)}?newNum=${newNum}`, {
+    // Fire-and-forget, comme handleDrop pour les tâches :
+    // pas d'await, pas de rechargement sur erreur
+    authFetch(`${ROUTES_API.columnMove(boardId, colId)}?newNum=${newNum}`, {
       method: "PATCH",
+      body:   "{}",
     });
-    if (!res.ok) fetchBoard();
   };
 
   /* ── Helpers ─────────────────────────────────────────────── */
@@ -339,17 +389,32 @@ export default function Dashboard() {
 
                 <div className="col-tasks"
                   onDragOver={e => e.preventDefault()}
-                  onDrop={e => e.preventDefault()}
+                  onDrop={e => {
+                    // Lâcher sur la zone vide sous les tâches → insertion en fin de colonne
+                    e.preventDefault();
+                    if (dragTaskRef.current) handleDrop(col.id, dragTaskRef.current);
+                  }}
                 >
                   {col.tasks.map(task => (
                     <div
                       key={task.id}
-                      className="task-card"
+                      className={`task-card ${dragTask?.id === task.id ? "dragging" : ""} ${dragOverTask === task.id && dragTask?.id !== task.id ? "drag-over-task" : ""}`}
                       draggable
                       onDragStart={e => { e.stopPropagation(); dragTaskRef.current = task; setDragTask(task); }}
-                      onDragEnd={() => { dragTaskRef.current = null; setDragTask(null); setDragOver(null); }}
-                      onDragOver={e => e.preventDefault()}
-                      onDrop={e => e.preventDefault()}
+                      onDragEnd={() => { dragTaskRef.current = null; setDragTask(null); setDragOver(null); setDragOverTask(null); }}
+                      onDragOver={e => {
+                        e.preventDefault();
+                        // stopPropagation indispensable : empêche la remontée vers col-tasks
+                        // qui appellerait handleDrop sans targetTaskId (insertion en fin de colonne)
+                        e.stopPropagation();
+                        setDragOverTask(task.id);
+                      }}
+                      onDragLeave={() => setDragOverTask(null)}
+                      onDrop={e => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        if (dragTaskRef.current) handleDrop(col.id, dragTaskRef.current, task.id);
+                      }}
                     >
                       <div className="task-header">
                         <span className={`badge ${priorityClass(task.priority)}`}>
