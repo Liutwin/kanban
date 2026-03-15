@@ -4,7 +4,7 @@ import { extractErrorMessage } from "../utils/apiHelpers";
 import Layout from "../components/Layout";
 import { ROUTES_API } from "../config/api";
 import { useAuth } from "../hooks/useAuth";
-import type { Board, Column, Task, Priority, User } from "../model/interfaces";
+import type { Board, Column, Task, Priority, User, Member } from "../model/interfaces";
 import "../styles/dashboard.css";
 import TaskDetailModal from "../components/TaskDetailModal";
 
@@ -19,12 +19,15 @@ export default function Dashboard() {
   const navigate      = useNavigate();
 
   const [boardName, setBoardName] = useState("");
+  const [board_creatorId, setBoardCreatorId] = useState<number | null>(null);
   const [columns, setColumns]     = useState<ColumnWithTasks[]>([]);
   const [loading, setLoading]     = useState(true);
   const [error, setError]         = useState("");
 
   // Membres du tableau (pour résoudre creatorId/assignedId → prénom nom)
   const [members, setMembers] = useState<User[]>([]);
+  // Rôles des membres (userId → role) pour contrôle d'accès frontend
+  const [memberRoles, setMemberRoles] = useState<Map<number, Member["role"]>>(new Map());
 
   // Modale tâche
   const [taskModal, setTaskModal] = useState<{ colId: number } | null>(null);
@@ -72,6 +75,7 @@ export default function Dashboard() {
       if (!resBoard.ok) throw new Error(await extractErrorMessage(resBoard));
       const board: Board = await resBoard.json();
       setBoardName(board.name);
+      setBoardCreatorId(board.creatorId);
 
       const resCols = await authFetch(ROUTES_API.columns(boardId));
       if (!resCols.ok) throw new Error(await extractErrorMessage(resCols));
@@ -97,8 +101,10 @@ export default function Dashboard() {
 
       const resMembers = await authFetch(ROUTES_API.boardMembers(boardId));
       if (resMembers.ok) {
-        const memberList: { userId: number }[] = await resMembers.json();
-        memberList.forEach(m => userIdsToFetch.add(m.userId));
+        const memberList: Member[] = await resMembers.json();
+        const roles = new Map<number, Member["role"]>();
+        memberList.forEach(m => { userIdsToFetch.add(m.userId); roles.set(m.userId, m.role); });
+        setMemberRoles(roles);
       }
 
       const userResults = await Promise.allSettled(
@@ -362,6 +368,15 @@ export default function Dashboard() {
 
   /* ── Helpers ─────────────────────────────────────────────── */
 
+  const resolveUser = (id: number | null | undefined): User | undefined =>
+    id != null ? members.find(m => m.id === id) : undefined;
+
+  const assigneeInitials = (u: User) => {
+    const f = u.firstName?.trim() ?? "";
+    const l = u.lastName?.trim()  ?? "";
+    return ((f[0] ?? "") + (l[0] ?? "")).toUpperCase() || "?";
+  };
+
   const priorityClass = (p: Priority) =>
     p === "haute" ? "badge-haute" : p === "moyenne" ? "badge-moyenne" : "badge-basse";
 
@@ -380,6 +395,16 @@ export default function Dashboard() {
     c.width = 1; c.height = 1;
     return c;
   })();
+
+  /* ── Rôle de l'utilisateur courant ──────────────────────── */
+
+  // Le créateur du tableau est toujours admin, sinon on lit memberRoles,
+  // et on replie sur "lecteur" si l'utilisateur n'est pas dans la liste.
+  const currentRole: Member["role"] = board_creatorId === user?.id
+    ? "admin"
+    : memberRoles.get(user?.id ?? -1) ?? "lecteur";
+
+  const isReadOnly = currentRole === "lecteur";
 
   /* ── Rendu ───────────────────────────────────────────────── */
 
@@ -404,14 +429,15 @@ export default function Dashboard() {
               <div
                 key={col.id}
                 className={`kanban-col ${dropTarget?.colId === col.id && !!dragTask ? "drag-over" : ""} ${dragColOver === col.id && !dragTask ? "drag-over" : ""}`}
-                onDragOver={e => { e.preventDefault(); if (!dragTaskRef.current) { reorderColLive(col); setDragColOver(col.id); } }}
+                onDragOver={e => { e.preventDefault(); if (!isReadOnly && !dragTaskRef.current) { reorderColLive(col); setDragColOver(col.id); } }}
                 onDragLeave={() => { setDragColOver(null); }}
-                onDrop={e => { e.preventDefault(); didDrop.current = true; setDropTarget(null); setDragMirror(null); if (dragTaskRef.current) { handleDrop(col.id, dragTaskRef.current); } else { handleColDrop(col); } }}
+                onDrop={e => { e.preventDefault(); didDrop.current = true; setDropTarget(null); setDragMirror(null); if (dragTaskRef.current) { handleDrop(col.id, dragTaskRef.current); } else if (!isReadOnly) { handleColDrop(col); } }}
               >
                 <div
                   className="col-header"
-                  draggable
+                  draggable={!isReadOnly}
                   onDragStart={e => {
+                    if (isReadOnly) return;
                     e.stopPropagation();
                     columnsSnapshot.current = columns;
                     didDrop.current = false;
@@ -425,21 +451,28 @@ export default function Dashboard() {
                     setDragMirror({ ox: colRect ? e.clientX - colRect.left : 20, oy: colRect ? e.clientY - colRect.top : 20, width: colEl?.offsetWidth ?? 280, kind: "col", col });
                   }}
                   onDragEnd={() => { if (!didDrop.current) setColumns(columnsSnapshot.current); dragColRef.current = null; setDragCol(null); setDragColOver(null); setDragMirror(null); didDrop.current = false; }}
-                  style={{ cursor: "grab" }}
+                  style={{ cursor: isReadOnly ? "default" : "grab" }}
                 >
                   <span className="col-name">{col.name}</span>
                   <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                     <span className="col-count">{col.tasks.length}</span>
-                    <button
-                      className="icon-btn danger"
-                      title="Supprimer la colonne"
-                      onClick={() => handleDeleteColumn(col.id)}
-                    >✕</button>
+                    {!isReadOnly && (
+                      <button
+                        className="icon-btn danger"
+                        title="Supprimer la colonne"
+                        onClick={() => handleDeleteColumn(col.id)}
+                      >✕</button>
+                    )}
                   </div>
                 </div>
 
                 <div className="col-tasks"
-                  onDragOver={e => { e.preventDefault(); }}
+                  onDragOver={e => {
+                    e.preventDefault();
+                    // Déclenche le placeholder en bas (beforeTaskId=null) quand le curseur
+                    // entre dans la zone de tâches (colonne vide ou bas de colonne).
+                    if (dragTaskRef.current) setDropTarget({ colId: col.id, beforeTaskId: null });
+                  }}
                   onDrop={e => {
                     e.preventDefault();
                     if (dragTaskRef.current) { didDrop.current = true; setDropTarget(null); setDragMirror(null); handleDrop(col.id, dragTaskRef.current); }
@@ -456,10 +489,11 @@ export default function Dashboard() {
                       )}
                       <div
                         className={`task-card ${dragTask?.id === task.id && dragTask?.boardColumnId === col.id ? "dragging" : ""} ${dropTarget?.beforeTaskId === task.id && dragTaskRef.current?.boardColumnId === col.id ? "drag-over-task" : ""}`}
-                        draggable
+                        draggable={!isReadOnly}
                         style={{ cursor: "pointer" }}
                         onClick={() => setDetailTask(task)}
                         onDragStart={e => {
+                        if (isReadOnly) return;
                         e.stopPropagation();
                         columnsSnapshot.current = columns;
                         didDrop.current = false;
@@ -475,16 +509,18 @@ export default function Dashboard() {
                         onDragOver={e => {
                           e.preventDefault();
                           e.stopPropagation();
-                          if (dragTaskRef.current && dragTaskRef.current.id !== task.id) {
-                            // Détecter si le curseur est dans la moitié haute ou basse de la tâche
-                            const rect   = (e.currentTarget as HTMLElement).getBoundingClientRect();
-                            const isTop  = e.clientY < rect.top + rect.height / 2;
-                            const tasks  = col.tasks;
-                            const idx    = tasks.findIndex(t => t.id === task.id);
-                            const next   = tasks[idx + 1];
-                            const target = isTop ? task.id : (next ? next.id : null);
-                            setDropTarget({ colId: col.id, beforeTaskId: target });
-                          }
+                          if (!dragTaskRef.current || dragTaskRef.current.id === task.id) return;
+                          const dragged = dragTaskRef.current;
+                          const rect    = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                          const isTop   = e.clientY < rect.top + rect.height / 2;
+                          const tasks   = col.tasks;
+                          const idx     = tasks.findIndex(t => t.id === task.id);
+                          const prev    = tasks[idx - 1];
+                          if (isTop && prev && prev.id === dragged.id) return;
+                          const next    = tasks[idx + 1];
+                          if (!isTop && next && next.id === dragged.id) return;
+                          const target  = isTop ? task.id : (next ? next.id : null);
+                          setDropTarget({ colId: col.id, beforeTaskId: target });
                         }}
                         onDrop={e => {
                           e.preventDefault();
@@ -499,26 +535,44 @@ export default function Dashboard() {
                           <span className={`badge ${priorityClass(task.priority)}`}>
                             {priorityLabel(task.priority)}
                           </span>
-                          <div className="task-actions">
-                            <button className="icon-btn" onClick={e => { e.stopPropagation(); openEditTask(task); }} title="Modifier">✎</button>
-                            <button className="icon-btn danger" onClick={e => { e.stopPropagation(); handleDeleteTask(task.id); }} title="Supprimer">✕</button>
-                          </div>
+                          {!isReadOnly && (
+                            <div className="task-actions">
+                              <button className="icon-btn" onClick={e => { e.stopPropagation(); openEditTask(task); }} title="Modifier">✎</button>
+                              <button className="icon-btn danger" onClick={e => { e.stopPropagation(); handleDeleteTask(task.id); }} title="Supprimer">✕</button>
+                            </div>
+                          )}
                         </div>
 
                         <p className="task-title">{task.title}</p>
 
                         {task.details && <p className="task-details">{task.details}</p>}
 
-                        <div className="task-footer">
-                          {task.dueDate && (
-                            <span className={`task-date ${isOverdue(task.dueDate) ? "overdue" : ""}`}>
-                              ⏰ {formatDate(task.dueDate)}
-                            </span>
-                          )}
-                          {task.assignedId && (
-                            <span className="task-assignee">#{task.assignedId}</span>
-                          )}
-                        </div>
+                        {(task.dueDate || task.assignedId) && (
+                          <div className="task-footer">
+                            {task.dueDate
+                              ? <span className={`task-date ${isOverdue(task.dueDate) ? "overdue" : ""}`}>
+                                  ⏰ {formatDate(task.dueDate)}
+                                </span>
+                              : <span />
+                            }
+                            {task.assignedId && (() => {
+                              const assignee = resolveUser(task.assignedId);
+                              return assignee?.avatar
+                                ? <img
+                                    src={assignee.avatar}
+                                    alt={`${assignee.firstName} ${assignee.lastName}`}
+                                    title={`${assignee.firstName} ${assignee.lastName}`}
+                                    style={{ width: 24, height: 24, borderRadius: "50%", objectFit: "cover", border: "2px solid var(--bg-2, #2a2a2a)", flexShrink: 0 }}
+                                  />
+                                : <span
+                                    title={assignee ? `${assignee.firstName} ${assignee.lastName}` : `#${task.assignedId}`}
+                                    style={{ width: 24, height: 24, borderRadius: "50%", background: "var(--accent, #a3e635)", color: "#000", fontSize: 10, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, border: "2px solid var(--bg-2, #2a2a2a)" }}
+                                  >
+                                    {assignee ? assigneeInitials(assignee) : "?"}
+                                  </span>;
+                            })()}
+                          </div>
+                        )}
                       </div>
                     </React.Fragment>
                   ))}
@@ -531,20 +585,24 @@ export default function Dashboard() {
                   )}
                 </div>
 
-                <button
-                  className="add-task-btn"
-                  onClick={() => openCreateTask(col.id)}
-                  onDragOver={e => { e.preventDefault(); e.stopPropagation(); if (dragTaskRef.current) setDropTarget({ colId: col.id, beforeTaskId: null }); }}
-                  onDrop={e => { e.preventDefault(); e.stopPropagation(); if (dragTaskRef.current) { didDrop.current = true; setDropTarget(null); setDragMirror(null); handleDrop(col.id, dragTaskRef.current); } }}
-                >
-                  + Ajouter une tâche
-                </button>
+                {!isReadOnly && (
+                  <button
+                    className="add-task-btn"
+                    onClick={() => openCreateTask(col.id)}
+                    onDragOver={e => { e.preventDefault(); e.stopPropagation(); if (dragTaskRef.current) setDropTarget({ colId: col.id, beforeTaskId: null }); }}
+                    onDrop={e => { e.preventDefault(); e.stopPropagation(); if (dragTaskRef.current) { didDrop.current = true; setDropTarget(null); setDragMirror(null); handleDrop(col.id, dragTaskRef.current); } }}
+                  >
+                    + Ajouter une tâche
+                  </button>
+                )}
               </div>
             ))}
 
-            <button className="kanban-col-new" onClick={() => { setColName(""); setColError(""); setColModal(true); }}>
-              + Nouvelle colonne
-            </button>
+            {!isReadOnly && (
+              <button className="kanban-col-new" onClick={() => { setColName(""); setColError(""); setColModal(true); }}>
+                + Nouvelle colonne
+              </button>
+            )}
           </div>
         )}
       </div>
@@ -556,8 +614,12 @@ export default function Dashboard() {
           columnName={columns.find(c => c.id === detailTask.boardColumnId)?.name ?? ""}
           members={members}
           onClose={() => setDetailTask(null)}
-          onEdit={task => { setDetailTask(null); openEditTask(task); }}
+          onEdit={saved => {
+            setColumns(cols => cols.map(col => ({ ...col, tasks: col.tasks.map(t => t.id === saved.id ? saved : t) })));
+            setDetailTask(saved);
+          }}
           onDelete={taskId => { setDetailTask(null); handleDeleteTask(taskId); }}
+          currentRole={currentRole}
         />
       )}
 
@@ -648,13 +710,20 @@ export default function Dashboard() {
             <div className="task-card" style={{ margin: 0 }}>
               <div className="task-header">
                 <span className={`badge ${priorityClass(dragMirror.task.priority)}`}>{priorityLabel(dragMirror.task.priority)}</span>
+                {dragMirror.task.assignedId && (() => {
+                  const assignee = resolveUser(dragMirror.task.assignedId);
+                  return assignee?.avatar
+                    ? <img src={assignee.avatar} alt={`${assignee.firstName} ${assignee.lastName}`} style={{ width: 24, height: 24, borderRadius: "50%", objectFit: "cover", border: "2px solid var(--bg-2, #2a2a2a)", flexShrink: 0 }} />
+                    : <span style={{ width: 24, height: 24, borderRadius: "50%", background: "var(--accent, #a3e635)", color: "#000", fontSize: 10, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, border: "2px solid var(--bg-2, #2a2a2a)" }}>
+                        {assignee ? assigneeInitials(assignee) : "?"}
+                      </span>;
+                })()}
               </div>
               <p className="task-title">{dragMirror.task.title}</p>
               {dragMirror.task.details && <p className="task-details">{dragMirror.task.details}</p>}
-              {(dragMirror.task.dueDate || dragMirror.task.assignedId) && (
+              {dragMirror.task.dueDate && (
                 <div className="task-footer">
-                  {dragMirror.task.dueDate && <span className={`task-date ${isOverdue(dragMirror.task.dueDate) ? "overdue" : ""}`}>⏰ {formatDate(dragMirror.task.dueDate)}</span>}
-                  {dragMirror.task.assignedId && <span className="task-assignee">#{dragMirror.task.assignedId}</span>}
+                  <span className={`task-date ${isOverdue(dragMirror.task.dueDate) ? "overdue" : ""}`}>⏰ {formatDate(dragMirror.task.dueDate)}</span>
                 </div>
               )}
             </div>

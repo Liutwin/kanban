@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import type { Task, Priority, User, Comment, Member } from "../model/interfaces";
 import { ROUTES_API } from "../config/api";
 import { useAuth } from "../hooks/useAuth";
@@ -171,8 +171,8 @@ export default function TaskDetailModal({ task, columnName, members = [], onClos
   const [closeHover, setCloseHover] = useState(false);
 
   /* Sauvegarde automatique avec debounce */
-  const doSave = useCallback(async (
-    t: string, det: string, dd: string, prio: Priority, aId: number | null
+  const doSave = async (
+    t: string, det: string, dd: string, prio: Priority
   ) => {
     if (!t.trim()) { setError("Le titre ne peut pas être vide."); return; }
     setError("");
@@ -185,7 +185,6 @@ export default function TaskDetailModal({ task, columnName, members = [], onClos
         priority:      prio,
         boardColumnId: task.boardColumnId,
         creatorId:     task.creatorId,
-        assignedId:    aId,
       };
       const res = await authFetch(ROUTES_API.task(task.id), { method: "PUT", body: JSON.stringify(body) });
       if (!res.ok) throw new Error("Erreur lors de la sauvegarde.");
@@ -196,14 +195,34 @@ export default function TaskDetailModal({ task, columnName, members = [], onClos
       setSaveStatus("error");
       setError(e instanceof Error ? e.message : "Erreur.");
     }
-  }, [task.id, task.boardColumnId, task.creatorId]);
+  };
 
   const scheduleAutoSave = (
-    t = title, det = details, dd = dueDate, prio = priority, aId = assigneeId
+    t = title, det = details, dd = dueDate, prio = priority
   ) => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
     setSaveStatus("saving");
-    debounceRef.current = setTimeout(() => doSave(t, det, dd, prio, aId), 800);
+    debounceRef.current = setTimeout(() => doSave(t, det, dd, prio), 800);
+  };
+
+  /* Assignation via l'endpoint dédié PATCH /tasks/{id}/assign */
+  const handleAssigneeChange = async (newId: number | null) => {
+    setAssigneeId(newId);
+    setAssigneeOpen(false);
+    setSaveStatus("saving");
+    try {
+      const url = newId != null
+        ? `${ROUTES_API.taskAssign(task.id)}?userId=${newId}`
+        : ROUTES_API.taskAssign(task.id);
+      const res = await authFetch(url, { method: "PATCH", body: "{}" });
+      if (!res.ok) throw new Error("Erreur lors de l'assignation.");
+      const saved: Task = await res.json();
+      setSaveStatus("saved");
+      onEdit(saved);
+    } catch (e: unknown) {
+      setSaveStatus("error");
+      setError(e instanceof Error ? e.message : "Erreur.");
+    }
   };
 
   /* Styles de base pour les champs éditables */
@@ -413,10 +432,29 @@ export default function TaskDetailModal({ task, columnName, members = [], onClos
               <input
                 type="datetime-local"
                 value={dueDate}
-                onChange={e => { if (!canEdit) return; setDueDate(e.target.value); scheduleAutoSave(title, details, e.target.value); }}
+                onChange={e => {
+                  if (!canEdit) return;
+                  let val = e.target.value;
+                  if (val && val.length === 10) {
+                    const now = new Date();
+                    const hh = String(now.getHours()).padStart(2, "0");
+                    const mm = String(now.getMinutes()).padStart(2, "0");
+                    val = `${val}T${hh}:${mm}`;
+                  }
+                  setDueDate(val);
+                  scheduleAutoSave(title, details, val);
+                }}
                 readOnly={!canEdit}
                 style={{ ...inputBase, fontSize: 12, fontFamily: "'DM Mono', monospace", color: overdue ? "#f28b82" : "#b8b0c8" }}
-                onFocus={e => e.currentTarget.style.background = "rgba(255,255,255,0.05)"}
+                onFocus={e => {
+                  e.currentTarget.style.background = "rgba(255,255,255,0.05)";
+                  if (canEdit && !dueDate) {
+                    const now = new Date();
+                    const pad = (n: number) => String(n).padStart(2, "0");
+                    const local = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}`;
+                    setDueDate(local);
+                  }
+                }}
                 onBlur={e  => e.currentTarget.style.background = "transparent"}
               />
               {dueDate && overdue && <span style={{ fontSize: 10, fontWeight: 600, padding: "2px 7px", borderRadius: 999, background: "rgba(242,139,130,0.12)", border: "1px solid rgba(242,139,130,0.25)", color: "#f28b82", letterSpacing: "0.05em", textTransform: "uppercase", marginTop: 4, display: "inline-block" }}>En retard</span>}
@@ -439,10 +477,10 @@ export default function TaskDetailModal({ task, columnName, members = [], onClos
                 {/* Affichage actuel */}
                 <div
                   onClick={() => { if (!canEdit) return; setAssigneeOpen(o => !o); setPriorityOpen(false); }}
-                  style={{ cursor: "pointer" }}
+                  style={{ cursor: canEdit ? "pointer" : "default" }}
                 >
                   {assignee
-                    ? <UserCard user={assignee} accent="#b0a6ff" selected />
+                    ? <UserCard user={assignee} accent="#b0a6ff" selected onClick={canEdit ? () => { setAssigneeOpen(o => !o); setPriorityOpen(false); } : undefined} />
                     : (
                       <div style={{ display: "flex", alignItems: "center", gap: 8, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 10, padding: "9px 11px", color: "#7a7288", fontSize: 12, fontStyle: "italic" }}>
                         <span style={{ fontSize: 16 }}>+</span> Assigner à…
@@ -457,7 +495,7 @@ export default function TaskDetailModal({ task, columnName, members = [], onClos
                     {/* Option "Désassigner" */}
                     {assigneeId != null && (
                       <button
-                        onClick={() => { setAssigneeId(null); setAssigneeOpen(false); scheduleAutoSave(title, details, dueDate, priority, null); }}
+                        onClick={() => handleAssigneeChange(null)}
                         style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", padding: "9px 12px", background: "transparent", border: "none", borderBottom: "1px solid rgba(255,255,255,0.06)", color: "#f28b82", fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}
                       >
                         × Retirer l'assignation
@@ -466,7 +504,7 @@ export default function TaskDetailModal({ task, columnName, members = [], onClos
                     {members.map(m => (
                       <div
                         key={m.id}
-                        onClick={() => { setAssigneeId(m.id); setAssigneeOpen(false); scheduleAutoSave(title, details, dueDate, priority, m.id); }}
+                        onClick={() => handleAssigneeChange(m.id)}
                         style={{ padding: "6px 8px", cursor: "pointer", background: assigneeId === m.id ? "rgba(176,166,255,0.08)" : "transparent", transition: "background 0.1s" }}
                       >
                         <UserCard user={m} accent="#b0a6ff" selected={assigneeId === m.id} />
