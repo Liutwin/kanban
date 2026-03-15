@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { extractErrorMessage } from "../utils/apiHelpers";
 import Layout from "../components/Layout";
@@ -54,6 +54,27 @@ export default function Dashboard() {
   const [dragCol, setDragCol]         = useState<ColumnWithTasks | null>(null);
   const [dragColOver, setDragColOver] = useState<number | null>(null);
   const dragColRef = useRef<ColumnWithTasks | null>(null);
+
+  /* ── Recherche ───────────────────────────────────────────── */
+  const [searchQuery, setSearchQuery] = useState("");
+
+  useEffect(() => {
+    const handler = (e: Event) => {
+      setSearchQuery((e as CustomEvent<{ query: string }>).detail.query);
+    };
+    window.addEventListener("kanban:search", handler);
+    return () => window.removeEventListener("kanban:search", handler);
+  }, []);
+
+  /** Filtre les tâches d'une colonne selon la recherche en cours. */
+  const filterTasks = useCallback((tasks: Task[]) => {
+    if (!searchQuery.trim()) return tasks;
+    const q = searchQuery.toLowerCase();
+    return tasks.filter(t =>
+      t.title.toLowerCase().includes(q) ||
+      (t.details ?? "").toLowerCase().includes(q)
+    );
+  }, [searchQuery]);
 
   const columnsSnapshot   = useRef<ColumnWithTasks[]>([]);
   const didDrop           = useRef(false);
@@ -366,6 +387,30 @@ export default function Dashboard() {
     });
   };
 
+  /**
+   * Finalise le drop d'une colonne : persiste le nouvel ordre via l'API.
+   */
+  const handleColDrop = (targetCol: ColumnWithTasks) => {
+    const col = dragColRef.current;
+    if (!col || col.id === targetCol.id) return;
+
+    const current   = columns;
+    const currentIdx = current.findIndex(c => c.id === col.id);
+    const targetIdx  = current.findIndex(c => c.id === targetCol.id);
+    if (currentIdx === -1 || targetIdx === -1) return;
+
+    const newNum = current[targetIdx].numero;
+
+    authFetch(ROUTES_API.columnMove(boardId, col.id), {
+      method: "PATCH",
+      body:   JSON.stringify({ newPosition: newNum }),
+    }).catch(() => { setColumns(columnsSnapshot.current); fetchBoard(); });
+
+    dragColRef.current = null;
+    setDragCol(null);
+    setDragColOver(null);
+  };
+
   /* ── Helpers ─────────────────────────────────────────────── */
 
   const resolveUser = (id: number | null | undefined): User | undefined =>
@@ -409,7 +454,7 @@ export default function Dashboard() {
   /* ── Rendu ───────────────────────────────────────────────── */
 
   return (
-    <Layout title={boardName || "Tableau"}>
+    <Layout title={boardName || "Tableau"} boardId={boardId} boardRole={currentRole}>
       <div className="dashboard-page">
         <button className="back-btn" onClick={() => navigate("/boards")}>
           ← Retour aux tableaux
@@ -455,7 +500,7 @@ export default function Dashboard() {
                 >
                   <span className="col-name">{col.name}</span>
                   <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                    <span className="col-count">{col.tasks.length}</span>
+                    <span className="col-count">{filterTasks(col.tasks).length}{searchQuery && filterTasks(col.tasks).length !== col.tasks.length ? `/${col.tasks.length}` : ""}</span>
                     {!isReadOnly && (
                       <button
                         className="icon-btn danger"
@@ -478,7 +523,7 @@ export default function Dashboard() {
                     if (dragTaskRef.current) { didDrop.current = true; setDropTarget(null); setDragMirror(null); handleDrop(col.id, dragTaskRef.current); }
                   }}
                 >
-                  {col.tasks.map(task => (
+                  {filterTasks(col.tasks).map(task => (
                     <React.Fragment key={task.id}>
                       {dropTarget?.colId === col.id && dropTarget?.beforeTaskId === task.id && dragTask?.id !== task.id && (
                         <div
@@ -616,7 +661,7 @@ export default function Dashboard() {
           onClose={() => setDetailTask(null)}
           onEdit={saved => {
             setColumns(cols => cols.map(col => ({ ...col, tasks: col.tasks.map(t => t.id === saved.id ? saved : t) })));
-            setDetailTask(saved);
+            setDetailTask(prev => prev !== null ? saved : null);
           }}
           onDelete={taskId => { setDetailTask(null); handleDeleteTask(taskId); }}
           currentRole={currentRole}

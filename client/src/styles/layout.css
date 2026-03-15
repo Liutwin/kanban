@@ -588,3 +588,432 @@ body {
   .layout { grid-template-columns: 1fr; }
   .sidebar { display: none; }
 }
+
+/* ── Top-bar : mode tableau ──────────────────────────────── */
+.top-bar-board {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* ── Recherche ───────────────────────────────────────────── */
+.search-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.search-icon {
+  position: absolute;
+  left: 11px;
+  color: var(--text-3);
+  pointer-events: none;
+  flex-shrink: 0;
+}
+
+.search-input {
+  background: var(--surface2);
+  border: 1px solid var(--border2);
+  border-radius: var(--radius);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 13px;
+  padding: 7px 32px 7px 32px;
+  outline: none;
+  width: 220px;
+  transition: width 0.22s ease, border-color 0.18s ease, background 0.18s ease;
+}
+
+.search-input::placeholder { color: var(--text-3); }
+
+.search-input:focus {
+  border-color: var(--accent);
+  background: var(--surface3);
+  box-shadow: 0 0 0 3px rgba(176,166,255,0.1);
+  width: 280px;
+}
+
+.search-clear {
+  position: absolute;
+  right: 8px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: var(--text-3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  border-radius: 4px;
+  transition: color 0.15s;
+}
+.search-clear:hover { color: var(--text); }
+
+/* ── Avatars empilés ─────────────────────────────────────── */
+.members-trigger {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.avatars-stack {
+  display: flex;
+  align-items: center;
+}
+
+.stacked-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  font-family: 'DM Mono', monospace;
+  font-size: 10px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid var(--surface);
+  margin-left: -6px;
+  cursor: default;
+  transition: transform 0.15s ease;
+  flex-shrink: 0;
+}
+
+.stacked-avatar:first-child { margin-left: 0; }
+.stacked-avatar:hover { transform: translateY(-2px); z-index: 1; }
+
+.stacked-avatar--extra {
+  background: var(--surface3);
+  color: var(--text-3);
+  font-size: 9px;
+}
+
+/* ── Bouton Membres ──────────────────────────────────────── */
+.members-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: var(--surface2);
+  border: 1px solid var(--border2);
+  border-radius: var(--radius);
+  color: var(--text-2);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.18s ease;
+  white-space: nowrap;
+}
+
+.members-btn:hover {
+  background: var(--surface3);
+  color: var(--text);
+  border-color: var(--border3);
+}
+
+.members-btn--active {
+  background: var(--accent-dim);
+  border-color: rgba(176,166,255,0.3);
+  color: var(--accent);
+}
+
+/* ── Panneau membres ─────────────────────────────────────── */
+.members-panel {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  width: 320px;
+  background: var(--surface2);
+  border: 1px solid var(--border2);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--elev-4);
+  z-index: 50;
+  animation: slideDown 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+  overflow: hidden;
+}
+
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.members-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px 10px;
+  border-bottom: 1px solid var(--border);
+}
+
+.members-panel-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-2);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-family: 'DM Mono', monospace;
+}
+
+.members-panel-close {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: var(--text-3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  border-radius: 4px;
+  transition: color 0.15s;
+}
+.members-panel-close:hover { color: var(--text); }
+
+.members-panel-loader {
+  display: flex;
+  justify-content: center;
+  padding: 24px;
+}
+
+/* ── Liste des membres ───────────────────────────────────── */
+.members-list {
+  list-style: none;
+  padding: 6px 0;
+  max-height: 280px;
+  overflow-y: auto;
+}
+
+.member-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 16px;
+  transition: background 0.15s;
+}
+.member-row:hover { background: rgba(255,255,255,0.03); }
+
+.member-avatar {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  font-family: 'DM Mono', monospace;
+  font-size: 10px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.member-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.member-name {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.member-you {
+  font-size: 10px;
+  color: var(--text-3);
+  font-family: 'DM Mono', monospace;
+  font-weight: 400;
+}
+
+.member-email {
+  font-size: 11px;
+  color: var(--text-3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.member-role-select {
+  background: var(--surface3);
+  border: 1px solid var(--border2);
+  border-radius: 8px;
+  color: var(--text-2);
+  font-family: inherit;
+  font-size: 11px;
+  padding: 4px 6px;
+  outline: none;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: border-color 0.15s;
+}
+.member-role-select:focus { border-color: var(--accent); }
+
+/* ── Chips de rôle (lecture seule) ──────────────────────── */
+.role-chip {
+  font-size: 10px;
+  font-weight: 600;
+  font-family: 'DM Mono', monospace;
+  padding: 3px 8px;
+  border-radius: var(--radius-full);
+  flex-shrink: 0;
+}
+
+.role-chip--admin   { background: rgba(176,166,255,0.12); color: var(--accent);  border: 1px solid rgba(176,166,255,0.2); }
+.role-chip--editeur { background: rgba(100,210,200,0.1);  color: var(--accent-2); border: 1px solid rgba(100,210,200,0.2); }
+.role-chip--lecteur { background: var(--surface3);        color: var(--text-3);   border: 1px solid var(--border2); }
+
+/* ── Section invitation ──────────────────────────────────── */
+.invite-section {
+  padding: 12px 16px 14px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.invite-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-3);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-family: 'DM Mono', monospace;
+}
+
+.invite-error {
+  font-size: 12px;
+  color: var(--danger);
+}
+
+.invite-row {
+  display: flex;
+  gap: 6px;
+}
+
+.invite-email {
+  font-size: 12px !important;
+  padding: 7px 10px !important;
+}
+
+.invite-btn {
+  font-size: 12px;
+  padding: 7px 14px;
+  border-radius: var(--radius);
+  width: 100%;
+  justify-content: center;
+}
+
+/* ── Invite : autocomplétion ─────────────────────────────── */
+.invite-search-wrapper {
+  position: relative;
+}
+
+.invite-autocomplete {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  background: var(--surface3);
+  border: 1px solid var(--border2);
+  border-radius: var(--radius);
+  box-shadow: var(--elev-3);
+  list-style: none;
+  z-index: 60;
+  overflow: hidden;
+  animation: slideDown 0.12s ease;
+}
+
+.invite-autocomplete-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  cursor: pointer;
+  transition: background 0.12s;
+}
+.invite-autocomplete-item:hover { background: rgba(255,255,255,0.05); }
+
+.invite-ac-avatar {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  font-size: 9px;
+  font-weight: 600;
+  font-family: 'DM Mono', monospace;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.invite-ac-info {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.invite-ac-name {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.invite-ac-email {
+  font-size: 10px;
+  color: var(--text-3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.invite-no-result {
+  font-size: 12px;
+  color: var(--text-3);
+  padding: 6px 0 2px;
+  text-align: center;
+}
+
+.invite-success {
+  font-size: 12px;
+  color: var(--success);
+  padding: 2px 0;
+}
+
+.invite-row {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.invite-btn {
+  font-size: 12px;
+  padding: 7px 14px;
+  border-radius: var(--radius);
+  white-space: nowrap;
+}
+
+/* ── Avatar topbar cliquable ─────────────────────────────── */
+.stacked-avatar--btn {
+  cursor: pointer;
+  border: none;
+  padding: 0;
+  font-family: 'DM Mono', monospace;
+  font-size: 10px;
+  font-weight: 500;
+}
+
+.stacked-avatar--btn:hover {
+  transform: translateY(-2px) scale(1.08);
+  z-index: 2;
+}

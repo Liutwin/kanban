@@ -1,12 +1,14 @@
-import { NavLink, useNavigate } from "react-router-dom";
+import { NavLink, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import type { ReactNode } from "react";
 import "../styles/layout.css";
 
 import type { UserDTO } from "../model/interfaces.ts";
-import { ROUTES_AUTH } from "../config/api";
+import type { Member }  from "../model/interfaces.ts";
+import { ROUTES_AUTH, ROUTES_API } from "../config/api";
 import SidebarIcon from '../assets/kanban-icon-sidebar.svg';
+import MembersPanel, { getAvatarColor } from './MembersPanel';
 
 /**
  * Props du composant Layout.
@@ -16,6 +18,16 @@ interface LayoutProps {
   children: ReactNode;
   /** Titre affiché dans la barre supérieure. Si omis, aucun titre n'est affiché. */
   title?: string;
+  /**
+   * Identifiant du tableau courant.
+   * Quand fourni, le panneau membres et la recherche dans le tableau sont activés.
+   */
+  boardId?: number;
+  /**
+   * Rôle de l'utilisateur connecté dans le tableau courant.
+   * Détermine l'affichage des outils d'administration des membres.
+   */
+  boardRole?: "admin" | "editeur" | "lecteur";
 }
 
 /**
@@ -23,89 +35,133 @@ interface LayoutProps {
  *
  * Il affiche :
  * - une barre latérale (sidebar) avec la navigation et les infos de l'utilisateur connecté ;
- * - une zone principale avec un en-tête et le contenu de la page courante.
+ * - une zone principale avec un en-tête (titre, recherche, membres) et le contenu de la page.
  *
- * Les informations complètes de l'utilisateur (nom, prénom) sont récupérées depuis
- * l'API (`GET /users/{id}`) au montage du composant.
+ * Quand `boardId` est fourni, la top-bar affiche :
+ * - un champ de recherche par mot-clé (filtre les tâches via `window.dispatchEvent`) ;
+ * - les avatars des membres du tableau et un bouton ouvrant le panneau de gestion.
  *
  * @param props - {@link LayoutProps}
- * @returns Le squelette de la page.
- *
- * @example
- * ```tsx
- * <Layout title="Mes tableaux">
- *   <BoardList />
- * </Layout>
- * ```
  */
-export default function Layout({ children, title }: LayoutProps) {
-  const { user, logout, authFetch } = useAuth();
-  const navigate = useNavigate();
+interface AvatarInfo { userId: number; firstName: string; lastName: string; email: string; role: "admin" | "editeur" | "lecteur"; }
 
-  /**
-   * Données complètes de l'utilisateur connecté, chargées depuis l'API.
-   * `null` tant que le chargement n'est pas terminé ou en cas d'erreur.
-   */
+export default function Layout({ children, title, boardId, boardRole }: LayoutProps) {
+  const { user, logout, authFetch } = useAuth();
+  const navigate  = useNavigate();
+  const location  = useLocation();
+
+  /* ── Profil de l'utilisateur connecté ───────────────────── */
   const [userDTO, setUserDTO] = useState<UserDTO | null>(null);
 
-  /**
-   * Met à jour le titre de l'onglet du navigateur à chaque changement de page.
-   * Format : "Kanban — {titre}" ou simplement "Kanban" si aucun titre n'est fourni.
-   */
   useEffect(() => {
     document.title = title ? `Kanban — ${title}` : "Kanban";
   }, [title]);
 
-  /**
-   * Récupère les informations complètes de l'utilisateur connecté depuis l'API
-   * dès que son identifiant est disponible.
-   */
   useEffect(() => {
     if (!user?.id) return;
-
     authFetch(`/api/v1/users/${user.id}`)
-      .then((res) => {
-        if (!res.ok) throw new Error("Impossible de charger le profil utilisateur");
-        return res.json();
-      })
-      .then((json) => {
-        // Si Spring enveloppe dans { data: ... }, on extrait, sinon on prend json directement
-        const dto = (json?.data ?? json) as UserDTO;
-        setUserDTO(dto);
-      })
-      .catch((err) => {
-        console.error("[Layout] erreur chargement profil →", err);
-        setUserDTO(null);
-      });
+      .then(res => { if (!res.ok) throw new Error(); return res.json(); })
+      .then(json => setUserDTO((json?.data ?? json) as UserDTO))
+      .catch(() => setUserDTO(null));
   }, [user?.id]);
 
-  /**
-   * Retourne le nom complet de l'utilisateur (prénom + nom).
-   * Repli sur "Utilisateur" si les données ne sont pas encore chargées.
-   */
-const fullName =
-  `${userDTO?.firstName ?? user?.firstName ?? ""}${userDTO?.firstName ?? user?.firstName ? " " : ""}${userDTO?.lastName ?? user?.lastName ?? ""}`.trim() || "Utilisateur";
+  const fullName =
+    `${userDTO?.firstName ?? user?.firstName ?? ""}${(userDTO?.firstName ?? user?.firstName) ? " " : ""}${userDTO?.lastName ?? user?.lastName ?? ""}`.trim() || "Utilisateur";
 
-  /**
-   * Lettres des initiales affichée dans l'avatar en cas d'absence de celui-ci.
-   */
-const avatarInitial =
-  `${(userDTO?.firstName ?? user?.firstName)?.charAt(0) ?? ""}${(userDTO?.lastName ?? user?.lastName)?.charAt(0) ?? ""}`.toUpperCase() || "?";
+  const avatarInitial =
+    `${(userDTO?.firstName ?? user?.firstName)?.charAt(0) ?? ""}${(userDTO?.lastName ?? user?.lastName)?.charAt(0) ?? ""}`.toUpperCase() || "?";
 
-  /**
-   * Gère la déconnexion de l'utilisateur :
-   * 1. Appelle l'endpoint de logout côté serveur Deno.
-   * 2. Efface le contexte d'authentification local.
-   * 3. Redirige vers la page de connexion.
-   */
-  const handleLogout = async () => {
+  /* ── Recherche ───────────────────────────────────────────── */
+  const [searchValue, setSearchValue] = useState("");
+
+  /** Émet un événement global que Dashboard.tsx peut intercepter pour filtrer. */
+  const handleSearch = useCallback((value: string) => {
+    setSearchValue(value);
+    window.dispatchEvent(new CustomEvent("kanban:search", { detail: { query: value } }));
+  }, []);
+
+  // Réinitialise la recherche à chaque changement de page
+  useEffect(() => {
+    setSearchValue("");
+    window.dispatchEvent(new CustomEvent("kanban:search", { detail: { query: "" } }));
+  }, [location.pathname]);
+
+  /* ── Membres du tableau ──────────────────────────────────── */
+  // Les avatars de la topbar sont chargés ici (léger : juste userId + profil basique).
+  // La logique complète (rôles, ajout, popover) vit dans MembersPanel.
+  const [avatarMembers, setAvatarMembers] = useState<AvatarInfo[]>([]);
+  const [panelOpen,     setPanelOpen]     = useState(false);
+  const [topbarPopover, setTopbarPopover] = useState<AvatarInfo | null>(null);
+  const triggerRef = useRef<HTMLDivElement>(null);
+
+  const fetchAvatarMembers = useCallback(async () => {
+    if (!boardId) return;
     try {
-      await authFetch(ROUTES_AUTH.logout, { method: "POST" });
-    } finally {
-      logout();
-      navigate("/login");
-    }
+      const res  = await authFetch(ROUTES_API.boardMembers(boardId));
+      if (!res.ok) return;
+      const json = await res.json();
+      // Spring retourne un tableau direct ici (sans enveloppe { data })
+      let raw: Member[] = Array.isArray(json) ? json : (json?.data ?? []);
+
+      // Fallback : si l'utilisateur courant est absent (créateur sans participation_ptp),
+      // on l'injecte en admin pour qu'il apparaisse dans la topbar.
+      if (user?.id && !raw.some(m => m.userId === user.id)) {
+        raw = [{ userId: user.id, boardId, role: "admin" }, ...raw];
+      }
+
+      const enriched = await Promise.all(
+        raw.map(async m => {
+          try {
+            const r2    = await authFetch(ROUTES_API.user(m.userId));
+            const json2 = await r2.json();
+            const p     = json2?.data ?? json2;
+            return {
+              userId:    m.userId,
+              firstName: p.firstName ?? "",
+              lastName:  p.lastName  ?? "",
+              email:     p.email     ?? "",
+              role:      m.role,
+            };
+          } catch {
+            return { userId: m.userId, firstName: "?", lastName: "", email: "", role: m.role };
+          }
+        })
+      );
+      // Soi-même en premier
+      enriched.sort((a, b) => {
+        if (a.userId === user?.id) return -1;
+        if (b.userId === user?.id) return 1;
+        return 0;
+      });
+      setAvatarMembers(enriched);
+    } catch { /* silencieux */ }
+  }, [boardId, user?.id]);
+
+  useEffect(() => { if (boardId) fetchAvatarMembers(); }, [boardId, fetchAvatarMembers]);
+
+  // Ferme la popover topbar au clic en dehors
+  useEffect(() => {
+    if (!topbarPopover) return;
+    const handler = (e: MouseEvent) => {
+      if (triggerRef.current && !triggerRef.current.contains(e.target as Node))
+        setTopbarPopover(null);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [topbarPopover]);
+
+  /* ── Logout ──────────────────────────────────────────────── */
+  /* ── Logout ──────────────────────────────────────────────── */
+  const handleLogout = async () => {
+    try { await authFetch(ROUTES_AUTH.logout, { method: "POST" }); }
+    finally { logout(); navigate("/login"); }
   };
+
+  /* ── Helpers d'affichage ─────────────────────────────────── */
+  const memberInitials = (a: { firstName: string; lastName: string }) =>
+    `${a.firstName.charAt(0)}${a.lastName.charAt(0)}`.toUpperCase() || "?";
+
+  /* ─────────────────────────────────────────────────────────── */
 
   return (
     <div className="layout">
@@ -119,41 +175,25 @@ const avatarInitial =
         </div>
 
         <nav className="sidebar-nav">
-          <NavLink
-            to="/"
-            end
-            className={({ isActive }) => `nav-item ${isActive ? "active" : ""}`}
-          >
+          <NavLink to="/" end className={({ isActive }) => `nav-item ${isActive ? "active" : ""}`}>
             <span className="nav-icon">▦</span>
             <span>Tableaux</span>
           </NavLink>
-          <NavLink
-            to="/my-tasks"
-            className={({ isActive }) => `nav-item ${isActive ? "active" : ""}`}
-          >
+          <NavLink to="/my-tasks" className={({ isActive }) => `nav-item ${isActive ? "active" : ""}`}>
             <span className="nav-icon">✓</span>
             <span>Mes tâches</span>
           </NavLink>
-          <NavLink
-            to="/logs"
-            className={({ isActive }) => `nav-item ${isActive ? "active" : ""}`}
-          >
+          <NavLink to="/logs" className={({ isActive }) => `nav-item ${isActive ? "active" : ""}`}>
             <span className="nav-icon">≡</span>
             <span>Journal</span>
           </NavLink>
           <span className="nav-section-label" style={{ marginTop: "12px" }}>Compte</span>
-          <NavLink
-            to="/profile"
-            className={({ isActive }) => `nav-item ${isActive ? "active" : ""}`}
-          >
+          <NavLink to="/profile" className={({ isActive }) => `nav-item ${isActive ? "active" : ""}`}>
             <span className="nav-icon">◎</span>
             <span>Mon profil</span>
           </NavLink>
           {user?.isAdmin && (
-            <NavLink
-              to="/admin"
-              className={({ isActive }) => `nav-item ${isActive ? "active" : ""}`}
-            >
+            <NavLink to="/admin" className={({ isActive }) => `nav-item ${isActive ? "active" : ""}`}>
               <span className="nav-icon">⚙</span>
               <span>Administration</span>
             </NavLink>
@@ -162,23 +202,14 @@ const avatarInitial =
 
         <div className="sidebar-footer">
           <div className="user-info">
-            <div className="user-avatar" title={fullName}>
-              {avatarInitial}
-            </div>
+            <div className="user-avatar" title={fullName}>{avatarInitial}</div>
             <div className="user-details">
               <span className="user-name">{fullName}</span>
             </div>
           </div>
-
-          {/* Bouton déconnexion */}
-          <button
-            className="logout-btn"
-            onClick={handleLogout}
-            title="Se déconnecter"
-            aria-label="Se déconnecter"
-          >
+          <button className="logout-btn" onClick={handleLogout} title="Se déconnecter" aria-label="Se déconnecter">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
-                stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
               <polyline points="16 17 21 12 16 7"/>
               <line x1="21" y1="12" x2="9" y2="12"/>
@@ -190,15 +221,126 @@ const avatarInitial =
       {/* Contenu principal */}
       <main className="main-content">
         <header className="top-bar">
+          {/* Titre */}
           <h1 className="page-title">{title ?? ""}</h1>
-          <div className="top-bar-right">
-            {/* Indicateur de connexion avec nom complet */}
-            <span className="status-dot" />
-            <span className="status-text">
-              {fullName} — connecté
-            </span>
-          </div>
+
+          {/* Zone droite — visible seulement sur un tableau */}
+          {boardId ? (
+            <div className="top-bar-right top-bar-board">
+
+              {/* Champ de recherche */}
+              <div className="search-wrapper">
+                <svg className="search-icon" width="14" height="14" viewBox="0 0 16 16" fill="none">
+                  <circle cx="6.5" cy="6.5" r="4.5" stroke="currentColor" strokeWidth="1.5"/>
+                  <line x1="10" y1="10" x2="14.5" y2="14.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                </svg>
+                <input
+                  type="text"
+                  className="search-input"
+                  placeholder="Rechercher une tâche…"
+                  value={searchValue}
+                  onChange={e => handleSearch(e.target.value)}
+                  aria-label="Rechercher une tâche"
+                />
+                {searchValue && (
+                  <button className="search-clear" onClick={() => handleSearch("")} aria-label="Effacer la recherche">
+                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                      <line x1="1" y1="1" x2="11" y2="11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                      <line x1="11" y1="1" x2="1" y2="11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                    </svg>
+                  </button>
+                )}
+              </div>
+
+              {/* Avatars empilés + bouton membres */}
+              <div className="members-trigger" ref={triggerRef} style={{ position: "relative" }}>
+                <div className="avatars-stack">
+                  {avatarMembers.map(m => {
+                    const c = getAvatarColor(m.userId);
+                    return (
+                      <button key={m.userId}
+                        className="stacked-avatar stacked-avatar--btn"
+                        style={{ background: c.bg, color: c.color }}
+                        title={`${m.firstName} ${m.lastName}`}
+                        onClick={() => setTopbarPopover(topbarPopover?.userId === m.userId ? null : m)}
+                      >
+                        {memberInitials(m)}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Popover topbar avatar */}
+                {topbarPopover && (() => {
+                  const m = topbarPopover;
+                  const c = getAvatarColor(m.userId);
+                  const ROLE_LABELS: Record<string, string> = { admin: "Admin", editeur: "Éditeur", lecteur: "Lecteur" };
+                  return (
+                    <div style={{
+                      position: "absolute", top: "calc(100% + 8px)", left: 0,
+                      width: 210, background: "var(--surface2)",
+                      border: "1px solid var(--border2)", borderRadius: "var(--radius-lg)",
+                      boxShadow: "var(--elev-4)", zIndex: 300, overflow: "hidden",
+                    }}>
+                      <div style={{ padding: "18px 16px 12px", display: "flex", flexDirection: "column", alignItems: "center", gap: 10, borderBottom: "1px solid var(--border)" }}>
+                        <div style={{ width: 52, height: 52, borderRadius: "50%", background: c.bg, color: c.color, fontSize: 17, fontWeight: 600, fontFamily: "'DM Mono',monospace", display: "flex", alignItems: "center", justifyContent: "center", border: `2px solid ${c.color}55` }}>
+                          {memberInitials(m)}
+                        </div>
+                        <div style={{ textAlign: "center" }}>
+                          <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: "var(--text)" }}>{m.firstName} {m.lastName}</p>
+                          <p style={{ margin: "2px 0 0", fontSize: 11, color: "var(--text-3)" }}>{ROLE_LABELS[m.role] ?? m.role}</p>
+                        </div>
+                      </div>
+                      {m.email && (
+                        <div style={{ padding: "9px 14px", borderBottom: "1px solid var(--border)" }}>
+                          <p style={{ margin: 0, fontSize: 11, color: "var(--text-3)", fontFamily: "'DM Mono',monospace", wordBreak: "break-all" }}>{m.email}</p>
+                        </div>
+                      )}
+                      <button
+                        onClick={() => { setTopbarPopover(null); navigate("/profile"); }}
+                        style={{ width: "100%", padding: "9px 14px", background: "transparent", border: "none", cursor: "pointer", textAlign: "left", fontSize: 12, color: "var(--accent)", fontFamily: "inherit", display: "flex", alignItems: "center", gap: 6 }}
+                        onMouseEnter={e => (e.currentTarget.style.background = "rgba(176,166,255,0.08)")}
+                        onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
+                      >
+                        <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
+                          <circle cx="8" cy="5" r="3" stroke="currentColor" strokeWidth="1.5"/>
+                          <path d="M2 14c0-3 2.7-5 6-5s6 2 6 5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                        </svg>
+                        Voir le profil
+                      </button>
+                    </div>
+                  );
+                })()}
+
+                <button
+                  className={`members-btn ${panelOpen ? "members-btn--active" : ""}`}
+                  onClick={() => { setPanelOpen(v => !v); setTopbarPopover(null); }}
+                  aria-expanded={panelOpen}
+                >
+                  <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
+                    <circle cx="5.5" cy="5" r="2.5" stroke="currentColor" strokeWidth="1.4"/>
+                    <circle cx="10.5" cy="5" r="2.5" stroke="currentColor" strokeWidth="1.4"/>
+                    <path d="M1 13c0-2 2-3.5 4.5-3.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
+                    <path d="M15 13c0-2-2-3.5-4.5-3.5S6 11 6 13" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
+                  </svg>
+                  Membres
+                </button>
+
+                {panelOpen && boardId && user?.id && (
+                  <MembersPanel
+                    boardId={boardId}
+                    currentUserId={user.id}
+                    currentRole={boardRole ?? "lecteur"}
+                    onClose={() => { setPanelOpen(false); fetchAvatarMembers(); }}
+                  />
+                )}
+              </div>
+            </div>
+          ) : (
+            <div className="top-bar-right" />
+          )}
         </header>
+
         <div className="page-body">{children}</div>
       </main>
     </div>

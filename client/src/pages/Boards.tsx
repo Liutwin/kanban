@@ -28,13 +28,19 @@ export default function Boards() {
   const { authFetch, user } = useAuth();
   const navigate            = useNavigate();
 
-  const [boards, setBoards]           = useState<BoardWithRole[]>([]);
-  const [loading, setLoading]         = useState(true);
-  const [error, setError]             = useState("");
-  const [showModal, setShowModal]     = useState(false);
-  const [newName, setNewName]         = useState("");
-  const [creating, setCreating]       = useState(false);
-  const [createError, setCreateError] = useState("");
+  const [boards, setBoards]               = useState<BoardWithRole[]>([]);
+  const [loading, setLoading]             = useState(true);
+  const [error, setError]                 = useState("");
+
+  // Modale création
+  const [showModal, setShowModal]         = useState(false);
+  const [newName, setNewName]             = useState("");
+  const [creating, setCreating]           = useState(false);
+  const [createError, setCreateError]     = useState("");
+
+  // Modale confirmation suppression — null = fermée, sinon = id du tableau ciblé
+  const [pendingDelete, setPendingDelete] = useState<number | null>(null);
+  const [deleting, setDeleting]           = useState(false);
 
   /**
    * Récupère la liste des tableaux de l'utilisateur connecté depuis l'API
@@ -61,11 +67,19 @@ export default function Boards() {
     fetchBoards();
   }, [user?.id]);
 
+  /** Ferme la modale de création et réinitialise son état interne. */
+  const closeCreateModal = () => {
+    setShowModal(false);
+    setNewName("");
+    setCreateError("");
+  };
+
   /**
    * Soumet le formulaire de création de tableau.
    *
-   * Envoie un `POST /api/v1/boards` avec le nom saisi, puis ferme la modale
-   * et rafraîchit la liste en cas de succès.
+   * Envoie un `POST /api/v1/boards` avec le nom saisi, puis redirige
+   * directement vers le nouveau tableau en cas de succès (évite le
+   * re-fetch et le flash de chargement sur la page de liste).
    *
    * @param e - Événement de soumission du formulaire.
    */
@@ -80,32 +94,48 @@ export default function Boards() {
         body:   JSON.stringify({ name: newName.trim(), creatorId: user!.id }),
       });
       if (!res.ok) throw new Error(await extractErrorMessage(res));
-      setShowModal(false);
-      setNewName("");
-      fetchBoards();
+      const created: Board = await res.json();
+      navigate(`/boards/${created.id}-${toSlug(created.name)}`, { state: { role: "admin" } });
     } catch (e: unknown) {
       setCreateError(e instanceof Error ? e.message : "Erreur.");
-    } finally {
       setCreating(false);
     }
   };
 
   /**
-   * Supprime un tableau après confirmation.
-   * Réservé aux membres ayant le rôle ADMIN.
-   *
-   * @param e       - Événement du clic (stopPropagation pour ne pas naviguer vers le board).
-   * @param boardId - Identifiant du tableau à supprimer.
+   * Ouvre la modale de confirmation de suppression.
+   * stopPropagation empêche la navigation vers le tableau.
    */
-  const handleDelete = async (e: React.MouseEvent, boardId: number) => {
+  const askDelete = (e: React.MouseEvent, boardId: number) => {
     e.stopPropagation();
-    if (!confirm("Supprimer ce tableau ? Cette action est irréversible.")) return;
+    setPendingDelete(boardId);
+  };
+
+  /**
+   * Confirme et exécute la suppression avec mise à jour optimiste.
+   *
+   * Retire le tableau de la liste immédiatement, ferme la modale, puis
+   * envoie `DELETE /api/v1/boards/{id}`. En cas d'erreur API, restaure
+   * le tableau à sa position d'origine.
+   */
+  const confirmDelete = async () => {
+    if (pendingDelete === null) return;
+    const boardId  = pendingDelete;
+    const previous = boards;
+
+    setBoards(b => b.filter(board => board.id !== boardId));
+    setPendingDelete(null);
+    setError("");
+    setDeleting(true);
+
     try {
       const res = await authFetch(ROUTES_API.board(boardId), { method: "DELETE" });
       if (!res.ok) throw new Error(await extractErrorMessage(res));
-      fetchBoards();
     } catch (e: unknown) {
+      setBoards(previous);
       setError(e instanceof Error ? e.message : "Erreur lors de la suppression.");
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -116,6 +146,8 @@ export default function Boards() {
   /** Retourne la classe CSS associée au rôle pour le badge coloré. */
   const roleClass = (role: Role) =>
     role === "admin" ? "role-admin" : role === "editeur" ? "role-editeur" : "role-lecteur";
+
+  const pendingBoardName = boards.find(b => b.id === pendingDelete)?.name ?? "";
 
   return (
     <Layout title="Mes tableaux">
@@ -129,7 +161,7 @@ export default function Boards() {
 
         {loading && (
           <div className="loader">
-            <span className="spinner" style={{ borderTopColor: "#a3e635" }} />
+            <span className="spinner" />
             Chargement…
           </div>
         )}
@@ -165,7 +197,7 @@ export default function Boards() {
                   {board.role === "admin" && (
                     <button
                       className="board-delete-btn"
-                      onClick={e => handleDelete(e, board.id)}
+                      onClick={e => askDelete(e, board.id)}
                       title="Supprimer le tableau"
                       aria-label="Supprimer le tableau"
                     >
@@ -181,16 +213,19 @@ export default function Boards() {
         )}
       </div>
 
+      {/* ── Modale : nouveau tableau ─────────────────────────── */}
       {showModal && (
-        <div className="modal-overlay" onClick={() => setShowModal(false)}>
-          <div className="modal" onClick={e => e.stopPropagation()}>
-            <h2 className="modal-title">Nouveau tableau</h2>
-            <form onSubmit={handleCreate}>
-              {createError && (
-                <div className="alert alert-error" style={{ marginBottom: 14 }}>
-                  ⚠ {createError}
-                </div>
-              )}
+        <div className="modal-overlay" onClick={closeCreateModal}>
+          <div className="modal" style={{ maxWidth: 400 }} onClick={e => e.stopPropagation()}>
+
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 22 }}>
+              <h2 className="modal-title" style={{ margin: 0 }}>Nouveau tableau</h2>
+              <ModalCloseButton onClick={closeCreateModal} />
+            </div>
+
+            <form onSubmit={handleCreate} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              {createError && <div className="alert alert-error">⚠ {createError}</div>}
+
               <div className="form-group">
                 <label className="form-label">Nom du tableau</label>
                 <input
@@ -202,9 +237,13 @@ export default function Boards() {
                   maxLength={50}
                   autoFocus
                 />
+                <span style={{ alignSelf: "flex-end", fontSize: 11, color: "var(--text-3)", fontFamily: "'DM Mono', monospace" }}>
+                  {newName.length}/50
+                </span>
               </div>
-              <div className="modal-actions">
-                <button type="button" className="btn btn-ghost" onClick={() => setShowModal(false)}>
+
+              <div className="modal-actions" style={{ marginTop: 8 }}>
+                <button type="button" className="btn btn-ghost" onClick={closeCreateModal}>
                   Annuler
                 </button>
                 <button type="submit" className="btn btn-primary" disabled={creating}>
@@ -215,6 +254,67 @@ export default function Boards() {
           </div>
         </div>
       )}
+
+      {/* ── Modale : confirmation suppression ────────────────── */}
+      {pendingDelete !== null && (
+        <div className="modal-overlay" onClick={() => setPendingDelete(null)}>
+          <div className="modal" style={{ maxWidth: 400 }} onClick={e => e.stopPropagation()}>
+
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 18 }}>
+              <h2 className="modal-title" style={{ margin: 0 }}>Supprimer le tableau</h2>
+              <ModalCloseButton onClick={() => setPendingDelete(null)} />
+            </div>
+
+            <p style={{ fontSize: 14, color: "var(--text-2)", lineHeight: 1.6, margin: "0 0 6px" }}>
+              Le tableau <strong style={{ color: "var(--text)", fontWeight: 700 }}>«&nbsp;{pendingBoardName}&nbsp;»</strong> et
+              toutes ses colonnes et tâches seront définitivement supprimés.
+            </p>
+            <p style={{ fontSize: 13, color: "var(--text-3)", margin: "0 0 24px", fontFamily: "'DM Mono', monospace" }}>
+              Cette action est irréversible.
+            </p>
+
+            <div className="modal-actions">
+              <button type="button" className="btn btn-ghost" onClick={() => setPendingDelete(null)}>
+                Annuler
+              </button>
+              <button type="button" className="btn btn-danger" onClick={confirmDelete} disabled={deleting}>
+                {deleting ? "Suppression…" : "Supprimer"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </Layout>
+  );
+}
+
+/** Bouton ✕ standard des en-têtes de modale. */
+function ModalCloseButton({ onClick }: { onClick: () => void }) {
+  const [hovered, setHovered] = useState(false);
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        background:     hovered ? "rgba(242,139,130,0.12)" : "none",
+        border:         `1px solid ${hovered ? "rgba(242,139,130,0.25)" : "transparent"}`,
+        color:          hovered ? "#f28b82" : "var(--text-3)",
+        cursor:         "pointer",
+        width:          28,
+        height:         28,
+        display:        "flex",
+        alignItems:     "center",
+        justifyContent: "center",
+        borderRadius:   8,
+        fontSize:       14,
+        transition:     "all 0.15s",
+        flexShrink:     0,
+      }}
+      aria-label="Fermer"
+    >
+      ✕
+    </button>
   );
 }

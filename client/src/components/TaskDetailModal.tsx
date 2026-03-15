@@ -26,7 +26,7 @@ const formatDate  = (dt?: string | null) => dt
 const initials    = (u: User) => `${u.firstName.charAt(0)}${u.lastName.charAt(0)}`.toUpperCase();
 
 /* ── Carte utilisateur ── */
-function UserCard({ user, accent = "#b0a6ff", onClick, selected }: { user: User; accent?: string; onClick?: () => void; selected?: boolean }) {
+function UserCard({ user, accent = "#b0a6ff", onClick, selected }: { user: User; accent?: string; onClick?: (e: React.MouseEvent) => void; selected?: boolean }) {
   return (
     <div
       onClick={onClick}
@@ -74,6 +74,18 @@ export default function TaskDetailModal({ task, columnName, members = [], onClos
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [error,      setError]      = useState("");
   const debounceRef  = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isClosing    = useRef(false);
+
+  const handleClose = () => {
+    isClosing.current = true;
+    // Si une sauvegarde est en attente (debounce), la déclencher immédiatement
+    if (debounceRef.current) {
+      clearTimeout(debounceRef.current);
+      debounceRef.current = null;
+      doSave(title, details, dueDate, priority);
+    }
+    onClose();
+  };
 
   /* UI state */
   const [priorityOpen,  setPriorityOpen]  = useState(false);
@@ -162,7 +174,7 @@ export default function TaskDetailModal({ task, columnName, members = [], onClos
 
   /* Échap pour fermer la modale */
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") handleClose(); };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
   }, [onClose]);
@@ -189,9 +201,10 @@ export default function TaskDetailModal({ task, columnName, members = [], onClos
       const res = await authFetch(ROUTES_API.task(task.id), { method: "PUT", body: JSON.stringify(body) });
       if (!res.ok) throw new Error("Erreur lors de la sauvegarde.");
       const saved: Task = await res.json();
-      setSaveStatus("saved");
+      if (!isClosing.current) setSaveStatus("saved");
       onEdit(saved);
     } catch (e: unknown) {
+      if (isClosing.current) return;
       setSaveStatus("error");
       setError(e instanceof Error ? e.message : "Erreur.");
     }
@@ -217,9 +230,10 @@ export default function TaskDetailModal({ task, columnName, members = [], onClos
       const res = await authFetch(url, { method: "PATCH", body: "{}" });
       if (!res.ok) throw new Error("Erreur lors de l'assignation.");
       const saved: Task = await res.json();
-      setSaveStatus("saved");
+      if (!isClosing.current) setSaveStatus("saved");
       onEdit(saved);
     } catch (e: unknown) {
+      if (isClosing.current) return;
       setSaveStatus("error");
       setError(e instanceof Error ? e.message : "Erreur.");
     }
@@ -235,7 +249,7 @@ export default function TaskDetailModal({ task, columnName, members = [], onClos
   return (
     <div
       style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.65)", backdropFilter: "blur(6px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100 }}
-      onClick={onClose}
+      onClick={handleClose}
     >
       <div
         style={{ background: "#2b2930", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 20, width: "min(720px, 95vw)", maxHeight: "90vh", overflow: "hidden", display: "flex", flexDirection: "column", boxShadow: "0 24px 64px rgba(0,0,0,0.55)", animation: "slideUp 0.22s cubic-bezier(0.16,1,0.3,1)" }}
@@ -252,7 +266,7 @@ export default function TaskDetailModal({ task, columnName, members = [], onClos
             <span>#{task.id}</span>
           </div>
           <button
-            onClick={onClose}
+            onClick={handleClose}
             onMouseEnter={() => setCloseHover(true)}
             onMouseLeave={() => setCloseHover(false)}
             style={{ background: closeHover ? "rgba(242,139,130,0.12)" : "none", border: `1px solid ${closeHover ? "rgba(242,139,130,0.25)" : "transparent"}`, color: closeHover ? "#f28b82" : "#7a7288", cursor: "pointer", width: 28, height: 28, display: "flex", alignItems: "center", justifyContent: "center", borderRadius: 8, fontSize: 14, transition: "all 0.15s" }}
@@ -480,7 +494,7 @@ export default function TaskDetailModal({ task, columnName, members = [], onClos
                   style={{ cursor: canEdit ? "pointer" : "default" }}
                 >
                   {assignee
-                    ? <UserCard user={assignee} accent="#b0a6ff" selected onClick={canEdit ? () => { setAssigneeOpen(o => !o); setPriorityOpen(false); } : undefined} />
+                    ? <UserCard user={assignee} accent="#b0a6ff" selected onClick={canEdit ? (e: React.MouseEvent) => { e.stopPropagation(); setAssigneeOpen(o => !o); setPriorityOpen(false); } : undefined} />
                     : (
                       <div style={{ display: "flex", alignItems: "center", gap: 8, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 10, padding: "9px 11px", color: "#7a7288", fontSize: 12, fontStyle: "italic" }}>
                         <span style={{ fontSize: 16 }}>+</span> Assigner à…
