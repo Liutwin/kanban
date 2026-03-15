@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import Layout from "../components/Layout";
+import { getAvatarStyle } from "../utils/avatarColor";
 import { ROUTES_API } from "../config/api";
 import { useAuth } from "../hooks/useAuth";
 import { extractErrorMessage } from "../utils/apiHelpers";
@@ -306,7 +307,7 @@ export default function Profile() {
         <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: "var(--radius-lg)", padding: "28px 32px", display: "flex", alignItems: "center", gap: 24, boxShadow: "var(--elev-1)" }}>
           {/* Avatar */}
           <div style={{ position: "relative", flexShrink: 0 }}>
-            <div style={{ width: 72, height: 72, borderRadius: "50%", overflow: "hidden", background: "linear-gradient(135deg, var(--accent-dark), var(--accent))", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 0 0 3px rgba(176,166,255,0.25), var(--elev-2)" }}>
+            <div style={{ width: 72, height: 72, borderRadius: "50%", overflow: "hidden", background: user?.id ? getAvatarStyle(user.id).background : "linear-gradient(135deg, var(--accent-dark), var(--accent))", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: `0 0 0 3px ${user?.id ? getAvatarStyle(user.id).from + '44' : 'rgba(176,166,255,0.25)'}, var(--elev-2)` }}>
               {avatarSrc
                 ? <img src={avatarSrc} alt="Avatar" style={{ width: "100%", height: "100%", objectFit: "cover" }} onError={e => { (e.target as HTMLImageElement).style.display = "none"; }} />
                 : <span style={{ fontSize: 24, fontWeight: 700, color: "#1c1b1f" }}>{userInitials}</span>

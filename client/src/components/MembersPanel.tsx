@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import { ROUTES_API } from "../config/api";
 import type { Member, User } from "../model/interfaces";
+import { getAvatarStyle } from "../utils/avatarColor";
 
 // ─────────────────────────────────────────────────────────────
 // Types & constantes
@@ -25,19 +26,8 @@ const ROLE_LABELS: Record<Member["role"], string> = {
   lecteur: "Lecteur",
 };
 
-const AVATAR_COLORS = [
-  { bg: "rgba(124,111,240,0.2)",  color: "#7c6ff0" },  // indigo
-  { bg: "rgba(52,168,140,0.2)",   color: "#34a88c" },  // teal foncé
-  { bg: "rgba(220,100,60,0.2)",   color: "#dc643c" },  // terracotta
-  { bg: "rgba(80,140,200,0.2)",   color: "#508cc8" },  // bleu acier
-  { bg: "rgba(170,120,200,0.2)",  color: "#aa78c8" },  // mauve
-  { bg: "rgba(180,160,80,0.2)",   color: "#b4a050" },  // doré mat
-  { bg: "rgba(80,170,120,0.2)",   color: "#50aa78" },  // vert sauge
-];
-
-export function getAvatarColor(userId: number) {
-  return AVATAR_COLORS[userId % AVATAR_COLORS.length];
-}
+// getAvatarColor remplacé par getAvatarStyle (utils/avatarColor.ts)
+export { getAvatarStyle as getAvatarColor };
 
 function getInitials(u?: User | { firstName?: string; lastName?: string }): string {
   if (!u) return "?";
@@ -323,7 +313,7 @@ export default function MembersPanel({ boardId, currentUserId, currentRole, onCl
       {/* Popover profil — rendue ICI, hors du scroll, positionnée via top calculé */}
       {popover && (() => {
         const { member: m, top } = popover;
-        const c    = getAvatarColor(m.userId);
+        const c    = getAvatarStyle(m.userId);
         const u    = m.user;
         const name = u ? `${u.firstName ?? ""} ${u.lastName ?? ""}`.trim() : `#${m.userId}`;
         return (
@@ -336,7 +326,7 @@ export default function MembersPanel({ boardId, currentUserId, currentRole, onCl
           }}>
             {/* Avatar grand + nom */}
             <div style={{ padding: "18px 16px 12px", display: "flex", flexDirection: "column", alignItems: "center", gap: 10, borderBottom: "1px solid var(--border)" }}>
-              <div style={{ width: 52, height: 52, borderRadius: "50%", background: c.bg, color: c.color, fontSize: 17, fontWeight: 600, fontFamily: "'DM Mono',monospace", display: "flex", alignItems: "center", justifyContent: "center", border: `2px solid ${c.color}55` }}>
+              <div style={{ width: 52, height: 52, borderRadius: "50%", background: c.background, color: c.color, fontSize: 17, fontWeight: 600, fontFamily: "'DM Mono',monospace", display: "flex", alignItems: "center", justifyContent: "center", border: `2px solid ${c.color}55` }}>
                 {getInitials(u)}
               </div>
               <div style={{ textAlign: "center" }}>
@@ -375,13 +365,13 @@ export default function MembersPanel({ boardId, currentUserId, currentRole, onCl
           </div>
         ) : members.map(m => {
           const isSelf = m.userId === currentUserId;
-          const c      = getAvatarColor(m.userId);
+          const c      = getAvatarStyle(m.userId);
           const name   = m.user ? `${m.user.firstName ?? ""} ${m.user.lastName ?? ""}`.trim() : `#${m.userId}`;
           return (
             <div key={m.userId} className="mp-row">
               <button
                 className="mp-avatar-btn"
-                style={{ background: c.bg, color: c.color, border: `1px solid ${c.color}44` }}
+                style={{ background: c.background, color: c.color, border: `1px solid ${c.color}44` }}
                 onClick={e => handleAvatarClick(e, m)}
                 title="Voir le profil"
               >
@@ -468,11 +458,11 @@ export default function MembersPanel({ boardId, currentUserId, currentRole, onCl
             {searchResults.length > 0 && (
               <ul style={{ position: "absolute", top: "calc(100% + 4px)", left: 0, right: 0, margin: 0, padding: 0, listStyle: "none", background: "var(--surface3)", border: "1px solid var(--border2)", borderRadius: "var(--radius)", boxShadow: "var(--elev-3)", zIndex: 60, overflow: "hidden" }}>
                 {searchResults.map(u => {
-                  const c = getAvatarColor(u.id);
+                  const c = getAvatarStyle(u.id);
                   return (
                     <li key={u.id} className="ac-item"
                       onMouseDown={e => handleSelectUser(e, u)}>
-                      <div style={{ width: 24, height: 24, borderRadius: "50%", background: c.bg, color: c.color, fontSize: 9, fontWeight: 600, fontFamily: "'DM Mono',monospace", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                      <div style={{ width: 24, height: 24, borderRadius: "50%", background: c.background, color: c.color, fontSize: 9, fontWeight: 600, fontFamily: "'DM Mono',monospace", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                         {((u.firstName?.[0] ?? "") + (u.lastName?.[0] ?? "")).toUpperCase()}
                       </div>
                       <div style={{ minWidth: 0 }}>

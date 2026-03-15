@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { extractErrorMessage } from "../utils/apiHelpers";
 import Layout from "../components/Layout";
+import { getAvatarStyle } from "../utils/avatarColor";
 import { ROUTES_API } from "../config/api";
 import { useAuth } from "../hooks/useAuth";
 import type { Board, Column, Task, Priority, User, Member } from "../model/interfaces";
@@ -623,7 +624,7 @@ export default function Dashboard() {
                                         style={{ width: 24, height: 24, borderRadius: "50%", objectFit: "cover", border: "2px solid var(--bg-2, #2a2a2a)", flexShrink: 0 }}
                                       />
                                     : <span
-                                        style={{ width: 24, height: 24, borderRadius: "50%", background: "var(--accent, #a3e635)", color: "#000", fontSize: 10, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, border: "2px solid var(--bg-2, #2a2a2a)" }}
+                                        style={{ width: 24, height: 24, borderRadius: "50%", background: assignee ? getAvatarStyle(assignee.id).background : "var(--surface3)", color: "#1c1b1f", fontSize: 10, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, border: "2px solid var(--surface)" }}
                                       >
                                         {assignee ? assigneeInitials(assignee) : "?"}
                                       </span>
@@ -773,8 +774,8 @@ export default function Dashboard() {
                 {dragMirror.task.assignedId && (() => {
                   const assignee = resolveUser(dragMirror.task.assignedId);
                   return assignee?.avatar
-                    ? <img src={assignee.avatar} alt={`${assignee.firstName} ${assignee.lastName}`} style={{ width: 24, height: 24, borderRadius: "50%", objectFit: "cover", border: "2px solid var(--bg-2, #2a2a2a)", flexShrink: 0 }} />
-                    : <span style={{ width: 24, height: 24, borderRadius: "50%", background: "var(--accent, #a3e635)", color: "#000", fontSize: 10, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, border: "2px solid var(--bg-2, #2a2a2a)" }}>
+                    ? <img src={assignee.avatar} alt={`${assignee.firstName} ${assignee.lastName}`} style={{ width: 24, height: 24, borderRadius: "50%", objectFit: "cover", border: "2px solid var(--surface)", flexShrink: 0 }} />
+                    : <span style={{ width: 24, height: 24, borderRadius: "50%", background: assignee ? getAvatarStyle(assignee.id).background : "var(--surface3)", color: "#1c1b1f", fontSize: 10, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, border: "2px solid var(--surface)" }}>
                         {assignee ? assigneeInitials(assignee) : "?"}
                       </span>;
                 })()}

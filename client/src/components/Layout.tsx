@@ -9,7 +9,8 @@ import type { Member }  from "../model/interfaces.ts";
 import { ROUTES_AUTH, ROUTES_API } from "../config/api";
 import SidebarIcon from '../assets/kanban-icon-sidebar.svg';
 import Tooltip from "./Tooltip";
-import MembersPanel, { getAvatarColor } from './MembersPanel';
+import MembersPanel from './MembersPanel';
+import { getAvatarStyle } from '../utils/avatarColor';
 
 /**
  * Props du composant Layout.
@@ -203,7 +204,10 @@ export default function Layout({ children, title, boardId, boardRole }: LayoutPr
 
         <div className="sidebar-footer">
           <div className="user-info">
-            <div className="user-avatar" title={fullName}>{avatarInitial}</div>
+            <div className="user-avatar" title={fullName}
+            style={user?.id ? { background: getAvatarStyle(user.id).background } : undefined}>
+            {avatarInitial}
+          </div>
             <div className="user-details">
               <span className="user-name">{fullName}</span>
             </div>
@@ -259,29 +263,43 @@ export default function Layout({ children, title, boardId, boardRole }: LayoutPr
               <div className="members-trigger" ref={triggerRef} style={{ position: "relative" }}>
                 <div className="avatars-stack">
                   {avatarMembers.map((m, i) => {
-                    const c = getAvatarColor(m.userId);
+                    const c = getAvatarStyle(m.userId);
+                    const total = avatarMembers.length;
                     return (
                       <div key={m.userId} style={{
-                        marginLeft: i === 0 ? 0 : -6,
-                        zIndex: i + 1,
+                        marginRight: i < total - 1 ? -6 : 0,
+                        zIndex: total - i,
                         position: "relative",
                         flexShrink: 0,
                       }}>
-                        <Tooltip text={`${m.firstName} ${m.lastName}${m.role === "admin" ? " · Admin" : ""}`} position="bottom">
+                        <Tooltip text={`${m.firstName} ${m.lastName} · ${m.role === "admin" ? "Admin" : m.role === "editeur" ? "Éditeur" : "Lecteur"}`} position="bottom">
                           <button
                             className="stacked-avatar stacked-avatar--btn"
-                            style={{ background: c.color, color: "#1c1b1f" }}
+                            style={{
+                              background: c.background,
+                              color: c.color,
+                              // Halo au survol = couleur de départ du dégradé à 50% opacité
+                              ["--avatar-glow" as string]: `${c.from}80`,
+                            }}
                             onClick={() => setTopbarPopover(topbarPopover?.userId === m.userId ? null : m)}
                           >
                             {memberInitials(m)}
+                            {/* Badge rôle — haut droite, légèrement à cheval sur le bord */}
                             {m.role === "admin" && (
                               <span style={{
-                                position: "absolute", top: -3, right: -2,
-                                width: 10, height: 10, borderRadius: "50%",
-                                background: "#fdd663", border: "1.5px solid var(--surface)",
+                                position: "absolute", top: -2, right: -2,
+                                width: 12, height: 12, borderRadius: "50%",
+                                background: "#fdd663", border: "2px solid var(--surface)",
                                 display: "flex", alignItems: "center", justifyContent: "center",
-                                fontSize: 6, lineHeight: 1,
+                                fontSize: 7, lineHeight: 1,
                               }}>★</span>
+                            )}
+                            {m.role === "editeur" && (
+                              <span style={{
+                                position: "absolute", top: -1, right: -1,
+                                width: 9, height: 9, borderRadius: "50%",
+                                background: "#b0c8ff", border: "2px solid var(--surface)",
+                              }} />
                             )}
                           </button>
                         </Tooltip>
@@ -293,7 +311,7 @@ export default function Layout({ children, title, boardId, boardRole }: LayoutPr
                 {/* Popover topbar avatar */}
                 {topbarPopover && (() => {
                   const m = topbarPopover;
-                  const c = getAvatarColor(m.userId);
+                  const c = getAvatarStyle(m.userId);
                   const ROLE_LABELS: Record<string, string> = { admin: "Admin", editeur: "Éditeur", lecteur: "Lecteur" };
                   return (
                     <div style={{
@@ -303,7 +321,7 @@ export default function Layout({ children, title, boardId, boardRole }: LayoutPr
                       boxShadow: "var(--elev-4)", zIndex: 300, overflow: "hidden",
                     }}>
                       <div style={{ padding: "18px 16px 12px", display: "flex", flexDirection: "column", alignItems: "center", gap: 10, borderBottom: "1px solid var(--border)" }}>
-                        <div style={{ width: 52, height: 52, borderRadius: "50%", background: c.bg, color: c.color, fontSize: 17, fontWeight: 600, fontFamily: "'DM Mono',monospace", display: "flex", alignItems: "center", justifyContent: "center", border: `2px solid ${c.color}55` }}>
+                        <div style={{ width: 52, height: 52, borderRadius: "50%", background: c.background, color: c.color, fontSize: 17, fontWeight: 600, fontFamily: "'DM Mono',monospace", display: "flex", alignItems: "center", justifyContent: "center", border: `2px solid ${c.to}55` }}>
                           {memberInitials(m)}
                         </div>
                         <div style={{ textAlign: "center" }}>

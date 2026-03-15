@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import type { Task, Priority, User, Comment, Member } from "../model/interfaces";
 import { ROUTES_API } from "../config/api";
 import { useAuth } from "../hooks/useAuth";
+import { getAvatarStyle } from "../utils/avatarColor";
 import Tooltip from "./Tooltip";
 
 interface Props {
@@ -40,7 +41,7 @@ function UserCard({ user, accent = "#b0a6ff", onClick, selected }: { user: User;
         transition: "all 0.15s",
       }}
     >
-      <div style={{ width: 32, height: 32, borderRadius: "50%", flexShrink: 0, overflow: "hidden", background: `linear-gradient(135deg, ${accent}88, ${accent})`, display: "flex", alignItems: "center", justifyContent: "center", boxShadow: `0 0 0 2px ${accent}33` }}>
+      <div style={{ width: 32, height: 32, borderRadius: "50%", flexShrink: 0, overflow: "hidden", background: getAvatarStyle(user.id).background, display: "flex", alignItems: "center", justifyContent: "center", boxShadow: `0 0 0 2px ${getAvatarStyle(user.id).from}44` }}>
         {user.avatarURL
           ? <img src={user.avatarURL} alt={initials(user)} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
           : <span style={{ fontSize: 11, fontWeight: 700, color: "#1c1b1f" }}>{initials(user)}</span>
