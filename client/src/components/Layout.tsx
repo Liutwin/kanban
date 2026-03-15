@@ -222,7 +222,7 @@ export default function Layout({ children, title, boardId, boardRole }: LayoutPr
       </aside>
 
       {/* Contenu principal */}
-      <main className="main-content">
+      <main className={`main-content${boardId ? " main-content--board" : ""}`}>
         <header className="top-bar">
           {/* Titre */}
           <h1 className="page-title">{title ?? ""}</h1>
@@ -345,7 +345,7 @@ export default function Layout({ children, title, boardId, boardRole }: LayoutPr
           )}
         </header>
 
-        <div className="page-body">{children}</div>
+        <div className={`page-body${boardId ? " page-body--kanban" : ""}`}>{children}</div>
       </main>
     </div>
   );

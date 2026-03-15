@@ -16,7 +16,7 @@ interface Props {
 
 /* ── Helpers ── */
 const PRIORITIES: Priority[] = ["basse", "moyenne", "haute"];
-const priorityLabel = (p: Priority) => p === "haute" ? "↑ Haute" : p === "moyenne" ? "→ Moy." : "↓ Basse";
+const priorityLabel = (p: Priority) => p === "haute" ? "↑ Haute" : p === "moyenne" ? "→ Moyenne" : "↓ Basse";
 const priorityColor = (p: Priority) => p === "haute" ? "#f28b82" : p === "moyenne" ? "#fdd663" : "#81c995";
 const badgeBg     = (p: Priority) => p === "haute" ? "rgba(242,139,130,0.15)" : p === "moyenne" ? "rgba(253,214,99,0.12)" : "rgba(129,201,149,0.1)";
 const badgeBorder = (p: Priority) => p === "haute" ? "rgba(242,139,130,0.3)"  : p === "moyenne" ? "rgba(253,214,99,0.3)"  : "rgba(129,201,149,0.25)";
@@ -74,8 +74,9 @@ export default function TaskDetailModal({ task, columnName, members = [], onClos
   const [assigneeId, setAssigneeId] = useState<number | null>(task.assignedId ?? null);
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [error,      setError]      = useState("");
-  const debounceRef  = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const isClosing    = useRef(false);
+  const debounceRef        = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isClosing          = useRef(false);
+  const commentTextareaRef = useRef<HTMLTextAreaElement>(null);
 
   const handleClose = () => {
     isClosing.current = true;
@@ -165,6 +166,14 @@ export default function TaskDetailModal({ task, columnName, members = [], onClos
       textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
     }
   }, [details]);
+
+  /* Auto-resize textarea commentaire */
+  useEffect(() => {
+    if (commentTextareaRef.current) {
+      commentTextareaRef.current.style.height = "auto";
+      commentTextareaRef.current.style.height = `${commentTextareaRef.current.scrollHeight}px`;
+    }
+  }, [commentText]);
 
   /* Fermer les dropdowns si clic à l'extérieur */
   useEffect(() => {
@@ -391,12 +400,18 @@ export default function TaskDetailModal({ task, columnName, members = [], onClos
                 </div>
                 <div style={{ flex: 1, position: "relative" }}>
                   <textarea
+                    ref={commentTextareaRef}
                     value={commentText}
                     onChange={e => setCommentText(e.target.value)}
-                    onKeyDown={e => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) handleAddComment(); }}
-                    placeholder="Ajouter un commentaire… (Ctrl+Entrée pour envoyer)"
+                    onKeyDown={e => {
+                      if (e.key === "Enter" && !e.shiftKey) {
+                        e.preventDefault();
+                        handleAddComment();
+                      }
+                    }}
+                    placeholder="Ajouter un commentaire… (saut de ligne : Shift+Entrée)"
                     rows={1}
-                    style={{ ...inputBase, fontSize: 13, lineHeight: 1.55, resize: "none", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 10, padding: "8px 70px 8px 10px", display: "block", transition: "border-color 0.15s" }}
+                    style={{ ...inputBase, fontSize: 13, lineHeight: 1.55, resize: "none", overflow: "hidden", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 10, padding: "8px 70px 8px 10px", display: "block", transition: "border-color 0.15s" }}
                     onFocus={e => { e.currentTarget.style.background = "rgba(255,255,255,0.06)"; e.currentTarget.style.borderColor = "rgba(176,166,255,0.3)"; }}
                     onBlur={e  => { e.currentTarget.style.background = "rgba(255,255,255,0.04)"; e.currentTarget.style.borderColor = "rgba(255,255,255,0.08)"; }}
                   />

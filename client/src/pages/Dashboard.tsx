@@ -671,7 +671,7 @@ export default function Dashboard() {
           onClose={() => setDetailTask(null)}
           onEdit={saved => {
             setColumns(cols => cols.map(col => ({ ...col, tasks: col.tasks.map(t => t.id === saved.id ? saved : t) })));
-            setDetailTask(prev => prev !== null ? saved : null);
+            setDetailTask(saved);
           }}
           onDelete={taskId => { setDetailTask(null); handleDeleteTask(taskId); }}
           currentRole={currentRole}

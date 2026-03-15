@@ -1,6 +1,11 @@
 /* dashboard.css – Kanban Board · Material Dark */
 
-.dashboard-page { display: flex; flex-direction: column; gap: 20px; }
+.dashboard-page {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  height: 100%;
+}
 
 .dashboard-header {
   display: flex;
@@ -37,8 +42,11 @@
   display: flex;
   gap: 16px;
   overflow-x: auto;
+  overflow-y: auto;
   padding-bottom: 16px;
   align-items: flex-start;
+  flex: 1;
+  min-height: 0;
 }
 
 .kanban-board::-webkit-scrollbar { height: 6px; }

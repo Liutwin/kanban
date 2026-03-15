@@ -263,7 +263,8 @@ body {
 .main-content {
   display: flex;
   flex-direction: column;
-  min-height: 100vh;
+  height: 100vh;
+  overflow: hidden;
   min-width: 0;
 }
 
@@ -318,6 +319,13 @@ body {
   flex: 1;
   padding: 28px;
   overflow-y: auto;
+}
+
+/* Variante kanban : la scrollbar verticale est gérée par le board lui-même */
+.page-body--kanban {
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
 /* ── Cards ─────────────────────────────────────────────────── */

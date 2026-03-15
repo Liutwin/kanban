@@ -75,6 +75,9 @@ export default function MembersPanel({ boardId, currentUserId, currentRole, onCl
   // Popover avatar — rendue hors du container scrollable
   const [popover, setPopover] = useState<{ member: MemberWithUser; top: number } | null>(null);
 
+  // Confirmation inline de suppression
+  const [pendingRemove, setPendingRemove] = useState<MemberWithUser | null>(null);
+
   const panelRef = useRef<HTMLDivElement>(null);
   const isAdmin  = currentRole === "admin";
 
@@ -148,6 +151,16 @@ export default function MembersPanel({ boardId, currentUserId, currentRole, onCl
       .catch(() => {});
   }, [isAdmin]);
 
+  // ── Confirmer la suppression ──────────────────────────────
+  const confirmRemove = async () => {
+    if (!pendingRemove) return;
+    const userId = pendingRemove.userId;
+    setPendingRemove(null);
+    const res = await authFetch(ROUTES_API.boardMember(boardId, userId), { method: "DELETE" });
+    if (res.ok) setMembers(m => m.filter(x => x.userId !== userId));
+    else setInviteError("Erreur lors du retrait du membre.");
+  };
+
   // ── Recherche / autocomplétion ─────────────────────────────
   const handleSearch = (value: string) => {
     setSearchQuery(value);
@@ -179,10 +192,8 @@ export default function MembersPanel({ boardId, currentUserId, currentRole, onCl
   // ── Changer le rôle ────────────────────────────────────────
   const handleRoleChange = async (userId: number, newRole: Member["role"] | "retirer") => {
     if (newRole === "retirer") {
-      if (!confirm("Retirer ce membre du tableau ?")) return;
-      const res = await authFetch(ROUTES_API.boardMember(boardId, userId), { method: "DELETE" });
-      if (res.ok) setMembers(m => m.filter(x => x.userId !== userId));
-      else setInviteError("Erreur lors du retrait du membre.");
+      const member = members.find(m => m.userId === userId);
+      if (member) setPendingRemove(member);
       return;
     }
     // Mise à jour optimiste : on applique immédiatement dans l'UI,
@@ -215,14 +226,16 @@ export default function MembersPanel({ boardId, currentUserId, currentRole, onCl
       });
       if (!res.ok) {
         const text = await res.text().catch(() => "");
-        throw new Error(`Erreur ${res.status}${text ? " : " + text.slice(0, 120) : ""}`);
+        throw new Error(`Erreur ${res.status}${text ? " : " + text.slice(0, 200) : ""}`);
       }
-      const json      = await res.json();
-      const newMember = unwrap<Member>(json);
-      setMembers(m => [...m, { ...newMember, user: selectedUser }]);
-      setInviteSuccess(`${selectedUser.firstName} ${selectedUser.lastName} ajouté·e en tant que ${ROLE_LABELS[inviteRole]}.`);
+      // On recharge la liste complète plutôt que de parser le body
+      // (évite les problèmes de désérialisation du retour Spring)
+      const savedFirstName = selectedUser.firstName;
+      const savedLastName  = selectedUser.lastName;
       setSearchQuery("");
       setSelectedUser(null);
+      await fetchMembers();
+      setInviteSuccess(`${savedFirstName} ${savedLastName} ajouté·e en tant que ${ROLE_LABELS[inviteRole]}.`);
       setTimeout(() => setInviteSuccess(""), 4000);
     } catch (err) {
       setInviteError(err instanceof Error ? err.message : "Erreur.");
@@ -398,14 +411,35 @@ export default function MembersPanel({ boardId, currentUserId, currentRole, onCl
         </div>
       )}
 
+      {/* Confirmation de suppression */}
+      {pendingRemove && (
+        <div style={{ margin: "0 12px 10px", padding: "12px 14px", background: "rgba(242,139,130,0.08)", border: "1px solid rgba(242,139,130,0.25)", borderRadius: 10 }}>
+          <p style={{ margin: "0 0 10px", fontSize: 12, color: "var(--text)", lineHeight: 1.5 }}>
+            Retirer <strong>{pendingRemove.user?.firstName} {pendingRemove.user?.lastName}</strong> du tableau ?
+          </p>
+          <div style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}>
+            <button
+              onClick={() => setPendingRemove(null)}
+              style={{ background: "var(--surface3)", border: "1px solid var(--border2)", borderRadius: 7, color: "var(--text-2)", fontSize: 12, padding: "5px 14px", cursor: "pointer" }}
+            >
+              Annuler
+            </button>
+            <button
+              onClick={confirmRemove}
+              style={{ background: "rgba(242,139,130,0.15)", border: "1px solid rgba(242,139,130,0.35)", borderRadius: 7, color: "var(--danger)", fontSize: 12, fontWeight: 600, padding: "5px 14px", cursor: "pointer" }}
+            >
+              Retirer
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Ajouter un membre */}
       {isAdmin && (
         <div style={{ borderTop: "1px solid var(--border)", padding: "10px 12px 12px" }}>
           <p style={{ margin: "0 0 7px", fontSize: 11, fontWeight: 600, color: "var(--text-3)", textTransform: "uppercase", letterSpacing: "0.08em", fontFamily: "'DM Mono',monospace" }}>
             Ajouter un membre
           </p>
-
-          {inviteError && <p style={{ margin: "0 0 6px", fontSize: 12, color: "var(--danger)" }}>⚠ {inviteError}</p>}
 
           <div style={{ position: "relative", marginBottom: 7 }}>
             <input
@@ -456,9 +490,12 @@ export default function MembersPanel({ boardId, currentUserId, currentRole, onCl
               onClick={handleInvite}
               disabled={!selectedUser || inviting}
             >
-              {inviting ? "Ajout…" : "+ Ajouter"}
+              {inviting ? "En cours…" : "Ajouter"}
             </button>
           </div>
+          {inviteError && (
+            <p style={{ margin: "6px 0 0", fontSize: 12, color: "var(--danger)", lineHeight: 1.4 }}>⚠ {inviteError}</p>
+          )}
         </div>
       )}
     </div>
