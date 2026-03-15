@@ -1,28 +1,20 @@
-import { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { extractErrorMessage } from "../utils/apiHelpers";
 import Layout from "../components/Layout";
 import { ROUTES_API } from "../config/api";
 import { useAuth } from "../hooks/useAuth";
-import type { Board, Column, Task, Priority } from "../model/interfaces";
+import type { Board, Column, Task, Priority, User } from "../model/interfaces";
 import "../styles/dashboard.css";
+import TaskDetailModal from "../components/TaskDetailModal";
 
 interface ColumnWithTasks extends Column {
   tasks: Task[];
 }
 
-/**
- * Page d'affichage d'un tableau Kanban.
- *
- * Charge le tableau, ses colonnes et les tâches de chaque colonne au montage.
- * Permet de créer, modifier, supprimer des tâches, et de les déplacer entre
- * colonnes par drag & drop.
- *
- * Route : `<Route path="/boards/:id" element={<Dashboard />} />`
- */
 export default function Dashboard() {
   const { id }        = useParams<{ id: string }>();
-  const boardId       = parseInt(id ?? "", 10); // parseInt s'arrête au premier tiret : "7-mon-projet" → 7
+  const boardId       = parseInt(id ?? "", 10);
   const { authFetch, user } = useAuth();
   const navigate      = useNavigate();
 
@@ -30,6 +22,9 @@ export default function Dashboard() {
   const [columns, setColumns]     = useState<ColumnWithTasks[]>([]);
   const [loading, setLoading]     = useState(true);
   const [error, setError]         = useState("");
+
+  // Membres du tableau (pour résoudre creatorId/assignedId → prénom nom)
+  const [members, setMembers] = useState<User[]>([]);
 
   // Modale tâche
   const [taskModal, setTaskModal] = useState<{ colId: number } | null>(null);
@@ -40,17 +35,26 @@ export default function Dashboard() {
   const [saving, setSaving]       = useState(false);
   const [taskError, setTaskError] = useState("");
 
+  // Modale détail tâche
+  const [detailTask, setDetailTask] = useState<Task | null>(null);
+
+  // Mirror de drag : state pour afficher/masquer + contenu, ref pour la position (sans re-render)
+  const [dragMirror, setDragMirror] = useState<{ ox: number; oy: number; width: number; kind: "task"; task: Task } | { ox: number; oy: number; width: number; kind: "col"; col: ColumnWithTasks } | null>(null);
+  const mirrorRef = useRef<HTMLDivElement>(null);
+
   // Drag & drop tâches
   const [dragTask, setDragTask]         = useState<Task | null>(null);
-  const [dragOver, setDragOver]         = useState<number | null>(null);
-  /** Identifiant de la tâche survolée lors d'un drag : permet d'insérer la tâche déplacée AVANT elle. */
-  const [dragOverTask, setDragOverTask] = useState<number | null>(null);
+  const [dropTarget, setDropTarget] = useState<{ colId: number; beforeTaskId: number | null } | null>(null);
   const dragTaskRef = useRef<Task | null>(null);
 
   // Drag & drop colonnes
   const [dragCol, setDragCol]         = useState<ColumnWithTasks | null>(null);
   const [dragColOver, setDragColOver] = useState<number | null>(null);
   const dragColRef = useRef<ColumnWithTasks | null>(null);
+
+  const columnsSnapshot   = useRef<ColumnWithTasks[]>([]);
+  const didDrop           = useRef(false);
+  const lastLiveTaskKey   = useRef<string>("");
 
   // Colonnes
   const [colModal, setColModal]   = useState(false);
@@ -60,10 +64,6 @@ export default function Dashboard() {
 
   /* ── Chargement ──────────────────────────────────────────── */
 
-  /**
-   * Charge le nom du tableau, ses colonnes et les tâches de chaque colonne.
-   * Les colonnes sont triées par `numero` avant d'être stockées.
-   */
   const fetchBoard = async () => {
     setLoading(true);
     setError("");
@@ -87,6 +87,30 @@ export default function Dashboard() {
 
       colsWithTasks.sort((a, b) => a.numero - b.numero);
       setColumns(colsWithTasks);
+
+      // Charger les membres + le créateur du tableau pour résoudre
+      // creatorId/assignedId -> prénom nom dans TaskDetailModal.
+      // Le créateur du tableau n'est pas forcément dans participation_ptp,
+      // d'où le fetch séparé sur board.creatorId.
+      const userIdsToFetch = new Set<number>();
+      userIdsToFetch.add(board.creatorId);
+
+      const resMembers = await authFetch(ROUTES_API.boardMembers(boardId));
+      if (resMembers.ok) {
+        const memberList: { userId: number }[] = await resMembers.json();
+        memberList.forEach(m => userIdsToFetch.add(m.userId));
+      }
+
+      const userResults = await Promise.allSettled(
+        [...userIdsToFetch].map(uid =>
+          authFetch(ROUTES_API.user(uid)).then(r => r.ok ? r.json() as Promise<User> : null)
+        )
+      );
+      setMembers(
+        userResults
+          .filter((r): r is PromiseFulfilledResult<User> => r.status === "fulfilled" && r.value != null)
+          .map(r => r.value)
+      );
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Erreur de chargement.");
     } finally {
@@ -96,9 +120,25 @@ export default function Dashboard() {
 
   useEffect(() => { fetchBoard(); }, [boardId]);
 
+  useEffect(() => {
+    const onDragOver = (e: DragEvent) => {
+      if (mirrorRef.current) {
+        mirrorRef.current.style.left = `${e.clientX - dragMirror!.ox}px`;
+        mirrorRef.current.style.top  = `${e.clientY - dragMirror!.oy}px`;
+      }
+    };
+    // Phase de capture : s'exécute avant tout stopPropagation des enfants
+    const onDragEnd = () => setDragMirror(null);
+    document.addEventListener("dragover", onDragOver, true);
+    document.addEventListener("dragend",  onDragEnd,  true);
+    return () => {
+      document.removeEventListener("dragover", onDragOver, true);
+      document.removeEventListener("dragend",  onDragEnd,  true);
+    };
+  }, [dragMirror]);
+
   /* ── CRUD tâches ─────────────────────────────────────────── */
 
-  /** Ouvre la modale en mode création pour la colonne donnée. */
   const openCreateTask = (colId: number) => {
     setEditTask(null);
     setTaskForm({ title: "", details: "", dueDate: "", priority: "moyenne" });
@@ -106,7 +146,6 @@ export default function Dashboard() {
     setTaskModal({ colId });
   };
 
-  /** Ouvre la modale en mode édition pour la tâche donnée. */
   const openEditTask = (task: Task) => {
     setEditTask(task);
     setTaskForm({
@@ -119,11 +158,6 @@ export default function Dashboard() {
     setTaskModal({ colId: task.boardColumnId });
   };
 
-  /**
-   * Crée ou modifie une tâche selon que `editTask` est défini ou non.
-   * Met à jour le state localement sans recharger le tableau entier.
-   * @param e - Événement de soumission du formulaire.
-   */
   const handleSaveTask = async (e: React.FormEvent) => {
     e.preventDefault();
     setTaskError("");
@@ -145,10 +179,8 @@ export default function Dashboard() {
       const savedTask: Task = await res.json();
       setColumns(cols => cols.map(c => {
         if (editTask) {
-          // Modification : remplacer la tâche existante
           return { ...c, tasks: c.tasks.map(t => t.id === savedTask.id ? savedTask : t) };
         } else {
-          // Création : ajouter la tâche à la bonne colonne
           return c.id === taskModal!.colId ? { ...c, tasks: [...c.tasks, savedTask] } : c;
         }
       }));
@@ -160,11 +192,6 @@ export default function Dashboard() {
     }
   };
 
-  /**
-   * Supprime une tâche après confirmation.
-   * Met à jour le state localement sans recharger le tableau entier.
-   * @param taskId - Identifiant de la tâche à supprimer.
-   */
   const handleDeleteTask = async (taskId: number) => {
     if (!confirm("Supprimer cette tâche ?")) return;
     const res = await authFetch(ROUTES_API.task(taskId), { method: "DELETE" });
@@ -177,9 +204,6 @@ export default function Dashboard() {
 
   /* ── Colonnes ────────────────────────────────────────────── */
 
-  /** Crée une nouvelle colonne dans le tableau courant.
-   *  Met à jour le state localement sans recharger le tableau entier.
-   */
   const handleCreateColumn = async (e: React.FormEvent) => {
     e.preventDefault();
     setColError("");
@@ -202,11 +226,6 @@ export default function Dashboard() {
     }
   };
 
-  /**
-   * Supprime une colonne après confirmation.
-   * Met à jour le state localement sans recharger le tableau entier.
-   * @param colId - Identifiant de la colonne à supprimer.
-   */
   const handleDeleteColumn = async (colId: number) => {
     if (!confirm("Supprimer cette colonne et toutes ses tâches ?")) return;
     const res = await authFetch(ROUTES_API.column(boardId, colId), { method: "DELETE" });
@@ -219,49 +238,25 @@ export default function Dashboard() {
 
   /* ── Drag & drop ─────────────────────────────────────────── */
 
-  /**
-   * Déplace la tâche en cours de drag via `PATCH /api/v1/tasks/{id}/move`.
-   * Gère deux cas :
-   *
-   * **Inter-colonnes** (`targetColId !== task.boardColumnId`) :
-   * La tâche est retirée de sa colonne d'origine et insérée à `targetIndex`
-   * dans la colonne cible (ou en fin si aucune tâche n'est survolée).
-   *
-   * **Intra-colonne** (`targetColId === task.boardColumnId`) :
-   * Les tâches situées entre l'ancienne et la nouvelle position sont décalées
-   * de ±1, en miroir de l'algorithme `deplacer_colonne` côté SQL.
-   *
-   * Le state est mis à jour de façon optimiste avant l'appel réseau.
-   * En cas d'échec, `fetchBoard` resynchronise depuis le serveur.
-   *
-   * @param targetColId  - Identifiant de la colonne de destination.
-   * @param task         - Tâche en cours de déplacement.
-   * @param targetTaskId - Tâche survolée au lâcher : la tâche déplacée
-   *                       s'insère AVANT elle. Absent = insertion en fin de colonne.
-   */
-  const handleDrop = (targetColId: number, task: Task, targetTaskId?: number) => {
+  const reorderTaskLive = (targetColId: number, task: Task, targetTaskId?: number) => {
+    const key = `${targetColId}-${targetTaskId ?? "end"}`;
+    if (lastLiveTaskKey.current === key) return;
+    lastLiveTaskKey.current = key;
+
+    const snap       = columnsSnapshot.current;
     const sameColumn = task.boardColumnId === targetColId;
+    const targetCol  = snap.find(c => c.id === targetColId);
+    if (!targetCol) return;
 
-    const targetCol = columns.find(c => c.id === targetColId)!;
-
-    // Calcul de position AVANT la mise à jour optimiste du state,
-    // sur la liste des tâches telle qu'elle est au moment du drop.
-    // Pour l'intra-colonne : on exclut la tâche elle-même du décompte
-    // afin d'obtenir un index dans [0 .. nbTâches-1].
     const tasksWithoutDragged = sameColumn
       ? targetCol.tasks.filter(t => t.id !== task.id)
       : targetCol.tasks;
 
-    // Calcul de l'index d'insertion dans la liste filtrée.
-    // Pour un drag intra-colonne VERS LE BAS, on insère APRÈS la tâche survolée
-    // (et non avant) : sans cette correction, "insérer avant la tâche suivante"
-    // produit le même index que la position courante → le backend ne fait rien.
-    // Pour un drag vers le haut ou inter-colonnes, on insère avant (comportement standard).
     let targetIndex: number;
     if (targetTaskId != null) {
       const filteredIdx = tasksWithoutDragged.findIndex(t => t.id === targetTaskId);
       if (sameColumn) {
-        const targetTask = targetCol.tasks.find(t => t.id === targetTaskId);
+        const targetTask     = targetCol.tasks.find(t => t.id === targetTaskId);
         const isDraggingDown = targetTask != null && targetTask.position > task.position;
         targetIndex = isDraggingDown
           ? (filteredIdx < 0 ? tasksWithoutDragged.length : filteredIdx + 1)
@@ -274,21 +269,61 @@ export default function Dashboard() {
     }
     const position = targetIndex;
 
-    if (sameColumn && position === task.position) {
-      setDragTask(null); setDragOver(null); setDragOverTask(null); return;
-    }
-
-    setColumns(cols => cols.map(c => {
+    setColumns(snap.map(c => {
       if (sameColumn && c.id === targetColId) {
-        // position est déjà calculé sur la liste sans la tâche draguée,
-        // donc on peut insérer directement sans correction d'index
         const reordered = c.tasks.filter(t => t.id !== task.id);
         reordered.splice(position, 0, { ...task, position });
         return { ...c, tasks: reordered.map((t, i) => ({ ...t, position: i })) };
       }
       if (!sameColumn) {
-        if (c.id === task.boardColumnId)
-          return { ...c, tasks: c.tasks.filter(t => t.id !== task.id) };
+        if (c.id === task.boardColumnId) return { ...c, tasks: c.tasks.filter(t => t.id !== task.id) };
+        if (c.id === targetColId) {
+          const inserted = [...c.tasks];
+          inserted.splice(position, 0, { ...task, boardColumnId: targetColId, position });
+          return { ...c, tasks: inserted.map((t, i) => ({ ...t, position: i })) };
+        }
+      }
+      return c;
+    }));
+  };
+
+  const handleDrop = (targetColId: number, task: Task, targetTaskId?: number) => {
+    didDrop.current = true;
+
+    const snap       = columnsSnapshot.current;
+    const sameColumn = task.boardColumnId === targetColId;
+    const targetCol  = snap.find(c => c.id === targetColId);
+    if (!targetCol) return;
+
+    const tasksWithoutDragged = sameColumn
+      ? targetCol.tasks.filter(t => t.id !== task.id)
+      : targetCol.tasks;
+
+    let targetIndex: number;
+    if (targetTaskId != null) {
+      const filteredIdx = tasksWithoutDragged.findIndex(t => t.id === targetTaskId);
+      if (sameColumn) {
+        const targetTask     = targetCol.tasks.find(t => t.id === targetTaskId);
+        const isDraggingDown = targetTask != null && targetTask.position > task.position;
+        targetIndex = isDraggingDown
+          ? (filteredIdx < 0 ? tasksWithoutDragged.length : filteredIdx + 1)
+          : (filteredIdx < 0 ? tasksWithoutDragged.length : filteredIdx);
+      } else {
+        targetIndex = filteredIdx < 0 ? tasksWithoutDragged.length : filteredIdx;
+      }
+    } else {
+      targetIndex = tasksWithoutDragged.length;
+    }
+    const position = targetIndex;
+
+    setColumns(snap.map(c => {
+      if (sameColumn && c.id === targetColId) {
+        const reordered = c.tasks.filter(t => t.id !== task.id);
+        reordered.splice(position, 0, { ...task, position });
+        return { ...c, tasks: reordered.map((t, i) => ({ ...t, position: i })) };
+      }
+      if (!sameColumn) {
+        if (c.id === task.boardColumnId) return { ...c, tasks: c.tasks.filter(t => t.id !== task.id) };
         if (c.id === targetColId) {
           const inserted = [...c.tasks];
           inserted.splice(position, 0, { ...task, boardColumnId: targetColId, position });
@@ -298,51 +333,30 @@ export default function Dashboard() {
       return c;
     }));
 
-    setDragTask(null);
-    setDragOver(null);
-    setDragOverTask(null);
-
     authFetch(
       `${ROUTES_API.taskMove(task.id)}?newId=${targetColId}&position=${position}`,
       { method: "PATCH", body: "{}" }
-    );
+    ).catch(() => { setColumns(columnsSnapshot.current); fetchBoard(); });
   };
 
   /* ── Drag & drop colonnes ────────────────────────────────── */
 
   /**
-   * Déplace la colonne en cours de drag vers la position de la colonne cible
-   * via `PATCH /api/v1/boards/{boardId}/columns/{id}/move?newNum={num}`.
-   * Met à jour le state localement sans recharger le tableau entier.
-   *
-   * @param targetCol - Colonne sur laquelle on lâche.
+   * Réorganise les colonnes en temps réel pendant le drag.
+   * Calcule depuis l'état courant pour gérer les aller-retours.
    */
-  const handleColDrop = (targetCol: ColumnWithTasks) => {
-    // On capture dragColRef.current immédiatement : onDragEnd peut
-    // s'être déclenché avant onDrop sur certains navigateurs et
-    // avoir remis dragColRef.current à null.
+  const reorderColLive = (targetCol: ColumnWithTasks) => {
     const col = dragColRef.current;
-    if (!col || col.id === targetCol.id) {
-      setDragCol(null); setDragColOver(null); return;
-    }
-    const colId  = col.id;
-    const newNum = targetCol.numero;
-    setColumns(cols => {
-      const oldIdx        = cols.findIndex(c => c.id === colId);
-      const targetOrigIdx = cols.findIndex(c => c.id === targetCol.id);
-      const reordered     = cols.filter(c => c.id !== colId);
-      const targetIdx     = reordered.findIndex(c => c.id === targetCol.id);
-      const insertAt      = oldIdx < targetOrigIdx ? targetIdx + 1 : targetIdx;
-      reordered.splice(insertAt, 0, { ...col, numero: newNum });
+    if (!col || col.id === targetCol.id) return;
+
+    setColumns(current => {
+      const currentIdx = current.findIndex(c => c.id === col.id);
+      const targetIdx  = current.findIndex(c => c.id === targetCol.id);
+      if (currentIdx === -1 || targetIdx === -1 || currentIdx === targetIdx) return current;
+      const reordered = [...current];
+      const [moved]   = reordered.splice(currentIdx, 1);
+      reordered.splice(targetIdx, 0, moved);
       return reordered.map((c, i) => ({ ...c, numero: i + 1 }));
-    });
-    setDragCol(null);
-    setDragColOver(null);
-    // Fire-and-forget, comme handleDrop pour les tâches :
-    // pas d'await, pas de rechargement sur erreur
-    authFetch(`${ROUTES_API.columnMove(boardId, colId)}?newNum=${newNum}`, {
-      method: "PATCH",
-      body:   "{}",
     });
   };
 
@@ -359,6 +373,13 @@ export default function Dashboard() {
 
   const isOverdue = (dt: string | null | undefined) =>
     dt ? new Date(dt) < new Date() : false;
+
+  /* ── Pixel transparent pour masquer le ghost natif ─────────── */
+  const transparentPixel = (() => {
+    const c = document.createElement("canvas");
+    c.width = 1; c.height = 1;
+    return c;
+  })();
 
   /* ── Rendu ───────────────────────────────────────────────── */
 
@@ -382,16 +403,28 @@ export default function Dashboard() {
             {columns.map(col => (
               <div
                 key={col.id}
-                className={`kanban-col ${dragOver === col.id ? "drag-over" : ""} ${dragColOver === col.id && !dragTask ? "drag-over" : ""}`}
-                onDragOver={e => { e.preventDefault(); dragTaskRef.current ? setDragOver(col.id) : setDragColOver(col.id); }}
-                onDragLeave={() => { setDragOver(null); setDragColOver(null); }}
-                onDrop={e => { e.preventDefault(); console.log("DROP sur col", col.id, "dragTaskRef:", dragTaskRef.current?.id, "dragColRef:", dragColRef.current?.id); dragTaskRef.current ? handleDrop(col.id, dragTaskRef.current) : handleColDrop(col); }}
+                className={`kanban-col ${dropTarget?.colId === col.id && !!dragTask ? "drag-over" : ""} ${dragColOver === col.id && !dragTask ? "drag-over" : ""}`}
+                onDragOver={e => { e.preventDefault(); if (!dragTaskRef.current) { reorderColLive(col); setDragColOver(col.id); } }}
+                onDragLeave={() => { setDragColOver(null); }}
+                onDrop={e => { e.preventDefault(); didDrop.current = true; setDropTarget(null); setDragMirror(null); if (dragTaskRef.current) { handleDrop(col.id, dragTaskRef.current); } else { handleColDrop(col); } }}
               >
                 <div
                   className="col-header"
                   draggable
-                  onDragStart={e => { e.stopPropagation(); dragTaskRef.current = null; setDragTask(null); dragColRef.current = col; setDragCol(col); console.log("DRAGSTART col", col.id); }}
-                  onDragEnd={() => { dragColRef.current = null; setDragCol(null); setDragColOver(null); }}
+                  onDragStart={e => {
+                    e.stopPropagation();
+                    columnsSnapshot.current = columns;
+                    didDrop.current = false;
+                    dragTaskRef.current = null;
+                    setDragTask(null);
+                    dragColRef.current = col;
+                    setDragCol(col);
+                    e.dataTransfer.setDragImage(transparentPixel, 0, 0);
+                    const colEl = (e.currentTarget as HTMLElement).closest(".kanban-col") as HTMLElement;
+                    const colRect = colEl?.getBoundingClientRect();
+                    setDragMirror({ ox: colRect ? e.clientX - colRect.left : 20, oy: colRect ? e.clientY - colRect.top : 20, width: colEl?.offsetWidth ?? 280, kind: "col", col });
+                  }}
+                  onDragEnd={() => { if (!didDrop.current) setColumns(columnsSnapshot.current); dragColRef.current = null; setDragCol(null); setDragColOver(null); setDragMirror(null); didDrop.current = false; }}
                   style={{ cursor: "grab" }}
                 >
                   <span className="col-name">{col.name}</span>
@@ -406,75 +439,127 @@ export default function Dashboard() {
                 </div>
 
                 <div className="col-tasks"
-                  onDragOver={e => e.preventDefault()}
+                  onDragOver={e => { e.preventDefault(); }}
                   onDrop={e => {
-                    // Lâcher sur la zone vide sous les tâches → insertion en fin de colonne
                     e.preventDefault();
-                    if (dragTaskRef.current) handleDrop(col.id, dragTaskRef.current);
+                    if (dragTaskRef.current) { didDrop.current = true; setDropTarget(null); setDragMirror(null); handleDrop(col.id, dragTaskRef.current); }
                   }}
                 >
                   {col.tasks.map(task => (
-                    <div
-                      key={task.id}
-                      className={`task-card ${dragTask?.id === task.id ? "dragging" : ""} ${dragOverTask === task.id && dragTask?.id !== task.id ? "drag-over-task" : ""}`}
-                      draggable
-                      onDragStart={e => { e.stopPropagation(); dragTaskRef.current = task; setDragTask(task); }}
-                      onDragEnd={() => { dragTaskRef.current = null; setDragTask(null); setDragOver(null); setDragOverTask(null); }}
-                      onDragOver={e => {
-                        e.preventDefault();
-                        // stopPropagation indispensable : empêche la remontée vers col-tasks
-                        // qui appellerait handleDrop sans targetTaskId (insertion en fin de colonne)
+                    <React.Fragment key={task.id}>
+                      {dropTarget?.colId === col.id && dropTarget?.beforeTaskId === task.id && dragTask?.id !== task.id && (
+                        <div
+                          className="task-drop-placeholder"
+                          onDragOver={e => { e.preventDefault(); e.stopPropagation(); setDropTarget({ colId: col.id, beforeTaskId: task.id }); }}
+                          onDrop={e => { e.preventDefault(); e.stopPropagation(); didDrop.current = true; setDropTarget(null); setDragMirror(null); if (dragTaskRef.current) handleDrop(col.id, dragTaskRef.current, task.id); }}
+                        />
+                      )}
+                      <div
+                        className={`task-card ${dragTask?.id === task.id && dragTask?.boardColumnId === col.id ? "dragging" : ""} ${dropTarget?.beforeTaskId === task.id && dragTaskRef.current?.boardColumnId === col.id ? "drag-over-task" : ""}`}
+                        draggable
+                        style={{ cursor: "pointer" }}
+                        onClick={() => setDetailTask(task)}
+                        onDragStart={e => {
                         e.stopPropagation();
-                        setDragOverTask(task.id);
+                        columnsSnapshot.current = columns;
+                        didDrop.current = false;
+                        lastLiveTaskKey.current = "";
+                        dragTaskRef.current = task;
+                        setDragTask(task);
+                        e.dataTransfer.setDragImage(transparentPixel, 0, 0);
+                        const cardEl = e.currentTarget as HTMLElement;
+                        const cardRect = cardEl.getBoundingClientRect();
+                        setDragMirror({ ox: e.clientX - cardRect.left, oy: e.clientY - cardRect.top, width: cardEl.offsetWidth, kind: "task", task });
                       }}
-                      onDragLeave={() => setDragOverTask(null)}
-                      onDrop={e => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        if (dragTaskRef.current) handleDrop(col.id, dragTaskRef.current, task.id);
-                      }}
-                    >
-                      <div className="task-header">
-                        <span className={`badge ${priorityClass(task.priority)}`}>
-                          {priorityLabel(task.priority)}
-                        </span>
-                        <div className="task-actions">
-                          <button className="icon-btn" onClick={() => openEditTask(task)} title="Modifier">✎</button>
-                          <button className="icon-btn danger" onClick={() => handleDeleteTask(task.id)} title="Supprimer">✕</button>
+                        onDragEnd={() => { if (!didDrop.current) setColumns(columnsSnapshot.current); dragTaskRef.current = null; setDragTask(null); setDropTarget(null); setDragMirror(null); lastLiveTaskKey.current = ""; didDrop.current = false; }}
+                        onDragOver={e => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          if (dragTaskRef.current && dragTaskRef.current.id !== task.id) {
+                            // Détecter si le curseur est dans la moitié haute ou basse de la tâche
+                            const rect   = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                            const isTop  = e.clientY < rect.top + rect.height / 2;
+                            const tasks  = col.tasks;
+                            const idx    = tasks.findIndex(t => t.id === task.id);
+                            const next   = tasks[idx + 1];
+                            const target = isTop ? task.id : (next ? next.id : null);
+                            setDropTarget({ colId: col.id, beforeTaskId: target });
+                          }
+                        }}
+                        onDrop={e => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          didDrop.current = true;
+                          setDropTarget(null);
+                          setDragMirror(null);
+                          if (dragTaskRef.current) handleDrop(col.id, dragTaskRef.current, task.id);
+                        }}
+                      >
+                        <div className="task-header">
+                          <span className={`badge ${priorityClass(task.priority)}`}>
+                            {priorityLabel(task.priority)}
+                          </span>
+                          <div className="task-actions">
+                            <button className="icon-btn" onClick={e => { e.stopPropagation(); openEditTask(task); }} title="Modifier">✎</button>
+                            <button className="icon-btn danger" onClick={e => { e.stopPropagation(); handleDeleteTask(task.id); }} title="Supprimer">✕</button>
+                          </div>
+                        </div>
+
+                        <p className="task-title">{task.title}</p>
+
+                        {task.details && <p className="task-details">{task.details}</p>}
+
+                        <div className="task-footer">
+                          {task.dueDate && (
+                            <span className={`task-date ${isOverdue(task.dueDate) ? "overdue" : ""}`}>
+                              ⏰ {formatDate(task.dueDate)}
+                            </span>
+                          )}
+                          {task.assignedId && (
+                            <span className="task-assignee">#{task.assignedId}</span>
+                          )}
                         </div>
                       </div>
-
-                      <p className="task-title">{task.title}</p>
-
-                      {task.details && <p className="task-details">{task.details}</p>}
-
-                      <div className="task-footer">
-                        {task.dueDate && (
-                          <span className={`task-date ${isOverdue(task.dueDate) ? "overdue" : ""}`}>
-                            ⏰ {formatDate(task.dueDate)}
-                          </span>
-                        )}
-                        {task.assignedId && (
-                          <span className="task-assignee">#{task.assignedId}</span>
-                        )}
-                      </div>
-                    </div>
+                    </React.Fragment>
                   ))}
+                  {dropTarget?.colId === col.id && dropTarget?.beforeTaskId === null && (
+                    <div
+                      className="task-drop-placeholder"
+                      onDragOver={e => { e.preventDefault(); e.stopPropagation(); setDropTarget({ colId: col.id, beforeTaskId: null }); }}
+                      onDrop={e => { e.preventDefault(); e.stopPropagation(); didDrop.current = true; setDropTarget(null); setDragMirror(null); if (dragTaskRef.current) handleDrop(col.id, dragTaskRef.current); }}
+                    />
+                  )}
                 </div>
 
-                <button className="add-task-btn" onClick={() => openCreateTask(col.id)}>
+                <button
+                  className="add-task-btn"
+                  onClick={() => openCreateTask(col.id)}
+                  onDragOver={e => { e.preventDefault(); e.stopPropagation(); if (dragTaskRef.current) setDropTarget({ colId: col.id, beforeTaskId: null }); }}
+                  onDrop={e => { e.preventDefault(); e.stopPropagation(); if (dragTaskRef.current) { didDrop.current = true; setDropTarget(null); setDragMirror(null); handleDrop(col.id, dragTaskRef.current); } }}
+                >
                   + Ajouter une tâche
                 </button>
               </div>
             ))}
 
-            {/* Bouton nouvelle colonne */}
             <button className="kanban-col-new" onClick={() => { setColName(""); setColError(""); setColModal(true); }}>
               + Nouvelle colonne
             </button>
           </div>
         )}
       </div>
+
+      {/* Modale détail de tâche */}
+      {detailTask && (
+        <TaskDetailModal
+          task={detailTask}
+          columnName={columns.find(c => c.id === detailTask.boardColumnId)?.name ?? ""}
+          members={members}
+          onClose={() => setDetailTask(null)}
+          onEdit={task => { setDetailTask(null); openEditTask(task); }}
+          onDelete={taskId => { setDetailTask(null); handleDeleteTask(taskId); }}
+        />
+      )}
 
       {/* Modale création / édition de tâche */}
       {taskModal && (
@@ -526,6 +611,7 @@ export default function Dashboard() {
           </div>
         </div>
       )}
+
       {/* Modale création de colonne */}
       {colModal && (
         <div className="modal-overlay" onClick={() => setColModal(false)}>
@@ -553,6 +639,41 @@ export default function Dashboard() {
               </div>
             </form>
           </div>
+        </div>
+      )}
+      {/* Mirror de drag – suit le curseur, remplace le ghost natif */}
+      {dragMirror && (
+        <div ref={mirrorRef} style={{ position: "fixed", left: -9999, top: -9999, width: dragMirror.width, pointerEvents: "none", zIndex: 9999, transform: "rotate(2deg)", boxShadow: "0 12px 40px rgba(0,0,0,0.6)", opacity: 0.95, borderRadius: "var(--radius-lg)" }}>
+          {dragMirror.kind === "task" ? (
+            <div className="task-card" style={{ margin: 0 }}>
+              <div className="task-header">
+                <span className={`badge ${priorityClass(dragMirror.task.priority)}`}>{priorityLabel(dragMirror.task.priority)}</span>
+              </div>
+              <p className="task-title">{dragMirror.task.title}</p>
+              {dragMirror.task.details && <p className="task-details">{dragMirror.task.details}</p>}
+              {(dragMirror.task.dueDate || dragMirror.task.assignedId) && (
+                <div className="task-footer">
+                  {dragMirror.task.dueDate && <span className={`task-date ${isOverdue(dragMirror.task.dueDate) ? "overdue" : ""}`}>⏰ {formatDate(dragMirror.task.dueDate)}</span>}
+                  {dragMirror.task.assignedId && <span className="task-assignee">#{dragMirror.task.assignedId}</span>}
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="kanban-col" style={{ width: dragMirror.width, maxHeight: 400, overflow: "hidden" }}>
+              <div className="col-header">
+                <span className="col-name">{dragMirror.col.name}</span>
+                <span className="col-count">{dragMirror.col.tasks.length}</span>
+              </div>
+              <div className="col-tasks" style={{ gap: 6 }}>
+                {dragMirror.col.tasks.slice(0, 4).map(t => (
+                  <div key={t.id} className="task-card" style={{ margin: 0 }}>
+                    <p className="task-title" style={{ fontSize: 12 }}>{t.title}</p>
+                  </div>
+                ))}
+                {dragMirror.col.tasks.length > 4 && <p style={{ fontSize: 11, color: "var(--text-3)", textAlign: "center", padding: "4px 0" }}>+{dragMirror.col.tasks.length - 4} tâches</p>}
+              </div>
+            </div>
+          )}
         </div>
       )}
     </Layout>
