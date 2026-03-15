@@ -11,6 +11,7 @@ import com.repositories.BoardMemberRepository;
 import com.repositories.BoardRepository;
 import com.repositories.UserRepository;
 import com.services.BoardService;
+import com.services.MailService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -36,6 +37,7 @@ public class BoardServiceImpl implements BoardService {
     private final BoardMapper boardMapper;
     private final BoardMemberRepository boardMemberRepository;
     private final BoardMemberMapper boardMemberMapper;
+    private final MailService mailService;
 
     // -------------------------------------------------------------------------
     // Méthodes utilitaires privées
@@ -177,8 +179,28 @@ public class BoardServiceImpl implements BoardService {
         }
         // On force le boardId depuis l'URL (source de vérité)
         dto.setBoardId(boardId);
-        return boardMemberMapper.toDTO(
+        BoardMemberDTO result = boardMemberMapper.toDTO(
                 boardMemberRepository.save(boardMemberMapper.toEntity(dto)));
+
+        // Notification e-mail — totalement isolée, jamais bloquante
+        try {
+            userRepository.findById(dto.getUserId()).ifPresent(invited -> {
+                String inviterName = userRepository.findById(requesterId)
+                        .map(u -> u.getFirstName() + " " + u.getLastName())
+                        .orElse("Un administrateur");
+                mailService.sendBoardInvitation(
+                        invited.getEmail(),
+                        invited.getFirstName(),
+                        board.getName(),
+                        inviterName,
+                        dto.getRole() != null ? dto.getRole() : BoardMember.Role.LECTEUR
+                );
+            });
+        } catch (Exception e) {
+            // Ne jamais faire échouer l'ajout à cause d'un problème mail
+        }
+
+        return result;
     }
 
     /** {@inheritDoc} */

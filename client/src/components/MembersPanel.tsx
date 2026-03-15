@@ -26,11 +26,13 @@ const ROLE_LABELS: Record<Member["role"], string> = {
 };
 
 const AVATAR_COLORS = [
-  { bg: "rgba(176,166,255,0.18)", color: "#b0a6ff" },
-  { bg: "rgba(100,210,200,0.15)", color: "#64d2c8" },
-  { bg: "rgba(253,214,99,0.15)",  color: "#fdd663" },
-  { bg: "rgba(129,201,149,0.15)", color: "#81c995" },
-  { bg: "rgba(242,139,130,0.15)", color: "#f28b82" },
+  { bg: "rgba(124,111,240,0.2)",  color: "#7c6ff0" },  // indigo
+  { bg: "rgba(52,168,140,0.2)",   color: "#34a88c" },  // teal foncé
+  { bg: "rgba(220,100,60,0.2)",   color: "#dc643c" },  // terracotta
+  { bg: "rgba(80,140,200,0.2)",   color: "#508cc8" },  // bleu acier
+  { bg: "rgba(170,120,200,0.2)",  color: "#aa78c8" },  // mauve
+  { bg: "rgba(180,160,80,0.2)",   color: "#b4a050" },  // doré mat
+  { bg: "rgba(80,170,120,0.2)",   color: "#50aa78" },  // vert sauge
 ];
 
 export function getAvatarColor(userId: number) {
@@ -81,18 +83,23 @@ export default function MembersPanel({ boardId, currentUserId, currentRole, onCl
   const panelRef = useRef<HTMLDivElement>(null);
   const isAdmin  = currentRole === "admin";
 
-  // ── Click en dehors : utilise composedPath() pour gérer les éléments
-  //    retirés du DOM (ex: item d'autocomplétion) avant que l'event ne se propage ─
+  // ── Click en dehors ───────────────────────────────────────
+  // onClose est capturé dans une ref pour éviter que le useEffect
+  // se ré-abonne à chaque render (ce qui déclenchait onClose au moment
+  // du clic sur "Ajouter" car Layout re-rendait en même temps).
+  const onCloseRef = useRef(onClose);
+  useEffect(() => { onCloseRef.current = onClose; }, [onClose]);
+
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       const path = e.composedPath();
       if (panelRef.current && !path.includes(panelRef.current)) {
-        onClose();
+        onCloseRef.current();
       }
     };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
-  }, [onClose]);
+  }, []); // deps vide — le handler est stable, onClose est lu via la ref
 
   // ── Chargement membres ─────────────────────────────────────
   const fetchMembers = useCallback(async () => {
@@ -219,23 +226,29 @@ export default function MembersPanel({ boardId, currentUserId, currentRole, onCl
     }
     setInviting(true);
     setInviteError("");
+    // Capture avant tout setState asynchrone
+    const user      = selectedUser;
+    const roleAdded = inviteRole;
     try {
       const res = await authFetch(ROUTES_API.boardMembers(boardId), {
         method: "POST",
-        body:   JSON.stringify({ userId: selectedUser.id, boardId, role: inviteRole }),
+        body:   JSON.stringify({ userId: user.id, boardId, role: roleAdded }),
       });
       if (!res.ok) {
         const text = await res.text().catch(() => "");
         throw new Error(`Erreur ${res.status}${text ? " : " + text.slice(0, 200) : ""}`);
       }
-      // On recharge la liste complète plutôt que de parser le body
-      // (évite les problèmes de désérialisation du retour Spring)
-      const savedFirstName = selectedUser.firstName;
-      const savedLastName  = selectedUser.lastName;
+      // Mise à jour locale directe — pas de refetch (évite le démontage du panneau)
+      const newMember: MemberWithUser = {
+        userId:  user.id,
+        boardId,
+        role:    roleAdded,
+        user:    user as User,
+      };
+      setMembers(prev => [...prev, newMember]);
       setSearchQuery("");
       setSelectedUser(null);
-      await fetchMembers();
-      setInviteSuccess(`${savedFirstName} ${savedLastName} ajouté·e en tant que ${ROLE_LABELS[inviteRole]}.`);
+      setInviteSuccess(`${user.firstName} ${user.lastName} ajouté·e en tant que ${ROLE_LABELS[roleAdded]}.`);
       setTimeout(() => setInviteSuccess(""), 4000);
     } catch (err) {
       setInviteError(err instanceof Error ? err.message : "Erreur.");

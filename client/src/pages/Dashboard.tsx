@@ -57,11 +57,16 @@ export default function Dashboard() {
   const dragColRef = useRef<ColumnWithTasks | null>(null);
 
   /* ── Recherche ───────────────────────────────────────────── */
-  const [searchQuery, setSearchQuery] = useState("");
+  const [searchQuery,    setSearchQuery]    = useState("");
+  const [searchPriority, setSearchPriority] = useState<"" | "basse" | "moyenne" | "haute">("");
+  const [searchAssignee, setSearchAssignee] = useState<number | "">("");
 
   useEffect(() => {
     const handler = (e: Event) => {
-      setSearchQuery((e as CustomEvent<{ query: string }>).detail.query);
+      const d = (e as CustomEvent<{ query: string; priority: string; assigneeId: number | "" }>).detail;
+      setSearchQuery(d.query ?? "");
+      setSearchPriority((d.priority as "" | "basse" | "moyenne" | "haute") ?? "");
+      setSearchAssignee(d.assigneeId ?? "");
     };
     window.addEventListener("kanban:search", handler);
     return () => window.removeEventListener("kanban:search", handler);
@@ -69,13 +74,13 @@ export default function Dashboard() {
 
   /** Filtre les tâches d'une colonne selon la recherche en cours. */
   const filterTasks = useCallback((tasks: Task[]) => {
-    if (!searchQuery.trim()) return tasks;
-    const q = searchQuery.toLowerCase();
-    return tasks.filter(t =>
-      t.title.toLowerCase().includes(q) ||
-      (t.details ?? "").toLowerCase().includes(q)
-    );
-  }, [searchQuery]);
+    return tasks.filter(t => {
+      if (searchQuery.trim() && !t.title.toLowerCase().includes(searchQuery.toLowerCase()) && !(t.details ?? "").toLowerCase().includes(searchQuery.toLowerCase())) return false;
+      if (searchPriority && t.priority !== searchPriority) return false;
+      if (searchAssignee !== "" && searchAssignee !== -1 && t.assignedId !== searchAssignee) return false;
+      return true;
+    });
+  }, [searchQuery, searchPriority, searchAssignee]);
 
   const columnsSnapshot   = useRef<ColumnWithTasks[]>([]);
   const didDrop           = useRef(false);
@@ -427,7 +432,7 @@ export default function Dashboard() {
     p === "haute" ? "badge-haute" : p === "moyenne" ? "badge-moyenne" : "badge-basse";
 
   const priorityLabel = (p: Priority) =>
-    p === "haute" ? "↑ Haute" : p === "moyenne" ? "→ Moy." : "↓ Basse";
+    p === "haute" ? "↑ Haute" : p === "moyenne" ? "→ Moyenne" : "↓ Basse";
 
   const formatDate = (dt: string | null | undefined) =>
     dt ? new Date(dt).toLocaleDateString("fr-FR", { day: "2-digit", month: "short" }) : null;
@@ -501,7 +506,7 @@ export default function Dashboard() {
                 >
                   <span className="col-name">{col.name}</span>
                   <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                    <span className="col-count">{filterTasks(col.tasks).length}{searchQuery && filterTasks(col.tasks).length !== col.tasks.length ? `/${col.tasks.length}` : ""}</span>
+                    <span className="col-count">{filterTasks(col.tasks).length}{(searchQuery || searchPriority || searchAssignee !== "") && filterTasks(col.tasks).length !== col.tasks.length ? `/${col.tasks.length}` : ""}</span>
                     {!isReadOnly && (
                       <Tooltip text="Supprimer la colonne">
                         <button

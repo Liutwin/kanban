@@ -668,6 +668,8 @@ body {
 .avatars-stack {
   display: flex;
   align-items: center;
+  /* Nécessaire pour que le margin-left négatif fonctionne en flexbox */
+  flex-direction: row;
 }
 
 .stacked-avatar {
@@ -676,19 +678,22 @@ body {
   border-radius: 50%;
   font-family: 'DM Mono', monospace;
   font-size: 10px;
-  font-weight: 500;
+  font-weight: 700;
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 2px solid var(--surface);
-  margin-left: -6px;
-  cursor: default;
+  /* Bordure = couleur topbar, crée la séparation visuelle au chevauchement */
+  border: 2.5px solid var(--surface);
+  /* Chevauchement : chaque avatar empiète sur le précédent */
+  margin-left: -10px !important;
+  cursor: pointer;
   transition: transform 0.15s ease;
   flex-shrink: 0;
+  position: relative;
 }
 
-.stacked-avatar:first-child { margin-left: 0; }
-.stacked-avatar:hover { transform: translateY(-2px); z-index: 1; }
+.stacked-avatar:first-child { margin-left: 0 !important; }
+.stacked-avatar:hover { transform: translateY(-3px); }
 
 .stacked-avatar--extra {
   background: var(--surface3);

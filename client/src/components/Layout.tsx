@@ -67,10 +67,10 @@ export default function Layout({ children, title, boardId, boardRole }: LayoutPr
   }, [user?.id]);
 
   const fullName =
-    `${userDTO?.firstName ?? user?.firstName ?? ""}${(userDTO?.firstName ?? user?.firstName) ? " " : ""}${userDTO?.lastName ?? user?.lastName ?? ""}`.trim() || "Utilisateur";
+    `${user?.firstName ?? ""}${user?.firstName ? " " : ""}${user?.lastName ?? ""}`.trim() || "Utilisateur";
 
   const avatarInitial =
-    `${(userDTO?.firstName ?? user?.firstName)?.charAt(0) ?? ""}${(userDTO?.lastName ?? user?.lastName)?.charAt(0) ?? ""}`.toUpperCase() || "?";
+    `${user?.firstName?.charAt(0) ?? ""}${user?.lastName?.charAt(0) ?? ""}`.toUpperCase() || "?";
 
   /* ── Recherche ───────────────────────────────────────────── */
   const [searchValue, setSearchValue] = useState("");
@@ -258,18 +258,34 @@ export default function Layout({ children, title, boardId, boardRole }: LayoutPr
               {/* Avatars empilés + bouton membres */}
               <div className="members-trigger" ref={triggerRef} style={{ position: "relative" }}>
                 <div className="avatars-stack">
-                  {avatarMembers.map(m => {
+                  {avatarMembers.map((m, i) => {
                     const c = getAvatarColor(m.userId);
                     return (
-                      <Tooltip key={m.userId} text={`${m.firstName} ${m.lastName}`} position="bottom">
-                        <button
-                          className="stacked-avatar stacked-avatar--btn"
-                          style={{ background: c.bg, color: c.color }}
-                          onClick={() => setTopbarPopover(topbarPopover?.userId === m.userId ? null : m)}
-                        >
-                          {memberInitials(m)}
-                        </button>
-                      </Tooltip>
+                      <div key={m.userId} style={{
+                        marginLeft: i === 0 ? 0 : -6,
+                        zIndex: i + 1,
+                        position: "relative",
+                        flexShrink: 0,
+                      }}>
+                        <Tooltip text={`${m.firstName} ${m.lastName}${m.role === "admin" ? " · Admin" : ""}`} position="bottom">
+                          <button
+                            className="stacked-avatar stacked-avatar--btn"
+                            style={{ background: c.color, color: "#1c1b1f" }}
+                            onClick={() => setTopbarPopover(topbarPopover?.userId === m.userId ? null : m)}
+                          >
+                            {memberInitials(m)}
+                            {m.role === "admin" && (
+                              <span style={{
+                                position: "absolute", top: -3, right: -2,
+                                width: 10, height: 10, borderRadius: "50%",
+                                background: "#fdd663", border: "1.5px solid var(--surface)",
+                                display: "flex", alignItems: "center", justifyContent: "center",
+                                fontSize: 6, lineHeight: 1,
+                              }}>★</span>
+                            )}
+                          </button>
+                        </Tooltip>
+                      </div>
                     );
                   })}
                 </div>

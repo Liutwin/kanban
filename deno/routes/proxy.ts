@@ -1,6 +1,7 @@
 import { Router }       from "@oak/oak";
 import { authMiddleware, type AuthContext } from "../middleware/auth.ts";
 import { hashPassword } from "../lib/jwt.ts";
+import { db } from "../config/db.ts";
 
 /** URL de base du serveur Tomcat (backend Spring Boot). */
 const TOMCAT_URL = "http://localhost:8081";
@@ -71,6 +72,55 @@ router.post("/users", async (ctx) => {
   const body = await ctx.request.body.json();
   body.password = await hashPassword(body.password);
   await proxyToTomcat(ctx, "/api/v1/users", JSON.stringify(body));
+});
+
+/**
+ * Route protégée : changement de mot de passe d'un utilisateur.
+ *
+ * Intercepte la requête avant la route générique afin de :
+ * 1. Récupérer le hash stocké en base pour extraire le sel de l'ancien mdp.
+ * 2. Rehasher `oldPassword` avec ce sel — Spring compare directement les hashs.
+ * 3. Hasher `newPassword` avec un nouveau sel aléatoire.
+ * 4. Proxifier le corps modifié vers Spring.
+ *
+ * `PATCH /api/v1/users/:id/password`
+ */
+router.patch("/users/:id/password", authMiddleware, async (ctx: AuthContext) => {
+  const body = await ctx.request.body.json() as { oldPassword: string; newPassword: string };
+
+  // Extraire l'id depuis le pathname car AuthContext n'expose pas ctx.params
+  const match = ctx.request.url.pathname.match(/\/users\/(\d+)\/password/);
+  const userId = match?.[1] ?? String(ctx.state.user!.id);
+
+  // Récupérer le hash stocké en base pour extraire le sel
+  const [rows] = await db.query(
+    "SELECT usr_mdp FROM utilisateur_usr WHERE usr_id = ?",
+    [userId],
+  );
+  const row = (rows as Record<string, unknown>[])[0];
+  const storedHash = (row?.usr_mdp as string) ?? "";
+  const [hash, salt] = storedHash.split(".");
+
+  if (!hash || !salt) {
+    ctx.response.status = 500;
+    ctx.response.body   = JSON.stringify({ message: "Format de mot de passe en base invalide." });
+    return;
+  }
+
+  // Rehasher l'ancien mdp avec le même sel pour que Spring puisse comparer
+  const { scrypt } = await import("node:crypto");
+  const computeHash = (pwd: string, s: string): Promise<string> =>
+    new Promise((res, rej) =>
+      scrypt(pwd, s, 64, (err, dk) => err ? rej(err) : res(dk.toString("hex")))
+    );
+
+  const oldHashed = `${await computeHash(body.oldPassword, salt)}.${salt}`;
+
+  // Hasher le nouveau mdp avec un nouveau sel aléatoire
+  const newHashed = await hashPassword(body.newPassword);
+
+  const path = ctx.request.url.pathname;
+  await proxyToTomcat(ctx, path, JSON.stringify({ oldPassword: oldHashed, newPassword: newHashed }));
 });
 
 /**
