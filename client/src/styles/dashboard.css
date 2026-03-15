@@ -140,17 +140,29 @@
   border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: 13px;
-  cursor: grab;
+  cursor: pointer;
   display: flex;
   flex-direction: column;
   gap: 9px;
   box-shadow: var(--elev-1);
   transition: all 0.18s ease;
   position: relative;
+  overflow: hidden;
+}
+
+/* Bande violette a gauche, cachee par defaut */
+.task-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; bottom: 0;
+  width: 3px;
+  background: linear-gradient(180deg, var(--accent-dark), var(--accent));
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  border-radius: var(--radius) 0 0 var(--radius);
 }
 
 .task-card:active {
-  cursor: grabbing;
   transform: scale(0.98) rotate(0.4deg);
   box-shadow: var(--elev-3);
   z-index: 10;
@@ -160,6 +172,10 @@
   border-color: var(--border2);
   box-shadow: var(--elev-2);
   transform: translateY(-1px);
+}
+
+.task-card:hover::before {
+  opacity: 1;
 }
 
 .task-header {

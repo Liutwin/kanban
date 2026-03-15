@@ -18,13 +18,11 @@ import lombok.AllArgsConstructor;
  * {@code deplacer_colonne} via {@link BoardColumnRepository}.</p>
  */
 @Entity
-@jakarta.persistence.Table(
-        name = "colonne_col",
-        uniqueConstraints = @UniqueConstraint(
-                name = "uq_col_numero_tab",
-                columnNames = {"tab_id", "col_numero"}
-        )
-)
+@jakarta.persistence.Table(name = "colonne_col")
+// L'unicité de (tab_id, col_numero) est garantie par la logique applicative
+// de la procédure stockée deplacer_colonne — pas par une contrainte SQL,
+// car MariaDB l'évaluerait ligne par ligne et violerait l'unicité
+// pendant les décalages en masse (même avec des valeurs temporaires négatives).
 @Data
 @NoArgsConstructor
 @AllArgsConstructor

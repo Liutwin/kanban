@@ -82,17 +82,37 @@ public interface TaskRepository extends JpaRepository<Task, Long> {
      * @param to        borne supérieure inclusive de la plage à décaler
      * @param excludeId identifiant de la tâche à exclure du décalage
      */
+    /**
+     * Passe 1 du réordonnancement intra-colonne : marque temporairement
+     * en négatif les positions à décaler pour éviter les doublons transitoires
+     * sur la contrainte uq_tsk_position_col lors d'un UPDATE multi-lignes.
+     * Les positions cibles sont stockées comme -(position + delta + 1) afin
+     * de pouvoir les récupérer dans la passe 2 sans ambiguïté avec 0.
+     */
     @Modifying
     @Transactional
-    @Query("UPDATE Task t SET t.position = t.position + :delta " +
-            "WHERE t.boardColumn.id = :colId " +
-            "AND t.position >= :from AND t.position <= :to " +
-            "AND t.id <> :excludeId")
-    void shiftPositions(@Param("colId")     Long colId,
-                        @Param("delta")     int  delta,
-                        @Param("from")      int  from,
-                        @Param("to")        int  to,
-                        @Param("excludeId") Long excludeId);
+    @Query(value = "UPDATE tache_tsk SET tsk_position = -(tsk_position + :delta + 1) " +
+            "WHERE col_id = :colId " +
+            "AND tsk_position >= :from AND tsk_position <= :to " +
+            "AND tsk_id <> :excludeId",
+            nativeQuery = true)
+    void shiftPositionsPass1(@Param("colId")     Long colId,
+                             @Param("delta")     int  delta,
+                             @Param("from")      int  from,
+                             @Param("to")        int  to,
+                             @Param("excludeId") Long excludeId);
+
+    /**
+     * Passe 2 du réordonnancement intra-colonne : convertit les positions
+     * temporaires négatives en valeurs définitives positives.
+     * Formule inverse de la passe 1 : position = -(tsk_position) - 1.
+     */
+    @Modifying
+    @Transactional
+    @Query(value = "UPDATE tache_tsk SET tsk_position = (-tsk_position) - 1 " +
+            "WHERE col_id = :colId AND tsk_position < 0",
+            nativeQuery = true)
+    void shiftPositionsPass2(@Param("colId") Long colId);
 
     /**
      * Retourne le nombre de tâches présentes dans une colonne.

@@ -6,6 +6,7 @@ import { ROUTES_API } from "../config/api";
 import { useAuth } from "../hooks/useAuth";
 import type { Board, Column, Task, Priority } from "../model/interfaces";
 import "../styles/dashboard.css";
+import TaskDetailModal from "../components/TaskDetailModal";
 
 interface ColumnWithTasks extends Column {
   tasks: Task[];
@@ -39,6 +40,9 @@ export default function Dashboard() {
   });
   const [saving, setSaving]       = useState(false);
   const [taskError, setTaskError] = useState("");
+
+  // Modale détail tâche (vue Trello)
+  const [detailTask, setDetailTask] = useState<Task | null>(null);
 
   // Drag & drop tâches
   const [dragTask, setDragTask]         = useState<Task | null>(null);
@@ -372,7 +376,25 @@ export default function Dashboard() {
                 <div
                   className="col-header"
                   draggable
-                  onDragStart={e => { e.stopPropagation(); dragTaskRef.current = null; setDragTask(null); dragColRef.current = col; setDragCol(col); console.log("DRAGSTART col", col.id); }}
+                  onDragStart={e => {
+                        e.stopPropagation();
+                        dragTaskRef.current = null;
+                        setDragTask(null);
+                        dragColRef.current = col;
+                        setDragCol(col);
+                        const colEl = (e.currentTarget as HTMLElement).closest(".kanban-col") as HTMLElement;
+                        if (colEl) {
+                          const clone = colEl.cloneNode(true) as HTMLElement;
+                          clone.style.cssText = "position:fixed;top:-9999px;left:-9999px;opacity:1;transform:none;pointer-events:none;width:" + colEl.offsetWidth + "px";
+                          // Wrapper opaque : compense la transparence ~50% appliquée par le navigateur sur le ghost
+                          const wrapper = document.createElement("div");
+                          wrapper.style.cssText = "position:fixed;top:-9999px;left:-9999px;background:#1e1e2e;border-radius:12px;padding:2px;";
+                          wrapper.appendChild(clone);
+                          document.body.appendChild(wrapper);
+                          e.dataTransfer.setDragImage(wrapper, 40, 20);
+                          requestAnimationFrame(() => document.body.removeChild(wrapper));
+                        }
+                      }}
                   onDragEnd={() => { dragColRef.current = null; setDragCol(null); setDragColOver(null); }}
                   style={{ cursor: "grab" }}
                 >
@@ -400,7 +422,17 @@ export default function Dashboard() {
                       key={task.id}
                       className={`task-card ${dragTask?.id === task.id ? "dragging" : ""} ${dragOverTask === task.id && dragTask?.id !== task.id ? "drag-over-task" : ""}`}
                       draggable
-                      onDragStart={e => { e.stopPropagation(); dragTaskRef.current = task; setDragTask(task); }}
+                      onClick={() => setDetailTask(task)}
+                      onDragStart={e => {
+                        e.stopPropagation();
+                        dragTaskRef.current = task;
+                        setDragTask(task);
+                        const clone = (e.currentTarget as HTMLElement).cloneNode(true) as HTMLElement;
+                        clone.style.cssText = "position:fixed;top:-9999px;left:-9999px;opacity:1;transform:none;pointer-events:none;width:" + (e.currentTarget as HTMLElement).offsetWidth + "px";
+                        document.body.appendChild(clone);
+                        e.dataTransfer.setDragImage(clone, 20, 20);
+                        requestAnimationFrame(() => document.body.removeChild(clone));
+                      }}
                       onDragEnd={() => { dragTaskRef.current = null; setDragTask(null); setDragOver(null); setDragOverTask(null); }}
                       onDragOver={e => {
                         e.preventDefault();
@@ -421,8 +453,8 @@ export default function Dashboard() {
                           {priorityLabel(task.priority)}
                         </span>
                         <div className="task-actions">
-                          <button className="icon-btn" onClick={() => openEditTask(task)} title="Modifier">✎</button>
-                          <button className="icon-btn danger" onClick={() => handleDeleteTask(task.id)} title="Supprimer">✕</button>
+                          <button className="icon-btn" onClick={e => { e.stopPropagation(); openEditTask(task); }} title="Modifier">✎</button>
+                          <button className="icon-btn danger" onClick={e => { e.stopPropagation(); handleDeleteTask(task.id); }} title="Supprimer">✕</button>
                         </div>
                       </div>
 
@@ -457,6 +489,17 @@ export default function Dashboard() {
           </div>
         )}
       </div>
+
+      {/* Modale détail de tâche */}
+      {detailTask && (
+        <TaskDetailModal
+          task={detailTask}
+          columnName={columns.find(c => c.id === detailTask.boardColumnId)?.name ?? ""}
+          onClose={() => setDetailTask(null)}
+          onEdit={task => { setDetailTask(null); openEditTask(task); }}
+          onDelete={taskId => { setDetailTask(null); handleDeleteTask(taskId); }}
+        />
+      )}
 
       {/* Modale création / édition de tâche */}
       {taskModal && (

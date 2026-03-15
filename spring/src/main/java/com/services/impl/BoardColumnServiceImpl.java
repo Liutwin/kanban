@@ -140,16 +140,21 @@ public class BoardColumnServiceImpl implements BoardColumnService {
     @Override
     @Transactional
     public void moveColumn(Long id, int newNum, Long requesterId) {
+        // 1. Vérification des droits d'accès via une requête dédiée (sans charger l'entité complète)
         BoardColumn boardColumn = boardColumnRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Colonne introuvable : " + id));
         checkWriteAccess(boardColumn.getBoard().getId(), requesterId);
 
-        // On détache l'entité du contexte de persistance avant d'appeler la procédure.
-        // Sans cela, le flush JPA déclenché par @Modifying enverrait un UPDATE sur
-        // colonne_col AVANT que deplacer_colonne s'exécute, violant uq_col_numero_tab.
-        // En passant par EntityManager.createNativeQuery(), on bypasse entièrement
-        // le cycle flush/track de JPA et on exécute la procédure directement.
-        entityManager.detach(boardColumn);
+        // 2. On vide entièrement le contexte de persistance JPA avant d'appeler
+        //    la procédure stockée. Sans cela, un flush automatique pourrait tenter
+        //    un UPDATE sur colonne_col avant que deplacer_colonne ait réorganisé
+        //    les numéros, violant la contrainte uq_col_numero_tab.
+        entityManager.clear();
+
+        // 3. Désactive le flush automatique pour la durée de l'appel natif
+        entityManager.setFlushMode(jakarta.persistence.FlushModeType.COMMIT);
+
+        // 4. Appel direct de la procédure stockée via native query
         entityManager.createNativeQuery("CALL deplacer_colonne(:colId, :newNum)")
                 .setParameter("colId", id)
                 .setParameter("newNum", newNum)
