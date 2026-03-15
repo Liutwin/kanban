@@ -1,7 +1,6 @@
 package com.dtos;
 
 import com.entities.BoardMember;
-import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
@@ -18,7 +17,6 @@ public class BoardMemberDTO {
     /**
      * Identifiant de l'utilisateur participant.
      */
-    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
     private Long userId;
 
     /**

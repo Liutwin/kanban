@@ -57,6 +57,7 @@
   flex-direction: column;
   box-shadow: var(--elev-1);
   transition: all 0.2s ease;
+  overflow: visible;
 }
 
 .kanban-col.drag-over {

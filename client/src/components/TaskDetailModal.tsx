@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import type { Task, Priority, User, Comment, Member } from "../model/interfaces";
 import { ROUTES_API } from "../config/api";
 import { useAuth } from "../hooks/useAuth";
+import Tooltip from "./Tooltip";
 
 interface Props {
   task:       Task;
@@ -265,12 +266,14 @@ export default function TaskDetailModal({ task, columnName, members = [], onClos
             <span style={{ opacity: 0.4 }}>›</span>
             <span>#{task.id}</span>
           </div>
-          <button
-            onClick={handleClose}
-            onMouseEnter={() => setCloseHover(true)}
-            onMouseLeave={() => setCloseHover(false)}
-            style={{ background: closeHover ? "rgba(242,139,130,0.12)" : "none", border: `1px solid ${closeHover ? "rgba(242,139,130,0.25)" : "transparent"}`, color: closeHover ? "#f28b82" : "#7a7288", cursor: "pointer", width: 28, height: 28, display: "flex", alignItems: "center", justifyContent: "center", borderRadius: 8, fontSize: 14, transition: "all 0.15s" }}
-          >✕</button>
+          <Tooltip text="Fermer" position="bottom">
+            <button
+              onClick={handleClose}
+              onMouseEnter={() => setCloseHover(true)}
+              onMouseLeave={() => setCloseHover(false)}
+              style={{ background: closeHover ? "rgba(242,139,130,0.12)" : "none", border: `1px solid ${closeHover ? "rgba(242,139,130,0.25)" : "transparent"}`, color: closeHover ? "#f28b82" : "#7a7288", cursor: "pointer", width: 28, height: 28, display: "flex", alignItems: "center", justifyContent: "center", borderRadius: 8, fontSize: 14, transition: "all 0.15s" }}
+            >✕</button>
+          </Tooltip>
         </div>
 
         {/* Titre éditable */}
@@ -362,8 +365,12 @@ export default function TaskDetailModal({ task, columnName, members = [], onClos
                             <p style={{ fontSize: 13, color: "#b8b0c8", lineHeight: 1.55, margin: 0, flex: 1, wordBreak: "break-word", whiteSpace: "pre-wrap" }}>{com.content}</p>
                             {isOwn && canEdit && (
                               <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
-                                <button onClick={() => setEditingCom({ id: com.id, text: com.content })} style={{ background: "none", border: "none", color: "#7a7288", cursor: "pointer", fontSize: 12, padding: "2px 5px", borderRadius: 5 }} title="Modifier">✎</button>
-                                <button onClick={() => handleDeleteComment(com.id)} style={{ background: "none", border: "none", color: "#7a7288", cursor: "pointer", fontSize: 12, padding: "2px 5px", borderRadius: 5 }} title="Supprimer">✕</button>
+                                <Tooltip text="Modifier" position="top">
+                                  <button onClick={() => setEditingCom({ id: com.id, text: com.content })} style={{ background: "none", border: "none", color: "#7a7288", cursor: "pointer", fontSize: 12, padding: "2px 5px", borderRadius: 5 }}>✎</button>
+                                </Tooltip>
+                                <Tooltip text="Supprimer" position="top">
+                                  <button onClick={() => handleDeleteComment(com.id)} style={{ background: "none", border: "none", color: "#7a7288", cursor: "pointer", fontSize: 12, padding: "2px 5px", borderRadius: 5 }}>✕</button>
+                                </Tooltip>
                               </div>
                             )}
                           </div>
@@ -544,12 +551,16 @@ export default function TaskDetailModal({ task, columnName, members = [], onClos
                     {saveStatus === "error"  && <>⚠ Erreur</>}
                     {saveStatus === "idle"   && <span style={{ opacity: 0.3 }}>Auto-sauvegarde</span>}
                   </div>
-                  <button
-                    onClick={() => onDelete(task.id)}
-                    style={{ width: "100%", padding: "9px 0", borderRadius: 10, background: "rgba(242,139,130,0.08)", border: "1px solid rgba(242,139,130,0.2)", color: "#f28b82", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}
-                  >
-                    ✕ Supprimer
-                  </button>
+                  <Tooltip text="Supprimer la tâche" position="top">
+                    <button
+                      onClick={() => onDelete(task.id)}
+                      onMouseEnter={e => { e.currentTarget.style.background = "rgba(242,139,130,0.15)"; e.currentTarget.style.borderColor = "rgba(242,139,130,0.35)"; }}
+                      onMouseLeave={e => { e.currentTarget.style.background = "rgba(242,139,130,0.08)"; e.currentTarget.style.borderColor = "rgba(242,139,130,0.2)"; }}
+                      style={{ width: "100%", padding: "9px 0", borderRadius: 10, background: "rgba(242,139,130,0.08)", border: "1px solid rgba(242,139,130,0.2)", color: "#f28b82", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", transition: "all 0.15s" }}
+                    >
+                      ✕ Supprimer
+                    </button>
+                  </Tooltip>
                 </>
               )}
             </div>

@@ -7,6 +7,7 @@ import { useAuth } from "../hooks/useAuth";
 import type { Board, Column, Task, Priority, User, Member } from "../model/interfaces";
 import "../styles/dashboard.css";
 import TaskDetailModal from "../components/TaskDetailModal";
+import Tooltip from "../components/Tooltip";
 
 interface ColumnWithTasks extends Column {
   tasks: Task[];
@@ -502,11 +503,12 @@ export default function Dashboard() {
                   <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                     <span className="col-count">{filterTasks(col.tasks).length}{searchQuery && filterTasks(col.tasks).length !== col.tasks.length ? `/${col.tasks.length}` : ""}</span>
                     {!isReadOnly && (
-                      <button
-                        className="icon-btn danger"
-                        title="Supprimer la colonne"
-                        onClick={() => handleDeleteColumn(col.id)}
-                      >✕</button>
+                      <Tooltip text="Supprimer la colonne">
+                        <button
+                          className="icon-btn danger"
+                          onClick={() => handleDeleteColumn(col.id)}
+                        >✕</button>
+                      </Tooltip>
                     )}
                   </div>
                 </div>
@@ -582,8 +584,12 @@ export default function Dashboard() {
                           </span>
                           {!isReadOnly && (
                             <div className="task-actions">
-                              <button className="icon-btn" onClick={e => { e.stopPropagation(); openEditTask(task); }} title="Modifier">✎</button>
-                              <button className="icon-btn danger" onClick={e => { e.stopPropagation(); handleDeleteTask(task.id); }} title="Supprimer">✕</button>
+                              <Tooltip text="Modifier" position="top">
+                                <button className="icon-btn" onClick={e => { e.stopPropagation(); openEditTask(task); }}>✎</button>
+                              </Tooltip>
+                              <Tooltip text="Supprimer" position="top">
+                                <button className="icon-btn danger" onClick={e => { e.stopPropagation(); handleDeleteTask(task.id); }}>✕</button>
+                              </Tooltip>
                             </div>
                           )}
                         </div>
@@ -602,19 +608,23 @@ export default function Dashboard() {
                             }
                             {task.assignedId && (() => {
                               const assignee = resolveUser(task.assignedId);
-                              return assignee?.avatar
-                                ? <img
-                                    src={assignee.avatar}
-                                    alt={`${assignee.firstName} ${assignee.lastName}`}
-                                    title={`${assignee.firstName} ${assignee.lastName}`}
-                                    style={{ width: 24, height: 24, borderRadius: "50%", objectFit: "cover", border: "2px solid var(--bg-2, #2a2a2a)", flexShrink: 0 }}
-                                  />
-                                : <span
-                                    title={assignee ? `${assignee.firstName} ${assignee.lastName}` : `#${task.assignedId}`}
-                                    style={{ width: 24, height: 24, borderRadius: "50%", background: "var(--accent, #a3e635)", color: "#000", fontSize: 10, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, border: "2px solid var(--bg-2, #2a2a2a)" }}
-                                  >
-                                    {assignee ? assigneeInitials(assignee) : "?"}
-                                  </span>;
+                              const label = assignee ? `${assignee.firstName} ${assignee.lastName}` : `#${task.assignedId}`;
+                              return (
+                                <Tooltip text={label} position="top">
+                                  {assignee?.avatar
+                                    ? <img
+                                        src={assignee.avatar}
+                                        alt={label}
+                                        style={{ width: 24, height: 24, borderRadius: "50%", objectFit: "cover", border: "2px solid var(--bg-2, #2a2a2a)", flexShrink: 0 }}
+                                      />
+                                    : <span
+                                        style={{ width: 24, height: 24, borderRadius: "50%", background: "var(--accent, #a3e635)", color: "#000", fontSize: 10, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, border: "2px solid var(--bg-2, #2a2a2a)" }}
+                                      >
+                                        {assignee ? assigneeInitials(assignee) : "?"}
+                                      </span>
+                                  }
+                                </Tooltip>
+                              );
                             })()}
                           </div>
                         )}

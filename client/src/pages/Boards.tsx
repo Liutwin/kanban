@@ -7,6 +7,7 @@ import { extractErrorMessage } from "../utils/apiHelpers";
 import { toSlug } from "../utils/slug";
 import type { Board } from "../model/interfaces";
 import "../styles/boards.css";
+import Tooltip from "../components/Tooltip";
 
 type Role = "admin" | "editeur" | "lecteur";
 
@@ -195,14 +196,15 @@ export default function Boards() {
                     {roleLabel(board.role)}
                   </span>
                   {board.role === "admin" && (
-                    <button
-                      className="board-delete-btn"
-                      onClick={e => askDelete(e, board.id)}
-                      title="Supprimer le tableau"
-                      aria-label="Supprimer le tableau"
-                    >
-                      ✕
-                    </button>
+                    <Tooltip text="Supprimer le tableau" position="top">
+                      <button
+                        className="board-delete-btn"
+                        onClick={e => askDelete(e, board.id)}
+                        aria-label="Supprimer le tableau"
+                      >
+                        ✕
+                      </button>
+                    </Tooltip>
                   )}
                 </div>
                 <h2 className="board-name">{board.name}</h2>

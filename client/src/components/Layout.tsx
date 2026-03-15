@@ -8,6 +8,7 @@ import type { UserDTO } from "../model/interfaces.ts";
 import type { Member }  from "../model/interfaces.ts";
 import { ROUTES_AUTH, ROUTES_API } from "../config/api";
 import SidebarIcon from '../assets/kanban-icon-sidebar.svg';
+import Tooltip from "./Tooltip";
 import MembersPanel, { getAvatarColor } from './MembersPanel';
 
 /**
@@ -207,14 +208,16 @@ export default function Layout({ children, title, boardId, boardRole }: LayoutPr
               <span className="user-name">{fullName}</span>
             </div>
           </div>
-          <button className="logout-btn" onClick={handleLogout} title="Se déconnecter" aria-label="Se déconnecter">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
-              stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
-              <polyline points="16 17 21 12 16 7"/>
-              <line x1="21" y1="12" x2="9" y2="12"/>
-            </svg>
-          </button>
+          <Tooltip text="Se déconnecter" position="right">
+            <button className="logout-btn" onClick={handleLogout} aria-label="Se déconnecter">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+                <polyline points="16 17 21 12 16 7"/>
+                <line x1="21" y1="12" x2="9" y2="12"/>
+              </svg>
+            </button>
+          </Tooltip>
         </div>
       </aside>
 
@@ -258,14 +261,15 @@ export default function Layout({ children, title, boardId, boardRole }: LayoutPr
                   {avatarMembers.map(m => {
                     const c = getAvatarColor(m.userId);
                     return (
-                      <button key={m.userId}
-                        className="stacked-avatar stacked-avatar--btn"
-                        style={{ background: c.bg, color: c.color }}
-                        title={`${m.firstName} ${m.lastName}`}
-                        onClick={() => setTopbarPopover(topbarPopover?.userId === m.userId ? null : m)}
-                      >
-                        {memberInitials(m)}
-                      </button>
+                      <Tooltip key={m.userId} text={`${m.firstName} ${m.lastName}`} position="bottom">
+                        <button
+                          className="stacked-avatar stacked-avatar--btn"
+                          style={{ background: c.bg, color: c.color }}
+                          onClick={() => setTopbarPopover(topbarPopover?.userId === m.userId ? null : m)}
+                        >
+                          {memberInitials(m)}
+                        </button>
+                      </Tooltip>
                     );
                   })}
                 </div>

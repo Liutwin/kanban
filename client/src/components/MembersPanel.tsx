@@ -182,14 +182,22 @@ export default function MembersPanel({ boardId, currentUserId, currentRole, onCl
       if (!confirm("Retirer ce membre du tableau ?")) return;
       const res = await authFetch(ROUTES_API.boardMember(boardId, userId), { method: "DELETE" });
       if (res.ok) setMembers(m => m.filter(x => x.userId !== userId));
+      else setInviteError("Erreur lors du retrait du membre.");
       return;
     }
-    // Envoie le DTO complet attendu par Spring
-    const res = await authFetch(ROUTES_API.boardMember(boardId, userId), {
-      method: "PUT",
-      body:   JSON.stringify({ role: newRole }),
-    });
-    if (res.ok) setMembers(m => m.map(x => x.userId === userId ? { ...x, role: newRole } : x));
+    // Mise à jour optimiste : on applique immédiatement dans l'UI,
+    // et on annule (rollback) si l'API échoue.
+    const previousMembers = members;
+    setMembers(m => m.map(x => x.userId === userId ? { ...x, role: newRole } : x));
+    const res = await authFetch(
+      `${ROUTES_API.boardMember(boardId, userId)}?role=${newRole.toUpperCase()}`,
+      { method: "PUT" }
+    );
+    if (!res.ok) {
+      setMembers(previousMembers);
+      const text = await res.text().catch(() => "");
+      setInviteError(`Erreur changement de rôle (${res.status})${text ? " : " + text.slice(0, 80) : ""}`);
+    }
   };
 
   // ── Ajouter un membre ──────────────────────────────────────
@@ -203,9 +211,12 @@ export default function MembersPanel({ boardId, currentUserId, currentRole, onCl
     try {
       const res = await authFetch(ROUTES_API.boardMembers(boardId), {
         method: "POST",
-        body:   JSON.stringify({ userId: selectedUser.id, role: inviteRole }),
+        body:   JSON.stringify({ userId: selectedUser.id, boardId, role: inviteRole }),
       });
-      if (!res.ok) throw new Error("Erreur lors de l'ajout.");
+      if (!res.ok) {
+        const text = await res.text().catch(() => "");
+        throw new Error(`Erreur ${res.status}${text ? " : " + text.slice(0, 120) : ""}`);
+      }
       const json      = await res.json();
       const newMember = unwrap<Member>(json);
       setMembers(m => [...m, { ...newMember, user: selectedUser }]);
