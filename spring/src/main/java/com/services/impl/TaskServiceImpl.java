@@ -235,10 +235,12 @@ public class TaskServiceImpl implements TaskService {
             // Réordonnancement intra-colonne
             // ---------------------------------------------------------------
             int oldPosition = task.getPosition();
-            // Le frontend calcule targetPosition sur la liste SANS la tâche déplacée,
-            // donc l'index valide est dans [0 .. count-2] (count-1 tâches restantes).
-            // On borne ici par sécurité.
-            int maxPosition = (int) taskRepository.countByBoardColumnId(targetColumnId) - 2;
+            // Le frontend calcule targetPosition comme index d'insertion dans la liste
+            // SANS la tâche déplacée (count-1 éléments), donc les indices valides
+            // sont [0 .. count-1] : 0 = en tête, count-1 = en queue.
+            // L'ancienne borne count-2 était fausse : elle empêchait de placer
+            // la tâche en dernière position (index count-1 = append).
+            int maxPosition = (int) taskRepository.countByBoardColumnId(targetColumnId) - 1;
             if (maxPosition < 0) maxPosition = 0;
             if (targetPosition > maxPosition) targetPosition = maxPosition;
             if (targetPosition < 0)           targetPosition = 0;
@@ -250,36 +252,19 @@ public class TaskServiceImpl implements TaskService {
 
             if (targetPosition < oldPosition) {
                 // Déplacement vers le haut : les tâches [targetPos .. oldPos-1] décalent de +1
-                taskRepository.shiftPositionsPass1(targetColumnId, +1, targetPosition, oldPosition - 1, id);
+                taskRepository.shiftPositions(targetColumnId, +1, targetPosition, oldPosition - 1, id);
             } else {
                 // Déplacement vers le bas : les tâches [oldPos+1 .. targetPos] décalent de -1
-                taskRepository.shiftPositionsPass1(targetColumnId, -1, oldPosition + 1, targetPosition, id);
+                taskRepository.shiftPositions(targetColumnId, -1, oldPosition + 1, targetPosition, id);
             }
-            // Passe 2 : convertit les positions temporaires négatives en valeurs finales.
-            // Même technique que deplacer_colonne pour éviter les doublons transitoires
-            // sur uq_tsk_position_col lors du shift multi-lignes.
-            taskRepository.shiftPositionsPass2(targetColumnId);
 
             task.setPosition(targetPosition);
 
         } else {
             // ---------------------------------------------------------------
-            // Déplacement inter-colonnes : place la tâche en fin de la colonne cible.
-            // IMPORTANT : on doit d'abord libérer l'ancien (col_id, tsk_position)
-            // AVANT d'affecter le nouveau, sinon MariaDB évalue la contrainte
-            // uq_tsk_position_col sur le nouvel état avant que l'ancien slot
-            // soit libéré, ce qui crée un doublon transitoire.
-            // Solution : on passe par une position temporaire négative (-1) pour
-            // sortir de l'espace des positions valides, puis on applique la vraie
-            // position dans un second save.
+            // Déplacement inter-colonnes : place la tâche en fin de la colonne cible
             // ---------------------------------------------------------------
             int newPosition = (int) taskRepository.countByBoardColumnId(targetColumnId);
-
-            // Passe 1 : libère l'ancien slot en passant par une position hors-domaine
-            task.setPosition(-1);
-            taskRepository.saveAndFlush(task);
-
-            // Passe 2 : affecte la nouvelle colonne et la vraie position
             task.setBoardColumn(targetColumn);
             task.setPosition(newPosition);
         }
