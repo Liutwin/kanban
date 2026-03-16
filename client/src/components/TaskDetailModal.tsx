@@ -1,816 +1,592 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
-import { useParams, useNavigate } from "react-router-dom";
-import { extractErrorMessage } from "../utils/apiHelpers";
-import Layout from "../components/Layout";
-import { getAvatarStyle } from "../utils/avatarColor";
+import React, { useState, useEffect, useRef } from "react";
+import type { Task, Priority, User, Comment, Member } from "../model/interfaces";
 import { ROUTES_API } from "../config/api";
 import { useAuth } from "../hooks/useAuth";
-import type { Board, Column, Task, Priority, User, Member } from "../model/interfaces";
-import "../styles/dashboard.css";
-import TaskDetailModal from "../components/TaskDetailModal";
-import Tooltip from "../components/Tooltip";
+import { getAvatarStyle } from "../utils/avatarColor";
+import Tooltip from "./Tooltip";
 
-interface ColumnWithTasks extends Column {
-  tasks: Task[];
+interface Props {
+  task:       Task;
+  columnName: string;
+  members?:   User[];
+  onClose:    () => void;
+  onEdit:       (task: Task) => void;
+  onDelete:     (taskId: number) => void;
+  currentRole?: Member["role"];
 }
 
-export default function Dashboard() {
-  const { id }        = useParams<{ id: string }>();
-  const boardId       = parseInt(id ?? "", 10);
+/* ── Helpers ── */
+const PRIORITIES: Priority[] = ["basse", "moyenne", "haute"];
+const priorityLabel = (p: Priority) => p === "haute" ? "↑ Haute" : p === "moyenne" ? "→ Moyenne" : "↓ Basse";
+const priorityColor = (p: Priority) => p === "haute" ? "#f28b82" : p === "moyenne" ? "#fdd663" : "#81c995";
+const badgeBg     = (p: Priority) => p === "haute" ? "rgba(242,139,130,0.15)" : p === "moyenne" ? "rgba(253,214,99,0.12)" : "rgba(129,201,149,0.1)";
+const badgeBorder = (p: Priority) => p === "haute" ? "rgba(242,139,130,0.3)"  : p === "moyenne" ? "rgba(253,214,99,0.3)"  : "rgba(129,201,149,0.25)";
+const isOverdue   = (dt?: string | null) => dt ? new Date(dt) < new Date() : false;
+const formatDate  = (dt?: string | null) => dt
+  ? new Date(dt).toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" })
+  : null;
+const initials    = (u: User) => `${u.firstName.charAt(0)}${u.lastName.charAt(0)}`.toUpperCase();
+
+/* ── Carte utilisateur ── */
+function UserCard({ user, accent = "#b0a6ff", onClick, selected }: { user: User; accent?: string; onClick?: (e: React.MouseEvent) => void; selected?: boolean }) {
+  return (
+    <div
+      onClick={onClick}
+      style={{
+        display: "flex", alignItems: "center", gap: 10,
+        background: selected ? `${accent}18` : "rgba(255,255,255,0.04)",
+        border: `1px solid ${selected ? accent + "55" : "rgba(255,255,255,0.08)"}`,
+        borderRadius: 10, padding: "8px 11px",
+        cursor: onClick ? "pointer" : "default",
+        transition: "all 0.15s",
+      }}
+    >
+      <div style={{ width: 32, height: 32, borderRadius: "50%", flexShrink: 0, overflow: "hidden", background: getAvatarStyle(user.id).background, display: "flex", alignItems: "center", justifyContent: "center", boxShadow: `0 0 0 2px ${getAvatarStyle(user.id).from}44` }}>
+        {user.avatarURL
+          ? <img src={user.avatarURL} alt={initials(user)} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+          : <span style={{ fontSize: 11, fontWeight: 700, color: "#1c1b1f" }}>{initials(user)}</span>
+        }
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 1, minWidth: 0 }}>
+        <span style={{ fontSize: 13, fontWeight: 600, color: "#e8e0f0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{user.firstName} {user.lastName}</span>
+        <span style={{ fontSize: 11, color: "#7a7288", fontFamily: "'DM Mono', monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{user.email}</span>
+      </div>
+    </div>
+  );
+}
+
+/* ── Label de section ── */
+function Label({ children }: { children: React.ReactNode }) {
+  return <span style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", color: "#7a7288", display: "block", marginBottom: 6 }}>{children}</span>;
+}
+
+/* ── Composant principal ── */
+export default function TaskDetailModal({ task, columnName, members = [], onClose, onEdit, onDelete, currentRole = "editeur" }: Props) {
   const { authFetch, user } = useAuth();
-  const navigate      = useNavigate();
 
-  const [boardName, setBoardName] = useState("");
-  const [board_creatorId, setBoardCreatorId] = useState<number | null>(null);
-  const [columns, setColumns]     = useState<ColumnWithTasks[]>([]);
-  const [loading, setLoading]     = useState(true);
-  const [error, setError]         = useState("");
+  // Lecteur → lecture seule partout
+  const canEdit = currentRole !== "lecteur";
 
-  // Membres du tableau (pour résoudre creatorId/assignedId → prénom nom)
-  const [members, setMembers] = useState<User[]>([]);
-  // Rôles des membres (userId → role) pour contrôle d'accès frontend
-  const [memberRoles, setMemberRoles] = useState<Map<number, Member["role"]>>(new Map());
+  /* Formulaire */
+  const [title,      setTitle]      = useState(task.title);
+  const [details,    setDetails]    = useState(task.details ?? "");
+  const [dueDate,    setDueDate]    = useState(task.dueDate ? task.dueDate.slice(0, 16) : "");
+  const [priority,   setPriority]   = useState<Priority>(task.priority);
+  const [assigneeId, setAssigneeId] = useState<number | null>(task.assignedId ?? null);
+  const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const [error,      setError]      = useState("");
+  const debounceRef        = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isClosing          = useRef(false);
+  const commentTextareaRef = useRef<HTMLTextAreaElement>(null);
 
-  // Modale tâche
-  const [taskModal, setTaskModal] = useState<{ colId: number } | null>(null);
-  const [editTask, setEditTask]   = useState<Task | null>(null);
-  const [taskForm, setTaskForm]   = useState({
-    title: "", details: "", dueDate: "", priority: "moyenne" as Priority,
-  });
-  const [saving, setSaving]       = useState(false);
-  const [taskError, setTaskError] = useState("");
+  const handleClose = () => {
+    isClosing.current = true;
+    // Si une sauvegarde est en attente (debounce), la déclencher immédiatement
+    if (debounceRef.current) {
+      clearTimeout(debounceRef.current);
+      debounceRef.current = null;
+      doSave(title, details, dueDate, priority);
+    }
+    onClose();
+  };
 
-  // Modale détail tâche
-  const [detailTask, setDetailTask] = useState<Task | null>(null);
+  /* UI state */
+  const [priorityOpen,  setPriorityOpen]  = useState(false);
+  const [assigneeOpen,  setAssigneeOpen]  = useState(false);
 
-  // Mirror de drag : state pour afficher/masquer + contenu, ref pour la position (sans re-render)
-  const [dragMirror, setDragMirror] = useState<{ ox: number; oy: number; width: number; kind: "task"; task: Task } | { ox: number; oy: number; width: number; kind: "col"; col: ColumnWithTasks } | null>(null);
-  const mirrorRef = useRef<HTMLDivElement>(null);
+  /* Commentaires */
+  const [comments,      setComments]      = useState<Comment[]>([]);
+  const [commentText,   setCommentText]   = useState("");
+  const [editingCom,    setEditingCom]    = useState<{ id: number; text: string } | null>(null);
+  const [comLoading,    setComLoading]    = useState(false);
+  const [comSending,    setComSending]    = useState(false);
 
-  // Drag & drop tâches
-  const [dragTask, setDragTask]         = useState<Task | null>(null);
-  const [dropTarget, setDropTarget] = useState<{ colId: number; beforeTaskId: number | null } | null>(null);
-  const dragTaskRef = useRef<Task | null>(null);
-
-  // Drag & drop colonnes
-  const [dragCol, setDragCol]         = useState<ColumnWithTasks | null>(null);
-  const [dragColOver, setDragColOver] = useState<number | null>(null);
-  const dragColRef = useRef<ColumnWithTasks | null>(null);
-  const colDropTargetRef = useRef<ColumnWithTasks | null>(null);
-
-  /* ── Recherche ───────────────────────────────────────────── */
-  const [searchQuery,    setSearchQuery]    = useState("");
-  const [searchPriority, setSearchPriority] = useState<"" | "basse" | "moyenne" | "haute">("");
-  const [searchAssignee, setSearchAssignee] = useState<number | "">("");
-
+  // Charger les commentaires à l'ouverture
   useEffect(() => {
-    const handler = (e: Event) => {
-      const d = (e as CustomEvent<{ query: string; priority: string; assigneeId: number | "" }>).detail;
-      setSearchQuery(d.query ?? "");
-      setSearchPriority((d.priority as "" | "basse" | "moyenne" | "haute") ?? "");
-      setSearchAssignee(d.assigneeId ?? "");
-    };
-    window.addEventListener("kanban:search", handler);
-    return () => window.removeEventListener("kanban:search", handler);
+    setComLoading(true);
+    authFetch(ROUTES_API.commentsByTask(task.id))
+      .then(r => r.ok ? r.json() : [])
+      .then((data: Comment[]) => setComments(data))
+      .catch(() => {})
+      .finally(() => setComLoading(false));
+  }, [task.id]);
+
+  const handleAddComment = async () => {
+    if (!commentText.trim()) return;
+    setComSending(true);
+    try {
+      const res = await authFetch(ROUTES_API.comments, {
+        method: "POST",
+        body: JSON.stringify({ content: commentText.trim(), tskId: task.id, usrId: user!.id }),
+      });
+      if (!res.ok) return;
+      const created: Comment = await res.json();
+      setComments(prev => [...prev, created]);
+      setCommentText("");
+    } finally {
+      setComSending(false);
+    }
+  };
+
+  const handleUpdateComment = async (id: number, content: string) => {
+    if (!content.trim()) return;
+    const res = await authFetch(ROUTES_API.comment(id), {
+      method: "PUT",
+      body: JSON.stringify({ content: content.trim(), tskId: task.id, usrId: user!.id }),
+    });
+    if (!res.ok) return;
+    const updated: Comment = await res.json();
+    setComments(prev => prev.map(c => c.id === id ? updated : c));
+    setEditingCom(null);
+  };
+
+  const handleDeleteComment = async (id: number) => {
+    const res = await authFetch(ROUTES_API.comment(id), { method: "DELETE" });
+    if (res.ok) setComments(prev => prev.filter(c => c.id !== id));
+  };
+
+  /* Résolution créateur */
+  const creatorFromMembers = members.find(m => m.id === task.creatorId) ?? null;
+  const [fetchedCreator, setFetchedCreator] = useState<User | null>(null);
+  useEffect(() => {
+    if (creatorFromMembers) { setFetchedCreator(null); return; }
+    authFetch(ROUTES_API.user(task.creatorId))
+      .then(r => r.ok ? r.json() : null)
+      .then((u: User | null) => setFetchedCreator(u))
+      .catch(() => {});
+  }, [task.creatorId]);
+  const creator  = creatorFromMembers ?? fetchedCreator;
+  const assignee = assigneeId != null ? members.find(m => m.id === assigneeId) ?? null : null;
+  const overdue  = isOverdue(dueDate || null);
+
+  /* Auto-resize textarea */
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  useEffect(() => {
+    if (textareaRef.current) {
+      textareaRef.current.style.height = "auto";
+      textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
+    }
+  }, [details]);
+
+  /* Auto-resize textarea commentaire */
+  useEffect(() => {
+    if (commentTextareaRef.current) {
+      commentTextareaRef.current.style.height = "auto";
+      commentTextareaRef.current.style.height = `${commentTextareaRef.current.scrollHeight}px`;
+    }
+  }, [commentText]);
+
+  /* Fermer les dropdowns si clic à l'extérieur */
+  useEffect(() => {
+    const close = () => { setPriorityOpen(false); setAssigneeOpen(false); };
+    document.addEventListener("mousedown", close);
+    return () => document.removeEventListener("mousedown", close);
   }, []);
 
-  /** Filtre les tâches d'une colonne selon la recherche en cours. */
-  const filterTasks = useCallback((tasks: Task[]) => {
-    return tasks.filter(t => {
-      if (searchQuery.trim() && !t.title.toLowerCase().includes(searchQuery.toLowerCase()) && !(t.details ?? "").toLowerCase().includes(searchQuery.toLowerCase())) return false;
-      if (searchPriority && t.priority !== searchPriority) return false;
-      if (searchAssignee !== "" && searchAssignee !== -1 && t.assignedId !== searchAssignee) return false;
-      return true;
-    });
-  }, [searchQuery, searchPriority, searchAssignee]);
-
-  const columnsSnapshot   = useRef<ColumnWithTasks[]>([]);
-  const didDrop           = useRef(false);
-  const lastLiveTaskKey   = useRef<string>("");
-
-  // Colonnes
-  const [colModal, setColModal]   = useState(false);
-  const [colName, setColName]     = useState("");
-  const [colError, setColError]   = useState("");
-  const [colSaving, setColSaving] = useState(false);
-
-  /* ── Chargement ──────────────────────────────────────────── */
-
-  const fetchBoard = async () => {
-    setLoading(true);
-    setError("");
-    try {
-      const resBoard = await authFetch(ROUTES_API.board(boardId));
-      if (!resBoard.ok) throw new Error(await extractErrorMessage(resBoard));
-      const board: Board = await resBoard.json();
-      setBoardName(board.name);
-      setBoardCreatorId(board.creatorId);
-
-      const resCols = await authFetch(ROUTES_API.columns(boardId));
-      if (!resCols.ok) throw new Error(await extractErrorMessage(resCols));
-      const cols: Column[] = await resCols.json();
-
-      const colsWithTasks: ColumnWithTasks[] = await Promise.all(
-        cols.map(async col => {
-          const resTasks = await authFetch(ROUTES_API.tasksByColumn(col.id));
-          const tasks: Task[] = resTasks.ok ? await resTasks.json() : [];
-          return { ...col, tasks };
-        })
-      );
-
-      colsWithTasks.sort((a, b) => a.numero - b.numero);
-      setColumns(colsWithTasks);
-
-      // Charger les membres + le créateur du tableau pour résoudre
-      // creatorId/assignedId -> prénom nom dans TaskDetailModal.
-      // Le créateur du tableau n'est pas forcément dans participation_ptp,
-      // d'où le fetch séparé sur board.creatorId.
-      const userIdsToFetch = new Set<number>();
-      userIdsToFetch.add(board.creatorId);
-
-      const resMembers = await authFetch(ROUTES_API.boardMembers(boardId));
-      if (resMembers.ok) {
-        const memberList: Member[] = await resMembers.json();
-        const roles = new Map<number, Member["role"]>();
-        memberList.forEach(m => { userIdsToFetch.add(m.userId); roles.set(m.userId, m.role); });
-        setMemberRoles(roles);
-      }
-
-      const userResults = await Promise.allSettled(
-        [...userIdsToFetch].map(uid =>
-          authFetch(ROUTES_API.user(uid)).then(r => r.ok ? r.json() as Promise<User> : null)
-        )
-      );
-      setMembers(
-        userResults
-          .filter((r): r is PromiseFulfilledResult<User> => r.status === "fulfilled" && r.value != null)
-          .map(r => r.value)
-      );
-    } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Erreur de chargement.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => { fetchBoard(); }, [boardId]);
-
+  /* Échap pour fermer la modale */
   useEffect(() => {
-    const onDragOver = (e: DragEvent) => {
-      if (mirrorRef.current) {
-        mirrorRef.current.style.left = `${e.clientX - dragMirror!.ox}px`;
-        mirrorRef.current.style.top  = `${e.clientY - dragMirror!.oy}px`;
-      }
-    };
-    // Phase de capture : s'exécute avant tout stopPropagation des enfants
-    const onDragEnd = () => setDragMirror(null);
-    document.addEventListener("dragover", onDragOver, true);
-    document.addEventListener("dragend",  onDragEnd,  true);
-    return () => {
-      document.removeEventListener("dragover", onDragOver, true);
-      document.removeEventListener("dragend",  onDragEnd,  true);
-    };
-  }, [dragMirror]);
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") handleClose(); };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onClose]);
 
-  /* ── CRUD tâches ─────────────────────────────────────────── */
+  /* État hover pour le bouton fermer */
+  const [closeHover, setCloseHover] = useState(false);
 
-  const openCreateTask = (colId: number) => {
-    setEditTask(null);
-    setTaskForm({ title: "", details: "", dueDate: "", priority: "moyenne" });
-    setTaskError("");
-    setTaskModal({ colId });
-  };
-
-  const openEditTask = (task: Task) => {
-    setEditTask(task);
-    setTaskForm({
-      title:    task.title,
-      details:  task.details ?? "",
-      dueDate:  task.dueDate ? task.dueDate.slice(0, 16) : "",
-      priority: task.priority,
-    });
-    setTaskError("");
-    setTaskModal({ colId: task.boardColumnId });
-  };
-
-  const handleSaveTask = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setTaskError("");
-    if (!taskForm.title.trim()) { setTaskError("Le titre est requis."); return; }
-    setSaving(true);
+  /* Sauvegarde automatique avec debounce */
+  const doSave = async (
+    t: string, det: string, dd: string, prio: Priority
+  ) => {
+    if (!t.trim()) { setError("Le titre ne peut pas être vide."); return; }
+    setError("");
+    setSaveStatus("saving");
     try {
       const body = {
-        title:         taskForm.title.trim(),
-        details:       taskForm.details || null,
-        dueDate:       taskForm.dueDate || null,
-        priority:      taskForm.priority,
-        boardColumnId: taskModal!.colId,
-        creatorId:     user!.id,
+        title:         t.trim(),
+        details:       det || null,
+        dueDate:       dd ? new Date(dd).toISOString() : null,
+        priority:      prio,
+        boardColumnId: task.boardColumnId,
+        creatorId:     task.creatorId,
       };
-      const res = editTask
-        ? await authFetch(ROUTES_API.task(editTask.id), { method: "PUT",  body: JSON.stringify(body) })
-        : await authFetch(ROUTES_API.tasks,             { method: "POST", body: JSON.stringify(body) });
-      if (!res.ok) throw new Error(await extractErrorMessage(res));
-      const savedTask: Task = await res.json();
-      setColumns(cols => cols.map(c => {
-        if (editTask) {
-          return { ...c, tasks: c.tasks.map(t => t.id === savedTask.id ? savedTask : t) };
-        } else {
-          return c.id === taskModal!.colId ? { ...c, tasks: [...c.tasks, savedTask] } : c;
-        }
-      }));
-      setTaskModal(null);
+      const res = await authFetch(ROUTES_API.task(task.id), { method: "PUT", body: JSON.stringify(body) });
+      if (!res.ok) throw new Error("Erreur lors de la sauvegarde.");
+      const saved: Task = await res.json();
+      if (!isClosing.current) {
+        setSaveStatus("saved");
+        onEdit(saved);
+      }
     } catch (e: unknown) {
-      setTaskError(e instanceof Error ? e.message : "Erreur.");
-    } finally {
-      setSaving(false);
+      if (isClosing.current) return;
+      setSaveStatus("error");
+      setError(e instanceof Error ? e.message : "Erreur.");
     }
   };
 
-  const handleDeleteTask = async (taskId: number) => {
-    if (!confirm("Supprimer cette tâche ?")) return;
-    const res = await authFetch(ROUTES_API.task(taskId), { method: "DELETE" });
-    if (res.ok) {
-      setColumns(cols => cols.map(c => ({ ...c, tasks: c.tasks.filter(t => t.id !== taskId) })));
-    } else {
-      fetchBoard();
-    }
+  const scheduleAutoSave = (
+    t = title, det = details, dd = dueDate, prio = priority
+  ) => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    setSaveStatus("saving");
+    debounceRef.current = setTimeout(() => doSave(t, det, dd, prio), 800);
   };
 
-  /* ── Colonnes ────────────────────────────────────────────── */
-
-  const handleCreateColumn = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setColError("");
-    if (!colName.trim()) { setColError("Le nom est requis."); return; }
-    setColSaving(true);
+  /* Assignation via l'endpoint dédié PATCH /tasks/{id}/assign */
+  const handleAssigneeChange = async (newId: number | null) => {
+    setAssigneeId(newId);
+    setAssigneeOpen(false);
+    setSaveStatus("saving");
     try {
-      const res = await authFetch(ROUTES_API.columns(boardId), {
-        method: "POST",
-        body: JSON.stringify({ name: colName.trim() }),
-      });
-      if (!res.ok) throw new Error(await extractErrorMessage(res));
-      const newCol: Column = await res.json();
-      setColumns(cols => [...cols, { ...newCol, tasks: [] }]);
-      setColModal(false);
-      setColName("");
+      const url = newId != null
+        ? `${ROUTES_API.taskAssign(task.id)}?userId=${newId}`
+        : ROUTES_API.taskAssign(task.id);
+      const res = await authFetch(url, { method: "PATCH", body: "{}" });
+      if (!res.ok) throw new Error("Erreur lors de l'assignation.");
+      const saved: Task = await res.json();
+      if (!isClosing.current) {
+        setSaveStatus("saved");
+        onEdit(saved);
+      }
     } catch (e: unknown) {
-      setColError(e instanceof Error ? e.message : "Erreur.");
-    } finally {
-      setColSaving(false);
+      if (isClosing.current) return;
+      setSaveStatus("error");
+      setError(e instanceof Error ? e.message : "Erreur.");
     }
   };
 
-  const handleDeleteColumn = async (colId: number) => {
-    if (!confirm("Supprimer cette colonne et toutes ses tâches ?")) return;
-    const res = await authFetch(ROUTES_API.column(boardId, colId), { method: "DELETE" });
-    if (res.ok) {
-      setColumns(cols => cols.filter(c => c.id !== colId));
-    } else {
-      fetchBoard();
-    }
+  /* Styles de base pour les champs éditables */
+  const inputBase: React.CSSProperties = {
+    background: "transparent", border: "none", outline: "none",
+    color: "#e8e0f0", fontFamily: "inherit", width: "100%",
+    borderRadius: 8, padding: "5px 8px", transition: "background 0.15s",
   };
-
-  /* ── Drag & drop ─────────────────────────────────────────── */
-
-  const reorderTaskLive = (targetColId: number, task: Task, targetTaskId?: number) => {
-    const key = `${targetColId}-${targetTaskId ?? "end"}`;
-    if (lastLiveTaskKey.current === key) return;
-    lastLiveTaskKey.current = key;
-
-    const snap       = columnsSnapshot.current;
-    const sameColumn = task.boardColumnId === targetColId;
-    const targetCol  = snap.find(c => c.id === targetColId);
-    if (!targetCol) return;
-
-    const tasksWithoutDragged = sameColumn
-      ? targetCol.tasks.filter(t => t.id !== task.id)
-      : targetCol.tasks;
-
-    let targetIndex: number;
-    if (targetTaskId != null) {
-      const filteredIdx = tasksWithoutDragged.findIndex(t => t.id === targetTaskId);
-      if (sameColumn) {
-        const targetTask     = targetCol.tasks.find(t => t.id === targetTaskId);
-        const isDraggingDown = targetTask != null && targetTask.position > task.position;
-        targetIndex = isDraggingDown
-          ? (filteredIdx < 0 ? tasksWithoutDragged.length : filteredIdx + 1)
-          : (filteredIdx < 0 ? tasksWithoutDragged.length : filteredIdx);
-      } else {
-        targetIndex = filteredIdx < 0 ? tasksWithoutDragged.length : filteredIdx;
-      }
-    } else {
-      targetIndex = tasksWithoutDragged.length;
-    }
-    const position = targetIndex;
-
-    setColumns(snap.map(c => {
-      if (sameColumn && c.id === targetColId) {
-        const reordered = c.tasks.filter(t => t.id !== task.id);
-        reordered.splice(position, 0, { ...task, position });
-        return { ...c, tasks: reordered.map((t, i) => ({ ...t, position: i })) };
-      }
-      if (!sameColumn) {
-        if (c.id === task.boardColumnId) return { ...c, tasks: c.tasks.filter(t => t.id !== task.id) };
-        if (c.id === targetColId) {
-          const inserted = [...c.tasks];
-          inserted.splice(position, 0, { ...task, boardColumnId: targetColId, position });
-          return { ...c, tasks: inserted.map((t, i) => ({ ...t, position: i })) };
-        }
-      }
-      return c;
-    }));
-  };
-
-  const handleDrop = (targetColId: number, task: Task, targetTaskId?: number) => {
-    didDrop.current = true;
-
-    const snap       = columnsSnapshot.current;
-    const sameColumn = task.boardColumnId === targetColId;
-    const targetCol  = snap.find(c => c.id === targetColId);
-    if (!targetCol) return;
-
-    const tasksWithoutDragged = sameColumn
-      ? targetCol.tasks.filter(t => t.id !== task.id)
-      : targetCol.tasks;
-
-    let targetIndex: number;
-    if (targetTaskId != null) {
-      const filteredIdx = tasksWithoutDragged.findIndex(t => t.id === targetTaskId);
-      if (sameColumn) {
-        const targetTask     = targetCol.tasks.find(t => t.id === targetTaskId);
-        const isDraggingDown = targetTask != null && targetTask.position > task.position;
-        targetIndex = isDraggingDown
-          ? (filteredIdx < 0 ? tasksWithoutDragged.length : filteredIdx + 1)
-          : (filteredIdx < 0 ? tasksWithoutDragged.length : filteredIdx);
-      } else {
-        targetIndex = filteredIdx < 0 ? tasksWithoutDragged.length : filteredIdx;
-      }
-    } else {
-      targetIndex = tasksWithoutDragged.length;
-    }
-    const position = targetIndex;
-
-    setColumns(snap.map(c => {
-      if (sameColumn && c.id === targetColId) {
-        const reordered = c.tasks.filter(t => t.id !== task.id);
-        reordered.splice(position, 0, { ...task, position });
-        return { ...c, tasks: reordered.map((t, i) => ({ ...t, position: i })) };
-      }
-      if (!sameColumn) {
-        if (c.id === task.boardColumnId) return { ...c, tasks: c.tasks.filter(t => t.id !== task.id) };
-        if (c.id === targetColId) {
-          const inserted = [...c.tasks];
-          inserted.splice(position, 0, { ...task, boardColumnId: targetColId, position });
-          return { ...c, tasks: inserted.map((t, i) => ({ ...t, position: i })) };
-        }
-      }
-      return c;
-    }));
-
-    authFetch(
-      `${ROUTES_API.taskMove(task.id)}?newId=${targetColId}&position=${position}`,
-      { method: "PATCH", body: "{}" }
-    ).catch(() => { setColumns(columnsSnapshot.current); fetchBoard(); });
-  };
-
-  /* ── Drag & drop colonnes ────────────────────────────────── */
-
-  /**
-   * Réordonne les colonnes visuellement en temps réel pendant le drag.
-   * Capture la colonne cible dans colDropTargetRef AVANT le réordonnancement,
-   * car après le swap c'est la colonne draguée elle-même qui se retrouve
-   * sous le curseur — rendant targetCol inutilisable dans handleColDrop.
-   */
-  const reorderColLive = (targetCol: ColumnWithTasks) => {
-    const col = dragColRef.current;
-    if (!col || col.id === targetCol.id) return;
-    colDropTargetRef.current = targetCol; // numero original, avant tout swap
-    setColumns(current => {
-      const fromIdx = current.findIndex(c => c.id === col.id);
-      const toIdx   = current.findIndex(c => c.id === targetCol.id);
-      if (fromIdx === -1 || toIdx === -1 || fromIdx === toIdx) return current;
-      const reordered = [...current];
-      const [moved] = reordered.splice(fromIdx, 1);
-      reordered.splice(toIdx, 0, moved);
-      return reordered; // numéros inchangés : handleColDrop lit target.numero
-    });
-  };
-
-  /**
-   * Déplace la colonne en cours de drag vers la position de la colonne cible
-   * via `PATCH /api/v1/boards/{boardId}/columns/{id}/move?newNum={num}`.
-   * Met à jour le state localement sans recharger le tableau entier.
-   *
-   * @param targetCol - Colonne sur laquelle on lâche.
-   */
-  const handleColDrop = (targetCol: ColumnWithTasks) => {
-    // On capture dragColRef.current immédiatement : onDragEnd peut
-    // s'être déclenché avant onDrop sur certains navigateurs et
-    // avoir remis dragColRef.current à null.
-    const col    = dragColRef.current;
-    const target = colDropTargetRef.current; // capturé avant le swap live
-    colDropTargetRef.current = null;
-    if (!col || !target) { setDragCol(null); setDragColOver(null); return; }
-    const colId  = col.id;
-    const newNum = target.numero; // numero original, non modifié par reorderColLive
-    setDragCol(null);
-    setDragColOver(null);
-    // reorderColLive a déjà mis à jour l'affichage ; on persiste uniquement.
-    authFetch(`${ROUTES_API.columnMove(boardId, colId)}?newNum=${newNum}`, {
-      method: "PATCH",
-      body:   "{}",
-    }).catch(() => { setColumns(columnsSnapshot.current); fetchBoard(); });
-  };
-
-  /* ── Helpers ─────────────────────────────────────────────── */
-
-  const resolveUser = (id: number | null | undefined): User | undefined =>
-    id != null ? members.find(m => m.id === id) : undefined;
-
-  const assigneeInitials = (u: User) => {
-    const f = u.firstName?.trim() ?? "";
-    const l = u.lastName?.trim()  ?? "";
-    return ((f[0] ?? "") + (l[0] ?? "")).toUpperCase() || "?";
-  };
-
-  const priorityClass = (p: Priority) =>
-    p === "haute" ? "badge-haute" : p === "moyenne" ? "badge-moyenne" : "badge-basse";
-
-  const priorityLabel = (p: Priority) =>
-    p === "haute" ? "↑ Haute" : p === "moyenne" ? "→ Moyenne" : "↓ Basse";
-
-  const formatDate = (dt: string | null | undefined) =>
-    dt ? new Date(dt).toLocaleDateString("fr-FR", { day: "2-digit", month: "short" }) : null;
-
-  const isOverdue = (dt: string | null | undefined) =>
-    dt ? new Date(dt) < new Date() : false;
-
-  /* ── Pixel transparent pour masquer le ghost natif ─────────── */
-  const transparentPixel = (() => {
-    const c = document.createElement("canvas");
-    c.width = 1; c.height = 1;
-    return c;
-  })();
-
-  /* ── Rôle de l'utilisateur courant ──────────────────────── */
-
-  // Le créateur du tableau est toujours admin, sinon on lit memberRoles,
-  // et on replie sur "lecteur" si l'utilisateur n'est pas dans la liste.
-  const currentRole: Member["role"] = board_creatorId === user?.id
-    ? "admin"
-    : memberRoles.get(user?.id ?? -1) ?? "lecteur";
-
-  const isReadOnly = currentRole === "lecteur";
-
-  /* ── Rendu ───────────────────────────────────────────────── */
 
   return (
-    <Layout title={boardName || "Tableau"} boardId={boardId} boardRole={currentRole}>
-      <div className="dashboard-page">
-        <button className="back-btn" onClick={() => navigate("/boards")}>
-          ← Retour aux tableaux
-        </button>
+    <div
+      style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.65)", backdropFilter: "blur(6px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100 }}
+      onClick={handleClose}
+    >
+      <div
+        style={{ background: "#2b2930", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 20, width: "min(720px, 95vw)", maxHeight: "90vh", overflow: "hidden", display: "flex", flexDirection: "column", boxShadow: "0 24px 64px rgba(0,0,0,0.55)", animation: "slideUp 0.22s cubic-bezier(0.16,1,0.3,1)" }}
+        onClick={e => e.stopPropagation()}
+      >
+        {/* Bande priorité */}
+        <div style={{ height: 4, background: priorityColor(priority), flexShrink: 0, opacity: 0.9, transition: "background 0.2s" }} />
 
-        {loading && (
-          <div className="loader">
-            <span className="spinner" style={{ borderTopColor: "#a3e635" }} /> Chargement…
+        {/* En-tête */}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 22px 0", gap: 12, flexShrink: 0 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 7, fontSize: 12, fontFamily: "'DM Mono', monospace", color: "#7a7288" }}>
+            <span style={{ color: "#b0a6ff", fontWeight: 500 }}>{columnName}</span>
+            <span style={{ opacity: 0.4 }}>›</span>
+            <span>#{task.id}</span>
           </div>
-        )}
+          <Tooltip text="Fermer" position="bottom">
+            <button
+              onClick={handleClose}
+              onMouseEnter={() => setCloseHover(true)}
+              onMouseLeave={() => setCloseHover(false)}
+              style={{ background: closeHover ? "rgba(242,139,130,0.12)" : "none", border: `1px solid ${closeHover ? "rgba(242,139,130,0.25)" : "transparent"}`, color: closeHover ? "#f28b82" : "#7a7288", cursor: "pointer", width: 28, height: 28, display: "flex", alignItems: "center", justifyContent: "center", borderRadius: 8, fontSize: 14, transition: "all 0.15s" }}
+            >✕</button>
+          </Tooltip>
+        </div>
 
-        {error && <div className="alert alert-error">⚠ {error}</div>}
+        {/* Titre éditable */}
+        <div style={{ padding: "10px 22px 0", flexShrink: 0 }}>
+          <input
+            value={title}
+            onChange={e => { if (!canEdit) return; setTitle(e.target.value); scheduleAutoSave(e.target.value); }}
+            maxLength={50}
+            placeholder="Titre de la tâche…"
+            readOnly={!canEdit}
+            style={{ ...inputBase, fontSize: 20, fontWeight: 700, letterSpacing: "-0.02em", lineHeight: 1.3, padding: "6px 8px", borderRadius: 10, cursor: canEdit ? "text" : "default" }}
+            onFocus={e => { if (canEdit) e.currentTarget.style.background = "rgba(255,255,255,0.05)"; }}
+            onBlur={e  => e.currentTarget.style.background = "transparent"}
+          />
+          {error && <p style={{ fontSize: 12, color: "#f28b82", margin: "4px 8px 0" }}>{error}</p>}
+        </div>
 
-        {!loading && !error && (
-          <div className="kanban-board">
-            {columns.map(col => (
-              <div
-                key={col.id}
-                className={`kanban-col ${dropTarget?.colId === col.id && !!dragTask ? "drag-over" : ""} ${dragColOver === col.id && !dragTask ? "drag-over" : ""}`}
-                onDragOver={e => { e.preventDefault(); if (!isReadOnly && !dragTaskRef.current) { reorderColLive(col); setDragColOver(col.id); } }}
-                onDragLeave={() => { setDragColOver(null); }}
-                onDrop={e => { e.preventDefault(); didDrop.current = true; setDropTarget(null); setDragMirror(null); if (dragTaskRef.current) { handleDrop(col.id, dragTaskRef.current); } else if (!isReadOnly) { handleColDrop(col); } }}
-              >
-                <div
-                  className="col-header"
-                  draggable={!isReadOnly}
-                  onDragStart={e => {
-                    if (isReadOnly) return;
-                    e.stopPropagation();
-                    columnsSnapshot.current = columns;
-                    didDrop.current = false;
-                    dragTaskRef.current = null;
-                    setDragTask(null);
-                    dragColRef.current = col;
-                    setDragCol(col);
-                    e.dataTransfer.setDragImage(transparentPixel, 0, 0);
-                    const colEl = (e.currentTarget as HTMLElement).closest(".kanban-col") as HTMLElement;
-                    const colRect = colEl?.getBoundingClientRect();
-                    setDragMirror({ ox: colRect ? e.clientX - colRect.left : 20, oy: colRect ? e.clientY - colRect.top : 20, width: colEl?.offsetWidth ?? 280, kind: "col", col });
-                  }}
-                  onDragEnd={() => { if (!didDrop.current) setColumns(columnsSnapshot.current); dragColRef.current = null; colDropTargetRef.current = null; setDragCol(null); setDragColOver(null); setDragMirror(null); didDrop.current = false; }}
-                  style={{ cursor: isReadOnly ? "default" : "grab" }}
-                >
-                  <span className="col-name">{col.name}</span>
-                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                    <span className="col-count">{filterTasks(col.tasks).length}{(searchQuery || searchPriority || searchAssignee !== "") && filterTasks(col.tasks).length !== col.tasks.length ? `/${col.tasks.length}` : ""}</span>
-                    {!isReadOnly && (
-                      <Tooltip text="Supprimer la colonne">
-                        <button
-                          className="icon-btn danger"
-                          onClick={() => handleDeleteColumn(col.id)}
-                        >✕</button>
-                      </Tooltip>
-                    )}
-                  </div>
-                </div>
+        {/* Corps deux colonnes */}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 220px", overflowY: "auto", flex: 1, minHeight: 0, padding: "16px 0 0" }}>
 
-                <div className="col-tasks"
-                  onDragOver={e => {
-                    e.preventDefault();
-                    // Déclenche le placeholder en bas (beforeTaskId=null) quand le curseur
-                    // entre dans la zone de tâches (colonne vide ou bas de colonne).
-                    if (dragTaskRef.current) setDropTarget({ colId: col.id, beforeTaskId: null });
-                  }}
-                  onDrop={e => {
-                    e.preventDefault();
-                    if (dragTaskRef.current) { didDrop.current = true; setDropTarget(null); setDragMirror(null); handleDrop(col.id, dragTaskRef.current); }
-                  }}
-                >
-                  {filterTasks(col.tasks).map(task => (
-                    <React.Fragment key={task.id}>
-                      {dropTarget?.colId === col.id && dropTarget?.beforeTaskId === task.id && dragTask?.id !== task.id && (
-                        <div
-                          className="task-drop-placeholder"
-                          onDragOver={e => { e.preventDefault(); e.stopPropagation(); setDropTarget({ colId: col.id, beforeTaskId: task.id }); }}
-                          onDrop={e => { e.preventDefault(); e.stopPropagation(); didDrop.current = true; setDropTarget(null); setDragMirror(null); if (dragTaskRef.current) handleDrop(col.id, dragTaskRef.current, task.id); }}
-                        />
-                      )}
-                      <div
-                        className={`task-card ${dragTask?.id === task.id && dragTask?.boardColumnId === col.id ? "dragging" : ""} ${dropTarget?.beforeTaskId === task.id && dragTaskRef.current?.boardColumnId === col.id ? "drag-over-task" : ""}`}
-                        draggable={!isReadOnly}
-                        style={{ cursor: "pointer" }}
-                        onClick={() => setDetailTask(task)}
-                        onDragStart={e => {
-                        if (isReadOnly) return;
-                        e.stopPropagation();
-                        columnsSnapshot.current = columns;
-                        didDrop.current = false;
-                        lastLiveTaskKey.current = "";
-                        dragTaskRef.current = task;
-                        setDragTask(task);
-                        e.dataTransfer.setDragImage(transparentPixel, 0, 0);
-                        const cardEl = e.currentTarget as HTMLElement;
-                        const cardRect = cardEl.getBoundingClientRect();
-                        setDragMirror({ ox: e.clientX - cardRect.left, oy: e.clientY - cardRect.top, width: cardEl.offsetWidth, kind: "task", task });
-                      }}
-                        onDragEnd={() => { if (!didDrop.current) setColumns(columnsSnapshot.current); dragTaskRef.current = null; setDragTask(null); setDropTarget(null); setDragMirror(null); lastLiveTaskKey.current = ""; didDrop.current = false; }}
-                        onDragOver={e => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          if (!dragTaskRef.current || dragTaskRef.current.id === task.id) return;
-                          const dragged = dragTaskRef.current;
-                          const rect    = (e.currentTarget as HTMLElement).getBoundingClientRect();
-                          const isTop   = e.clientY < rect.top + rect.height / 2;
-                          const tasks   = col.tasks;
-                          const idx     = tasks.findIndex(t => t.id === task.id);
-                          const prev    = tasks[idx - 1];
-                          if (isTop && prev && prev.id === dragged.id) return;
-                          const next    = tasks[idx + 1];
-                          if (!isTop && next && next.id === dragged.id) return;
-                          const target  = isTop ? task.id : (next ? next.id : null);
-                          setDropTarget({ colId: col.id, beforeTaskId: target });
-                        }}
-                        onDrop={e => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          didDrop.current = true;
-                          setDropTarget(null);
-                          setDragMirror(null);
-                          if (dragTaskRef.current) handleDrop(col.id, dragTaskRef.current, task.id);
-                        }}
-                      >
-                        <div className="task-header">
-                          <span className={`badge ${priorityClass(task.priority)}`}>
-                            {priorityLabel(task.priority)}
+          {/* Colonne principale */}
+          <div style={{ padding: "0 20px 24px 22px", borderRight: "1px solid rgba(255,255,255,0.06)", display: "flex", flexDirection: "column", gap: 24 }}>
+
+            {/* Description */}
+            <div>
+              <Label>📋 Description</Label>
+              <textarea
+                ref={textareaRef}
+                value={details}
+                onChange={e => { if (!canEdit) return; setDetails(e.target.value); scheduleAutoSave(title, e.target.value); }}
+                readOnly={!canEdit}
+                placeholder={canEdit ? "Ajouter une description…" : ""}
+                rows={3}
+                style={{ ...inputBase, fontSize: 13.5, lineHeight: 1.65, resize: "none", overflow: "hidden", minHeight: 72, display: "block", cursor: canEdit ? "text" : "default" }}
+                onFocus={e => { if (canEdit) e.currentTarget.style.background = "rgba(255,255,255,0.05)"; }}
+                onBlur={e  => e.currentTarget.style.background = "transparent"}
+              />
+            </div>
+
+            {/* Commentaires */}
+            <div>
+              <Label>💬 Commentaires ({comments.length})</Label>
+
+              {/* Liste */}
+              <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 14 }}>
+                {comLoading && <span style={{ fontSize: 12, color: "#7a7288", fontStyle: "italic" }}>Chargement…</span>}
+                {!comLoading && comments.length === 0 && (
+                  <span style={{ fontSize: 12, color: "#7a7288", fontStyle: "italic" }}>Aucun commentaire.</span>
+                )}
+                {comments.map(com => {
+                  const author = members.find(m => m.id === com.usrId);
+                  const isOwn  = user?.id === com.usrId;
+                  const isEditing = editingCom?.id === com.id;
+                  return (
+                    <div key={com.id} style={{ display: "flex", gap: 10 }}>
+                      {/* Avatar */}
+                      <div style={{ width: 28, height: 28, borderRadius: "50%", flexShrink: 0, background: "linear-gradient(135deg, #b0a6ff88, #b0a6ff)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 700, color: "#1c1b1f", overflow: "hidden", marginTop: 2 }}>
+                        {author?.avatarURL
+                          ? <img src={author.avatarURL} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                          : <span>{author ? initials(author) : "?"}</span>
+                        }
+                      </div>
+                      {/* Bulle */}
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 4 }}>
+                          <span style={{ fontSize: 12, fontWeight: 600, color: "#e8e0f0" }}>
+                            {author ? `${author.firstName} ${author.lastName}` : `#${com.usrId}`}
                           </span>
-                          {!isReadOnly && (
-                            <div className="task-actions">
-                              <Tooltip text="Modifier" position="top">
-                                <button className="icon-btn" onClick={e => { e.stopPropagation(); openEditTask(task); }}>✎</button>
-                              </Tooltip>
-                              <Tooltip text="Supprimer" position="top">
-                                <button className="icon-btn danger" onClick={e => { e.stopPropagation(); handleDeleteTask(task.id); }}>✕</button>
-                              </Tooltip>
-                            </div>
-                          )}
+                          <span style={{ fontSize: 11, color: "#7a7288", fontFamily: "'DM Mono', monospace" }}>
+                            {new Date(com.date).toLocaleDateString("fr-FR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
+                          </span>
                         </div>
-
-                        <p className="task-title">{task.title}</p>
-
-                        {task.details && <p className="task-details">{task.details}</p>}
-
-                        {(task.dueDate || task.assignedId) && (
-                          <div className="task-footer">
-                            {task.dueDate
-                              ? <span className={`task-date ${isOverdue(task.dueDate) ? "overdue" : ""}`}>
-                                  ⏰ {formatDate(task.dueDate)}
-                                </span>
-                              : <span />
-                            }
-                            {task.assignedId && (() => {
-                              const assignee = resolveUser(task.assignedId);
-                              const label = assignee ? `${assignee.firstName} ${assignee.lastName}` : `#${task.assignedId}`;
-                              return (
-                                <Tooltip text={label} position="top">
-                                  {assignee?.avatar
-                                    ? <img
-                                        src={assignee.avatar}
-                                        alt={label}
-                                        style={{ width: 24, height: 24, borderRadius: "50%", objectFit: "cover", border: "2px solid var(--bg-2, #2a2a2a)", flexShrink: 0 }}
-                                      />
-                                    : <span
-                                        style={{ width: 24, height: 24, borderRadius: "50%", background: assignee ? getAvatarStyle(assignee.id).background : "var(--surface3)", color: "#1c1b1f", fontSize: 10, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, border: "2px solid var(--surface)" }}
-                                      >
-                                        {assignee ? assigneeInitials(assignee) : "?"}
-                                      </span>
-                                  }
+                        {isEditing ? (
+                          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                            <textarea
+                              autoFocus
+                              value={editingCom.text}
+                              onChange={e => setEditingCom({ ...editingCom, text: e.target.value })}
+                              rows={2}
+                              style={{ ...inputBase, fontSize: 13, lineHeight: 1.55, resize: "none", background: "rgba(255,255,255,0.05)", borderRadius: 8, padding: "6px 8px", border: "1px solid rgba(255,255,255,0.1)" }}
+                            />
+                            <div style={{ display: "flex", gap: 6 }}>
+                              <button onClick={() => handleUpdateComment(com.id, editingCom.text)} style={{ fontSize: 11, padding: "3px 10px", borderRadius: 6, border: "none", background: "rgba(176,166,255,0.18)", color: "#b0a6ff", cursor: "pointer", fontFamily: "inherit", fontWeight: 600 }}>Enregistrer</button>
+                              <button onClick={() => setEditingCom(null)} style={{ fontSize: 11, padding: "3px 10px", borderRadius: 6, border: "none", background: "rgba(255,255,255,0.06)", color: "#7a7288", cursor: "pointer", fontFamily: "inherit" }}>Annuler</button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
+                            <p style={{ fontSize: 13, color: "#b8b0c8", lineHeight: 1.55, margin: 0, flex: 1, wordBreak: "break-word", whiteSpace: "pre-wrap" }}>{com.content}</p>
+                            {isOwn && canEdit && (
+                              <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
+                                <Tooltip text="Modifier" position="top">
+                                  <button onClick={() => setEditingCom({ id: com.id, text: com.content })} style={{ background: "none", border: "none", color: "#7a7288", cursor: "pointer", fontSize: 12, padding: "2px 5px", borderRadius: 5 }}>✎</button>
                                 </Tooltip>
-                              );
-                            })()}
+                                <Tooltip text="Supprimer" position="top">
+                                  <button onClick={() => handleDeleteComment(com.id)} style={{ background: "none", border: "none", color: "#7a7288", cursor: "pointer", fontSize: 12, padding: "2px 5px", borderRadius: 5 }}>✕</button>
+                                </Tooltip>
+                              </div>
+                            )}
                           </div>
                         )}
                       </div>
-                    </React.Fragment>
-                  ))}
-                  {dropTarget?.colId === col.id && dropTarget?.beforeTaskId === null && (
-                    <div
-                      className="task-drop-placeholder"
-                      onDragOver={e => { e.preventDefault(); e.stopPropagation(); setDropTarget({ colId: col.id, beforeTaskId: null }); }}
-                      onDrop={e => { e.preventDefault(); e.stopPropagation(); didDrop.current = true; setDropTarget(null); setDragMirror(null); if (dragTaskRef.current) handleDrop(col.id, dragTaskRef.current); }}
-                    />
-                  )}
-                </div>
+                    </div>
+                  );
+                })}
+              </div>
 
-                {!isReadOnly && (
+              {/* Saisie nouveau commentaire — masquée pour les lecteurs */}
+              {canEdit && <div style={{ display: "flex", gap: 8, alignItems: "flex-end" }}>
+                <div style={{ width: 28, height: 28, borderRadius: "50%", flexShrink: 0, background: "linear-gradient(135deg, #64d2c888, #64d2c8)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 700, color: "#1c1b1f", overflow: "hidden" }}>
+                  {user && members.find(m => m.id === user.id)?.avatarURL
+                    ? <img src={members.find(m => m.id === user.id)!.avatarURL} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                    : <span>{user ? `${user.firstName.charAt(0)}${user.lastName.charAt(0)}` : "?"}</span>
+                  }
+                </div>
+                <div style={{ flex: 1, position: "relative" }}>
+                  <textarea
+                    ref={commentTextareaRef}
+                    value={commentText}
+                    onChange={e => setCommentText(e.target.value)}
+                    onKeyDown={e => {
+                      if (e.key === "Enter" && !e.shiftKey) {
+                        e.preventDefault();
+                        handleAddComment();
+                      }
+                    }}
+                    placeholder="Ajouter un commentaire… (saut de ligne : Shift+Entrée)"
+                    rows={1}
+                    style={{ ...inputBase, fontSize: 13, lineHeight: 1.55, resize: "none", overflow: "hidden", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 10, padding: "8px 70px 8px 10px", display: "block", transition: "border-color 0.15s" }}
+                    onFocus={e => { e.currentTarget.style.background = "rgba(255,255,255,0.06)"; e.currentTarget.style.borderColor = "rgba(176,166,255,0.3)"; }}
+                    onBlur={e  => { e.currentTarget.style.background = "rgba(255,255,255,0.04)"; e.currentTarget.style.borderColor = "rgba(255,255,255,0.08)"; }}
+                  />
                   <button
-                    className="add-task-btn"
-                    onClick={() => openCreateTask(col.id)}
-                    onDragOver={e => { e.preventDefault(); e.stopPropagation(); if (dragTaskRef.current) setDropTarget({ colId: col.id, beforeTaskId: null }); }}
-                    onDrop={e => { e.preventDefault(); e.stopPropagation(); if (dragTaskRef.current) { didDrop.current = true; setDropTarget(null); setDragMirror(null); handleDrop(col.id, dragTaskRef.current); } }}
+                    onClick={handleAddComment}
+                    disabled={comSending || !commentText.trim()}
+                    style={{ position: "absolute", right: 6, top: "50%", transform: "translateY(-50%)", padding: "4px 10px", borderRadius: 7, border: "none", background: commentText.trim() ? "rgba(176,166,255,0.2)" : "transparent", color: commentText.trim() ? "#b0a6ff" : "#4a4460", fontSize: 11, fontWeight: 600, cursor: commentText.trim() ? "pointer" : "not-allowed", fontFamily: "inherit", transition: "all 0.15s" }}
                   >
-                    + Ajouter une tâche
+                    {comSending ? "…" : "Envoyer"}
                   </button>
+                </div>
+              </div>}
+            </div>
+
+          </div>
+
+          {/* Sidebar */}
+          <div style={{ padding: "0 18px 24px", display: "flex", flexDirection: "column", gap: 16 }}>
+
+            {/* Priorité — badge cliquable + dropdown */}
+            <div>
+              <Label>🎯 Priorité</Label>
+              <div style={{ position: "relative" }} onMouseDown={e => e.stopPropagation()}>
+                {/* Badge actuel */}
+                <button
+                  onClick={() => { if (!canEdit) return; setPriorityOpen(o => !o); setAssigneeOpen(false); }}
+                  style={{ display: "inline-flex", alignItems: "center", gap: 6, background: badgeBg(priority), border: `1px solid ${badgeBorder(priority)}`, borderRadius: 999, padding: "4px 12px", color: priorityColor(priority), fontSize: 11, fontWeight: 600, cursor: canEdit ? "pointer" : "default", fontFamily: "inherit" }}
+                >
+                  {priorityLabel(priority)}
+                  {canEdit && <span style={{ fontSize: 9, opacity: 0.7 }}>▼</span>}
+                </button>
+
+                {/* Dropdown */}
+                {priorityOpen && canEdit && (
+                  <div style={{ position: "absolute", top: "calc(100% + 6px)", left: 0, background: "#322f38", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 12, overflow: "hidden", boxShadow: "0 8px 24px rgba(0,0,0,0.4)", zIndex: 10, minWidth: 130 }}>
+                    {PRIORITIES.map(p => (
+                      <button
+                        key={p}
+                        onClick={() => { setPriority(p); setPriorityOpen(false); scheduleAutoSave(title, details, dueDate, p); }}
+                        style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", padding: "9px 14px", background: priority === p ? badgeBg(p) : "transparent", border: "none", color: priority === p ? priorityColor(p) : "#b8b0c8", fontSize: 12, fontWeight: priority === p ? 600 : 400, cursor: "pointer", fontFamily: "inherit", textAlign: "left" }}
+                      >
+                        <span style={{ width: 6, height: 6, borderRadius: "50%", background: priorityColor(p), flexShrink: 0 }} />
+                        {priorityLabel(p)}
+                      </button>
+                    ))}
+                  </div>
                 )}
               </div>
-            ))}
+            </div>
 
-            {!isReadOnly && (
-              <button className="kanban-col-new" onClick={() => { setColName(""); setColError(""); setColModal(true); }}>
-                + Nouvelle colonne
-              </button>
-            )}
-          </div>
-        )}
-      </div>
+            {/* Date limite */}
+            <div>
+              <Label>⏰ Date limite</Label>
+              <input
+                type="datetime-local"
+                value={dueDate}
+                onChange={e => {
+                  if (!canEdit) return;
+                  let val = e.target.value;
+                  if (val && val.length === 10) {
+                    const now = new Date();
+                    const hh = String(now.getHours()).padStart(2, "0");
+                    const mm = String(now.getMinutes()).padStart(2, "0");
+                    val = `${val}T${hh}:${mm}`;
+                  }
+                  setDueDate(val);
+                  scheduleAutoSave(title, details, val);
+                }}
+                readOnly={!canEdit}
+                style={{ ...inputBase, fontSize: 12, fontFamily: "'DM Mono', monospace", color: overdue ? "#f28b82" : "#b8b0c8" }}
+                onFocus={e => {
+                  e.currentTarget.style.background = "rgba(255,255,255,0.05)";
+                  if (canEdit && !dueDate) {
+                    const now = new Date();
+                    const pad = (n: number) => String(n).padStart(2, "0");
+                    const local = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}`;
+                    setDueDate(local);
+                  }
+                }}
+                onBlur={e  => e.currentTarget.style.background = "transparent"}
+              />
+              {dueDate && overdue && <span style={{ fontSize: 10, fontWeight: 600, padding: "2px 7px", borderRadius: 999, background: "rgba(242,139,130,0.12)", border: "1px solid rgba(242,139,130,0.25)", color: "#f28b82", letterSpacing: "0.05em", textTransform: "uppercase", marginTop: 4, display: "inline-block" }}>En retard</span>}
+              {dueDate && canEdit && <button onClick={() => { setDueDate(""); scheduleAutoSave(title, details, ""); }} style={{ display: "block", marginTop: 3, fontSize: 11, color: "#7a7288", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", padding: "2px 8px" }}>× Effacer</button>}
+            </div>
 
-      {/* Modale détail de tâche */}
-      {detailTask && (
-        <TaskDetailModal
-          task={detailTask}
-          columnName={columns.find(c => c.id === detailTask.boardColumnId)?.name ?? ""}
-          members={members}
-          onClose={() => setDetailTask(null)}
-          onEdit={saved => {
-            setColumns(cols => cols.map(col => ({ ...col, tasks: col.tasks.map(t => t.id === saved.id ? saved : t) })));
-            setDetailTask(saved);
-          }}
-          onDelete={taskId => { setDetailTask(null); handleDeleteTask(taskId); }}
-          currentRole={currentRole}
-        />
-      )}
+            {/* Créateur (lecture seule) */}
+            <div>
+              <Label>✏️ Créé par</Label>
+              {creator
+                ? <UserCard user={creator} accent="#64d2c8" />
+                : <span style={{ fontSize: 12, color: "#7a7288", fontStyle: "italic" }}>#{task.creatorId}</span>
+              }
+            </div>
 
-      {/* Modale création / édition de tâche */}
-      {taskModal && (
-        <div className="modal-overlay" onClick={() => setTaskModal(null)}>
-          <div className="modal" style={{ maxWidth: 480 }} onClick={e => e.stopPropagation()}>
-            <h2 className="modal-title">{editTask ? "Modifier la tâche" : "Nouvelle tâche"}</h2>
-            <form onSubmit={handleSaveTask} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-              {taskError && <div className="alert alert-error">⚠ {taskError}</div>}
-
-              <div className="form-group">
-                <label className="form-label">Titre</label>
-                <input className="form-input" type="text" placeholder="Nom de la tâche…"
-                  value={taskForm.title} maxLength={50} autoFocus
-                  onChange={e => setTaskForm(f => ({ ...f, title: e.target.value }))} />
-              </div>
-
-              <div className="form-group">
-                <label className="form-label">Détails</label>
-                <textarea className="form-textarea" placeholder="Description optionnelle…"
-                  value={taskForm.details}
-                  onChange={e => setTaskForm(f => ({ ...f, details: e.target.value }))} />
-              </div>
-
-              <div className="form-row">
-                <div className="form-group">
-                  <label className="form-label">Priorité</label>
-                  <select className="form-select" value={taskForm.priority}
-                    onChange={e => setTaskForm(f => ({ ...f, priority: e.target.value as Priority }))}>
-                    <option value="basse">Basse</option>
-                    <option value="moyenne">Moyenne</option>
-                    <option value="haute">Haute</option>
-                  </select>
+            {/* Assigné — carte cliquable + dropdown */}
+            <div>
+              <Label>👤 Assigné à</Label>
+              <div style={{ position: "relative" }} onMouseDown={e => e.stopPropagation()}>
+                {/* Affichage actuel */}
+                <div
+                  onClick={() => { if (!canEdit) return; setAssigneeOpen(o => !o); setPriorityOpen(false); }}
+                  style={{ cursor: canEdit ? "pointer" : "default" }}
+                >
+                  {assignee
+                    ? <UserCard user={assignee} accent="#b0a6ff" selected onClick={canEdit ? (e: React.MouseEvent) => { e.stopPropagation(); setAssigneeOpen(o => !o); setPriorityOpen(false); } : undefined} />
+                    : (
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 10, padding: "9px 11px", color: "#7a7288", fontSize: 12, fontStyle: "italic" }}>
+                        <span style={{ fontSize: 16 }}>+</span> Assigner à…
+                      </div>
+                    )
+                  }
                 </div>
-                <div className="form-group">
-                  <label className="form-label">Date limite</label>
-                  <input className="form-input" type="datetime-local"
-                    value={taskForm.dueDate}
-                    onChange={e => setTaskForm(f => ({ ...f, dueDate: e.target.value }))} />
-                </div>
-              </div>
 
-              <div className="modal-actions">
-                <button type="button" className="btn btn-ghost" onClick={() => setTaskModal(null)}>Annuler</button>
-                <button type="submit" className="btn btn-primary" disabled={saving}>
-                  {saving ? "Sauvegarde…" : editTask ? "Enregistrer" : "Créer"}
-                </button>
+                {/* Dropdown membres */}
+                {assigneeOpen && canEdit && members.length > 0 && (
+                  <div style={{ position: "absolute", top: "calc(100% + 6px)", left: 0, right: 0, background: "#322f38", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 12, overflow: "hidden", boxShadow: "0 8px 24px rgba(0,0,0,0.4)", zIndex: 10, maxHeight: 220, overflowY: "auto" }}>
+                    {/* Option "Désassigner" */}
+                    {assigneeId != null && (
+                      <button
+                        onClick={() => handleAssigneeChange(null)}
+                        style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", padding: "9px 12px", background: "transparent", border: "none", borderBottom: "1px solid rgba(255,255,255,0.06)", color: "#f28b82", fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}
+                      >
+                        × Retirer l'assignation
+                      </button>
+                    )}
+                    {members.map(m => (
+                      <div
+                        key={m.id}
+                        onClick={() => handleAssigneeChange(m.id)}
+                        style={{ padding: "6px 8px", cursor: "pointer", background: assigneeId === m.id ? "rgba(176,166,255,0.08)" : "transparent", transition: "background 0.1s" }}
+                      >
+                        <UserCard user={m} accent="#b0a6ff" selected={assigneeId === m.id} />
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
-            </form>
-          </div>
-        </div>
-      )}
+            </div>
 
-      {/* Modale création de colonne */}
-      {colModal && (
-        <div className="modal-overlay" onClick={() => setColModal(false)}>
-          <div className="modal" style={{ maxWidth: 360 }} onClick={e => e.stopPropagation()}>
-            <h2 className="modal-title">Nouvelle colonne</h2>
-            <form onSubmit={handleCreateColumn} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-              {colError && <div className="alert alert-error">⚠ {colError}</div>}
-              <div className="form-group">
-                <label className="form-label">Nom</label>
-                <input
-                  className="form-input"
-                  type="text"
-                  placeholder="Ex : En révision…"
-                  value={colName}
-                  maxLength={50}
-                  autoFocus
-                  onChange={e => setColName(e.target.value)}
-                />
-              </div>
-              <div className="modal-actions">
-                <button type="button" className="btn btn-ghost" onClick={() => setColModal(false)}>Annuler</button>
-                <button type="submit" className="btn btn-primary" disabled={colSaving}>
-                  {colSaving ? "Création…" : "Créer"}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-      {/* Mirror de drag – suit le curseur, remplace le ghost natif */}
-      {dragMirror && (
-        <div ref={mirrorRef} style={{ position: "fixed", left: -9999, top: -9999, width: dragMirror.width, pointerEvents: "none", zIndex: 9999, transform: "rotate(2deg)", boxShadow: "0 12px 40px rgba(0,0,0,0.6)", opacity: 0.95, borderRadius: "var(--radius-lg)" }}>
-          {dragMirror.kind === "task" ? (
-            <div className="task-card" style={{ margin: 0 }}>
-              <div className="task-header">
-                <span className={`badge ${priorityClass(dragMirror.task.priority)}`}>{priorityLabel(dragMirror.task.priority)}</span>
-                {dragMirror.task.assignedId && (() => {
-                  const assignee = resolveUser(dragMirror.task.assignedId);
-                  return assignee?.avatar
-                    ? <img src={assignee.avatar} alt={`${assignee.firstName} ${assignee.lastName}`} style={{ width: 24, height: 24, borderRadius: "50%", objectFit: "cover", border: "2px solid var(--surface)", flexShrink: 0 }} />
-                    : <span style={{ width: 24, height: 24, borderRadius: "50%", background: assignee ? getAvatarStyle(assignee.id).background : "var(--surface3)", color: "#1c1b1f", fontSize: 10, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, border: "2px solid var(--surface)" }}>
-                        {assignee ? assigneeInitials(assignee) : "?"}
-                      </span>;
-                })()}
-              </div>
-              <p className="task-title">{dragMirror.task.title}</p>
-              {dragMirror.task.details && <p className="task-details">{dragMirror.task.details}</p>}
-              {dragMirror.task.dueDate && (
-                <div className="task-footer">
-                  <span className={`task-date ${isOverdue(dragMirror.task.dueDate) ? "overdue" : ""}`}>⏰ {formatDate(dragMirror.task.dueDate)}</span>
-                </div>
+            <div style={{ height: 1, background: "rgba(255,255,255,0.06)" }} />
+
+            {/* Actions */}
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {!canEdit && (
+                <div style={{ textAlign: "center", fontSize: 11, color: "#7a7288", fontStyle: "italic", padding: "6px 0", letterSpacing: "0.05em" }}>👁 Lecture seule</div>
+              )}
+              {canEdit && (
+                <>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 7, padding: "8px 0", fontSize: 12, fontFamily: "'DM Mono', monospace", color: saveStatus === "error" ? "#f28b82" : saveStatus === "saving" ? "#7a7288" : saveStatus === "saved" ? "#81c995" : "#7a7288", transition: "color 0.3s" }}>
+                    {saveStatus === "saving" && <><span style={{ display: "inline-block", width: 10, height: 10, border: "1.5px solid currentColor", borderTopColor: "transparent", borderRadius: "50%", animation: "spin 0.7s linear infinite" }} /> Sauvegarde…</>}
+                    {saveStatus === "saved"  && <>✓ Sauvegardé</>}
+                    {saveStatus === "error"  && <>⚠ Erreur</>}
+                    {saveStatus === "idle"   && <span style={{ opacity: 0.3 }}>Auto-sauvegarde</span>}
+                  </div>
+                  <Tooltip text="Supprimer la tâche" position="top">
+                    <button
+                      onClick={() => onDelete(task.id)}
+                      onMouseEnter={e => { e.currentTarget.style.background = "rgba(242,139,130,0.15)"; e.currentTarget.style.borderColor = "rgba(242,139,130,0.35)"; }}
+                      onMouseLeave={e => { e.currentTarget.style.background = "rgba(242,139,130,0.08)"; e.currentTarget.style.borderColor = "rgba(242,139,130,0.2)"; }}
+                      style={{ width: "100%", padding: "9px 0", borderRadius: 10, background: "rgba(242,139,130,0.08)", border: "1px solid rgba(242,139,130,0.2)", color: "#f28b82", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", transition: "all 0.15s" }}
+                    >
+                      ✕ Supprimer
+                    </button>
+                  </Tooltip>
+                </>
               )}
             </div>
-          ) : (
-            <div className="kanban-col" style={{ width: dragMirror.width, maxHeight: 400, overflow: "hidden" }}>
-              <div className="col-header">
-                <span className="col-name">{dragMirror.col.name}</span>
-                <span className="col-count">{dragMirror.col.tasks.length}</span>
-              </div>
-              <div className="col-tasks" style={{ gap: 6 }}>
-                {dragMirror.col.tasks.slice(0, 4).map(t => (
-                  <div key={t.id} className="task-card" style={{ margin: 0 }}>
-                    <p className="task-title" style={{ fontSize: 12 }}>{t.title}</p>
-                  </div>
-                ))}
-                {dragMirror.col.tasks.length > 4 && <p style={{ fontSize: 11, color: "var(--text-3)", textAlign: "center", padding: "4px 0" }}>+{dragMirror.col.tasks.length - 4} tâches</p>}
-              </div>
-            </div>
-          )}
+          </div>
         </div>
-      )}
-    </Layout>
+      </div>
+    </div>
   );
 }
