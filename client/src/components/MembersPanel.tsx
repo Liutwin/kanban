@@ -14,10 +14,11 @@ interface MemberWithUser extends Member {
 }
 
 interface MembersPanelProps {
-  boardId:       number;
-  currentUserId: number;
-  currentRole:   Member["role"];
-  onClose:       () => void;
+  boardId:        number;
+  currentUserId:  number;
+  currentRole:    Member["role"];
+  boardCreatorId?: number;
+  onClose:        () => void;
 }
 
 const ROLE_LABELS: Record<Member["role"], string> = {
@@ -47,7 +48,7 @@ function unwrap<T>(json: unknown): T {
 // Composant principal
 // ─────────────────────────────────────────────────────────────
 
-export default function MembersPanel({ boardId, currentUserId, currentRole, onClose }: MembersPanelProps) {
+export default function MembersPanel({ boardId, currentUserId, currentRole, boardCreatorId, onClose }: MembersPanelProps) {
   const { authFetch } = useAuth();
   const navigate      = useNavigate();
 
@@ -364,7 +365,8 @@ export default function MembersPanel({ boardId, currentUserId, currentRole, onCl
             <span style={{ width: 18, height: 18, border: "2px solid var(--border2)", borderTopColor: "var(--accent)", borderRadius: "50%", display: "inline-block", animation: "spin 0.7s linear infinite" }} />
           </div>
         ) : members.map(m => {
-          const isSelf = m.userId === currentUserId;
+          const isSelf    = m.userId === currentUserId;
+          const isCreator = boardCreatorId !== undefined && m.userId === boardCreatorId;
           const c      = getAvatarStyle(m.userId);
           const name   = m.user ? `${m.user.firstName ?? ""} ${m.user.lastName ?? ""}`.trim() : `#${m.userId}`;
           return (
@@ -389,17 +391,33 @@ export default function MembersPanel({ boardId, currentUserId, currentRole, onCl
               </div>
 
               {isAdmin && !isSelf ? (
-                <select className="mp-role-select" value={m.role}
-                  onChange={e => handleRoleChange(m.userId, e.target.value as Member["role"] | "retirer")}>
-                  <option value="admin">Admin</option>
-                  <option value="editeur">Éditeur</option>
-                  <option value="lecteur">Lecteur</option>
-                  <option value="retirer" style={{ color: "#f28b82" }}>— Retirer</option>
-                </select>
+                isCreator ? (
+                  // Créateur : badge fixe + couronne, non modifiable
+                  <span style={{
+                    fontSize: 11, flexShrink: 0, fontFamily: "'DM Mono',monospace",
+                    color: "var(--accent)", display: "flex", alignItems: "center", gap: 4,
+                  }}>
+                    {ROLE_LABELS[m.role]}
+                    <span title="Créateur du tableau" style={{ fontSize: 10, opacity: 0.75 }}>👑</span>
+                  </span>
+                ) : (
+                  // Autres membres (y compris les autres admins) : select normal
+                  <select className="mp-role-select" value={m.role}
+                    onChange={e => handleRoleChange(m.userId, e.target.value as Member["role"] | "retirer")}>
+                    <option value="admin">Admin</option>
+                    <option value="editeur">Éditeur</option>
+                    <option value="lecteur">Lecteur</option>
+                    <option value="retirer" style={{ color: "#f28b82" }}>— Retirer</option>
+                  </select>
+                )
               ) : (
+                // Soi-même, ou non-admin : badge fixe
                 <span style={{ fontSize: 11, flexShrink: 0, fontFamily: "'DM Mono',monospace",
-                  color: m.role === "admin" ? "var(--accent)" : m.role === "editeur" ? "var(--accent-2)" : "var(--text-3)" }}>
+                  color: m.role === "admin" ? "var(--accent)" : m.role === "editeur" ? "var(--accent-2)" : "var(--text-3)",
+                  display: "flex", alignItems: "center", gap: 4,
+                }}>
                   {ROLE_LABELS[m.role]}
+                  {isCreator && <span title="Créateur du tableau" style={{ fontSize: 10, opacity: 0.75 }}>👑</span>}
                 </span>
               )}
             </div>

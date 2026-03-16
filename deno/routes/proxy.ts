@@ -11,16 +11,17 @@ const router = new Router({ prefix: "/api/v1" });
 /**
  * Transmet une requête HTTP au serveur Tomcat et recopie la réponse dans le contexte Oak.
  *
- * - Pour les méthodes `POST`, `PUT` et `PATCH`, le corps de la requête est transmis tel quel,
- *   sauf si `overrideBody` est fourni (cas du hashage de mot de passe à la création de compte).
+ * - Pour les requêtes multipart (upload de fichiers), le body brut et le Content-Type
+ *   original (avec la boundary) sont transmis tels quels à Spring.
+ * - Pour les méthodes `POST`, `PUT` et `PATCH` JSON standard, le corps est transmis
+ *   tel quel, sauf si `overrideBody` est fourni (ex : hashage de mot de passe).
  * - L'identifiant de l'utilisateur authentifié est injecté dans l'en-tête `X-User-Id`
  *   afin que Spring puisse l'utiliser sans redécoder le JWT.
- * - Les réponses `204 No Content` (ex. : DELETE réussi) sont transmises sans body,
- *   conformément à la spécification HTTP.
+ * - Les réponses `204 No Content` (ex. : DELETE réussi) sont transmises sans body.
  *
  * @param ctx          - Contexte Oak enrichi par {@link authMiddleware} avec `ctx.state.user`.
  * @param path         - Chemin complet de la ressource côté Tomcat (ex. : `/api/v1/boards/5`).
- * @param overrideBody - Corps JSON sérialisé à envoyer à la place du body original de la requête.
+ * @param overrideBody - Corps JSON sérialisé à envoyer à la place du body original.
  */
 async function proxyToTomcat(
   ctx: AuthContext,
@@ -30,15 +31,35 @@ async function proxyToTomcat(
   const url    = `${TOMCAT_URL}${path}`;
   const method = ctx.request.method;
 
+  // Détecte si la requête entrante est un upload multipart
+  const incomingContentType = ctx.request.headers.get("Content-Type") ?? "";
+  const isMultipart = incomingContentType.includes("multipart/form-data");
+
   let bodyInit: BodyInit | undefined;
   if (["POST", "PUT", "PATCH"].includes(method)) {
-    const text = overrideBody ?? await ctx.request.body.text();
-    console.log("bodyInit envoyé à Spring:", text);
-    bodyInit = text.length > 0 ? text : undefined;
+    if (overrideBody !== undefined) {
+      // Corps JSON fourni explicitement (ex : hashage de mot de passe)
+      bodyInit = overrideBody.length > 0 ? overrideBody : undefined;
+    } else if (isMultipart) {
+      // Upload multipart : transmet le stream brut sans le lire comme texte
+      // pour ne pas corrompre les données binaires
+      bodyInit = ctx.request.body.stream ?? undefined;
+    } else {
+      // Requête JSON standard
+      const text = await ctx.request.body.text();
+      console.log("bodyInit envoyé à Spring:", text);
+      bodyInit = text.length > 0 ? text : undefined;
+    }
   }
 
   const headers = new Headers();
-  headers.set("Content-Type", "application/json");
+
+  if (isMultipart) {
+    // Recopie le Content-Type original avec sa boundary — indispensable pour Spring
+    headers.set("Content-Type", incomingContentType);
+  } else {
+    headers.set("Content-Type", "application/json");
+  }
 
   if (ctx.state.user) {
     headers.set("X-User-Id", String(ctx.state.user.id));
@@ -47,16 +68,23 @@ async function proxyToTomcat(
   console.log(`[proxy] → ${method} ${url}`);
   const response = await fetch(url, { method, headers, body: bodyInit });
   console.log(`[proxy] ← ${response.status} ${url}`);
-  const responseBody = await response.text();
-  console.log(`[proxy] body:`, responseBody);
 
   ctx.response.status = response.status;
 
   // Les réponses 204 No Content (ex. : DELETE) n'ont pas de body —
   // tenter d'en assigner un provoquerait une erreur Oak.
   if (response.status !== 204) {
-    ctx.response.body = responseBody;
-    ctx.response.headers.set("Content-Type", "application/json");
+    const responseContentType = response.headers.get("Content-Type") ?? "application/json";
+    ctx.response.headers.set("Content-Type", responseContentType);
+
+    // Transmet le body comme ArrayBuffer pour préserver les données binaires
+    // (images, PDF, zip…). response.text() corromprait les bytes non-UTF-8.
+    const buffer = await response.arrayBuffer();
+    if (responseContentType.includes("application/json")) {
+      // Log uniquement pour le JSON (lisible)
+      console.log(`[proxy] body:`, new TextDecoder().decode(buffer));
+    }
+    ctx.response.body = buffer;
   }
 }
 

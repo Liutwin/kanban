@@ -1,6 +1,9 @@
 package com.services;
 
 import com.dtos.FileDTO;
+import org.springframework.core.io.Resource;
+import org.springframework.web.multipart.MultipartFile;
+
 import java.util.List;
 
 /**
@@ -36,18 +39,29 @@ public interface FileService {
     FileDTO getFileById(String id);
 
     /**
-     * Enregistre les métadonnées d'un fichier déposé sur une tâche.
-     * Les champs {@code tskId} et {@code usrId} sont vérifiés en cohérence
-     * avec MariaDB avant l'insertion.
+     * Sauvegarde le fichier physique sur le disque et enregistre ses métadonnées dans MongoDB.
+     * Les champs {@code tskId} et {@code usrId} sont vérifiés en cohérence avec MariaDB.
      *
-     * @param dto les métadonnées du fichier ({@code tskId} et {@code usrId} obligatoires)
+     * @param multipartFile le fichier uploadé
+     * @param tskId         l'identifiant de la tâche (référence MariaDB)
+     * @param usrId         l'identifiant de l'utilisateur (référence MariaDB)
+     * @param comId         l'identifiant du commentaire associé (optionnel, ObjectId en String)
      * @return le {@link FileDTO} créé avec son identifiant généré
      * @throws RuntimeException si la tâche ou l'utilisateur n'existe pas en MariaDB
      */
-    FileDTO addFile(FileDTO dto);
+    FileDTO uploadFile(MultipartFile multipartFile, Long tskId, Long usrId, String comId);
 
     /**
-     * Supprime un fichier par son identifiant.
+     * Retourne le fichier physique sous forme de {@link Resource} pour le téléchargement.
+     *
+     * @param id l'identifiant du fichier (ObjectId en String)
+     * @return la ressource lisible
+     * @throws RuntimeException si le fichier est introuvable ou illisible sur le disque
+     */
+    Resource downloadFile(String id);
+
+    /**
+     * Supprime un fichier par son identifiant (métadonnées MongoDB + fichier physique).
      *
      * @param id l'identifiant du fichier à supprimer
      * @throws RuntimeException si le fichier n'est pas trouvé

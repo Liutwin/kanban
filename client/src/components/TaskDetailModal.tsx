@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import type { Task, Priority, User, Comment, Member } from "../model/interfaces";
+import type { Task, Priority, User, Comment, Member, File as FileAttachment } from "../model/interfaces";
 import { ROUTES_API } from "../config/api";
 import { useAuth } from "../hooks/useAuth";
 import { getAvatarStyle } from "../utils/avatarColor";
@@ -93,6 +93,82 @@ export default function TaskDetailModal({ task, columnName, members = [], onClos
   /* UI state */
   const [priorityOpen,  setPriorityOpen]  = useState(false);
   const [assigneeOpen,  setAssigneeOpen]  = useState(false);
+
+  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
+
+  /* Pièces jointes */
+  const [files,        setFiles]        = useState<FileAttachment[]>([]);
+  const [filesLoading, setFilesLoading] = useState(false);
+  const [uploading,    setUploading]    = useState(false);
+  const [blobUrls,     setBlobUrls]     = useState<Record<string, string>>({});
+  const fileInputRef                    = useRef<HTMLInputElement>(null);
+
+  // Libère les blob URLs à la fermeture pour éviter les fuites mémoire
+  useEffect(() => {
+    return () => { Object.values(blobUrls).forEach(URL.revokeObjectURL); };
+  }, [blobUrls]);
+
+  const loadBlobUrl = async (f: FileAttachment) => {
+    if (blobUrls[String(f.id)]) return; // déjà chargé
+    const res = await authFetch(ROUTES_API.file(String(f.id)) + "/download");
+    if (!res.ok) return;
+    const blob = await res.blob();
+    setBlobUrls(prev => ({ ...prev, [String(f.id)]: URL.createObjectURL(blob) }));
+  };
+
+  useEffect(() => {
+    setFilesLoading(true);
+    authFetch(ROUTES_API.filesByTask(task.id))
+      .then(r => r.ok ? r.json() : [])
+      .then((data: FileAttachment[]) => {
+        setFiles(data);
+        // Pré-charge les blob URLs des images
+        data.filter((f: FileAttachment) => f.type?.startsWith("image/")).forEach(loadBlobUrl);
+      })
+      .catch(() => {})
+      .finally(() => setFilesLoading(false));
+  }, [task.id]);
+
+  const handleDownload = async (f: FileAttachment) => {
+    const res = await authFetch(ROUTES_API.file(String(f.id)) + "/download");
+    if (!res.ok) return;
+    const blob = await res.blob();
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement("a");
+    a.href     = url;
+    a.download = f.name;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const picked = e.target.files?.[0];
+    if (!picked) return;
+    setUploading(true);
+    try {
+      const form = new FormData();
+      form.append("file",  picked);
+      form.append("tskId", String(task.id));
+      form.append("usrId", String(user!.id));
+      const res = await authFetch(ROUTES_API.files, { method: "POST", body: form });
+      if (!res.ok) return;
+      const created: FileAttachment = await res.json();
+      setFiles(prev => [...prev, created]);
+      // Pré-charge le blob URL si c'est une image
+      if (created.type?.startsWith("image/")) loadBlobUrl(created);
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
+  const handleDeleteFile = async (id: string) => {
+    const res = await authFetch(ROUTES_API.file(String(id)), { method: "DELETE" });
+    if (res.ok) {
+      setFiles(prev => prev.filter(f => String(f.id) !== id));
+      setBlobUrls(prev => { const next = { ...prev }; delete next[id]; return next; });
+    }
+  };
 
   /* Commentaires */
   const [comments,      setComments]      = useState<Comment[]>([]);
@@ -262,6 +338,30 @@ export default function TaskDetailModal({ task, columnName, members = [], onClos
   };
 
   return (
+    <>
+      {/* Lightbox image plein écran */}
+      {lightboxUrl && (
+        <div
+          onClick={() => setLightboxUrl(null)}
+          style={{
+            position: "fixed", inset: 0, zIndex: 200,
+            background: "rgba(0,0,0,0.88)", backdropFilter: "blur(8px)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            cursor: "zoom-out",
+          }}
+        >
+          <img
+            src={lightboxUrl}
+            alt=""
+            style={{ maxWidth: "90vw", maxHeight: "90vh", objectFit: "contain", borderRadius: 8, boxShadow: "0 24px 64px rgba(0,0,0,0.8)" }}
+          />
+          <button
+            onClick={() => setLightboxUrl(null)}
+            style={{ position: "fixed", top: 20, right: 24, background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.2)", color: "#e8e0f0", width: 36, height: 36, borderRadius: 10, fontSize: 16, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
+          >✕</button>
+        </div>
+      )}
+
     <div
       style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.65)", backdropFilter: "blur(6px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100 }}
       onClick={handleClose}
@@ -431,6 +531,113 @@ export default function TaskDetailModal({ task, columnName, members = [], onClos
               </div>}
             </div>
 
+            {/* Pièces jointes */}
+            <div>
+              <Label>📎 Pièces jointes ({files.length})</Label>
+
+              <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 10 }}>
+                {filesLoading && (
+                  <span style={{ fontSize: 12, color: "#7a7288", fontStyle: "italic" }}>Chargement…</span>
+                )}
+                {!filesLoading && files.length === 0 && (
+                  <span style={{ fontSize: 12, color: "#7a7288", fontStyle: "italic" }}>Aucune pièce jointe.</span>
+                )}
+                {files.map(f => {
+                  const isImage = f.type?.startsWith("image/");
+                  const blobUrl = blobUrls[String(f.id)];
+                  return (
+                    <div
+                      key={String(f.id)}
+                      style={{
+                        background: "rgba(255,255,255,0.04)",
+                        border: "1px solid rgba(255,255,255,0.08)",
+                        borderRadius: 10, overflow: "hidden",
+                      }}
+                    >
+                      {/* Aperçu image cliquable */}
+                      {isImage && blobUrl && (
+                        <img
+                          src={blobUrl}
+                          alt={f.name}
+                          onClick={() => setLightboxUrl(blobUrl)}
+                          style={{
+                            width: "100%", maxHeight: 200,
+                            objectFit: "contain", display: "block",
+                            background: "rgba(0,0,0,0.2)",
+                            cursor: "zoom-in",
+                          }}
+                        />
+                      )}
+                      {isImage && !blobUrl && (
+                        <div style={{ height: 60, display: "flex", alignItems: "center", justifyContent: "center", color: "#7a7288", fontSize: 12, fontStyle: "italic" }}>
+                          Chargement…
+                        </div>
+                      )}
+
+                      {/* Barre nom + actions — overflow visible pour les tooltips */}
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 10px", overflow: "visible" }}>
+                        <span style={{ fontSize: 16, flexShrink: 0 }}>
+                          {isImage ? "🖼️"
+                            : f.type === "application/pdf" ? "📄"
+                            : f.type?.startsWith("text/") ? "📝"
+                            : "📦"}
+                        </span>
+                        <span style={{
+                          flex: 1, fontSize: 12, color: "#b8b0c8",
+                          overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                        }}>
+                          {f.name}
+                        </span>
+                        <Tooltip text="Télécharger" position="left">
+                          <button
+                            onClick={() => handleDownload(f)}
+                            style={{ background: "none", border: "none", color: "#7a7288", cursor: "pointer", fontSize: 14, padding: "2px 5px", borderRadius: 5, flexShrink: 0 }}
+                          >⬇</button>
+                        </Tooltip>
+                        {canEdit && (
+                          <Tooltip text="Supprimer" position="left">
+                            <button
+                              onClick={() => handleDeleteFile(String(f.id))}
+                              style={{ background: "none", border: "none", color: "#7a7288", cursor: "pointer", fontSize: 12, padding: "2px 5px", borderRadius: 5, flexShrink: 0 }}
+                            >✕</button>
+                          </Tooltip>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {canEdit && (
+                <>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    style={{ display: "none" }}
+                    onChange={handleUpload}
+                  />
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={uploading}
+                    style={{
+                      display: "flex", alignItems: "center", gap: 6,
+                      padding: "6px 12px", borderRadius: 8,
+                      background: "rgba(176,166,255,0.08)",
+                      border: "1px solid rgba(176,166,255,0.2)",
+                      color: uploading ? "#7a7288" : "#b0a6ff",
+                      fontSize: 12, fontWeight: 600,
+                      cursor: uploading ? "not-allowed" : "pointer",
+                      fontFamily: "inherit", transition: "all 0.15s",
+                    }}
+                    onMouseEnter={e => { if (!uploading) e.currentTarget.style.background = "rgba(176,166,255,0.14)"; }}
+                    onMouseLeave={e => { e.currentTarget.style.background = "rgba(176,166,255,0.08)"; }}
+                  >
+                    {uploading ? "⏳ Upload en cours…" : "＋ Ajouter un fichier"}
+                  </button>
+                </>
+              )}
+            </div>
+
           </div>
 
           {/* Sidebar */}
@@ -588,5 +795,6 @@ export default function TaskDetailModal({ task, columnName, members = [], onClos
         </div>
       </div>
     </div>
+    </>
   );
 }

@@ -14,6 +14,7 @@ import com.repositories.BoardRepository;
 import com.repositories.CommentRepository;
 import com.repositories.TaskRepository;
 import com.repositories.UserRepository;
+import com.services.FileService;
 import com.services.TaskService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -55,13 +56,14 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class TaskServiceImpl implements TaskService {
 
-    private final TaskRepository       taskRepository;
+    private final TaskRepository        taskRepository;
     private final BoardColumnRepository boardColumnRepository;
-    private final BoardRepository      boardRepository;
+    private final BoardRepository       boardRepository;
     private final BoardMemberRepository boardMemberRepository;
-    private final CommentRepository    commentRepository;
-    private final UserRepository       userRepository;
-    private final TaskMapper           taskMapper;
+    private final CommentRepository     commentRepository;
+    private final UserRepository        userRepository;
+    private final TaskMapper            taskMapper;
+    private final FileService fileService;
 
     // =========================================================================
     // Méthodes utilitaires privées
@@ -278,6 +280,7 @@ public class TaskServiceImpl implements TaskService {
         Task task = taskRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Tâche introuvable : " + id));
         checkWriteAccess(task.getBoardColumn().getBoard().getId(), requesterId);
+        fileService.deleteByTache(id);
         commentRepository.deleteByTskId(id);
         taskRepository.deleteById(id);
     }

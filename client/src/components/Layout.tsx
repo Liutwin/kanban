@@ -30,6 +30,8 @@ interface LayoutProps {
    * Détermine l'affichage des outils d'administration des membres.
    */
   boardRole?: "admin" | "editeur" | "lecteur";
+  /** Identifiant du créateur du tableau (protège son compte dans MembersPanel). */
+  boardCreatorId?: number;
 }
 
 /**
@@ -47,7 +49,7 @@ interface LayoutProps {
  */
 interface AvatarInfo { userId: number; firstName: string; lastName: string; email: string; role: "admin" | "editeur" | "lecteur"; }
 
-export default function Layout({ children, title, boardId, boardRole }: LayoutProps) {
+export default function Layout({ children, title, boardId, boardRole, boardCreatorId }: LayoutProps) {
   const { user, logout, authFetch } = useAuth();
   const navigate  = useNavigate();
   const location  = useLocation();
@@ -369,6 +371,7 @@ export default function Layout({ children, title, boardId, boardRole }: LayoutPr
                     boardId={boardId}
                     currentUserId={user.id}
                     currentRole={boardRole ?? "lecteur"}
+                    boardCreatorId={boardCreatorId}
                     onClose={() => { setPanelOpen(false); fetchAvatarMembers(); }}
                   />
                 )}

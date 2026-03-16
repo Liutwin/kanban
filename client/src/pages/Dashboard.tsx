@@ -466,7 +466,7 @@ export default function Dashboard() {
   /* ── Rendu ───────────────────────────────────────────────── */
 
   return (
-    <Layout title={boardName || "Tableau"} boardId={boardId} boardRole={currentRole}>
+    <Layout title={boardName || "Tableau"} boardId={boardId} boardRole={currentRole} boardCreatorId={board_creatorId ?? undefined}>
       <div className="dashboard-page">
         <button className="back-btn" onClick={() => navigate("/boards")}>
           ← Retour aux tableaux
