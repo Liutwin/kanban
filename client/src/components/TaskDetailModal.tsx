@@ -71,6 +71,9 @@ export default function TaskDetailModal({ task, columnName, members = [], onClos
   const [title,      setTitle]      = useState(task.title);
   const [details,    setDetails]    = useState(task.details ?? "");
   const [dueDate,    setDueDate]    = useState(task.dueDate ? task.dueDate.slice(0, 16) : "");
+  // Champs date et heure séparés pour un meilleur contrôle du picker
+  const [dueDatePart, setDueDatePart] = useState(task.dueDate ? task.dueDate.slice(0, 10) : "");
+  const [dueTimePart, setDueTimePart] = useState(task.dueDate ? task.dueDate.slice(11, 16) : "");
   const [priority,   setPriority]   = useState<Priority>(task.priority);
   const [assigneeId, setAssigneeId] = useState<number | null>(task.assignedId ?? null);
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
@@ -78,7 +81,7 @@ export default function TaskDetailModal({ task, columnName, members = [], onClos
   const debounceRef        = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isClosing          = useRef(false);
   const commentTextareaRef = useRef<HTMLTextAreaElement>(null);
-
+  const timeInputRef       = useRef<HTMLInputElement>(null);
   const handleClose = () => {
     isClosing.current = true;
     // Si une sauvegarde est en attente (debounce), la déclencher immédiatement
@@ -466,36 +469,61 @@ export default function TaskDetailModal({ task, columnName, members = [], onClos
             {/* Date limite */}
             <div>
               <Label>⏰ Date limite</Label>
-              <input
-                type="datetime-local"
-                value={dueDate}
-                onChange={e => {
-                  if (!canEdit) return;
-                  let val = e.target.value;
-                  if (val && val.length === 10) {
-                    const now = new Date();
-                    const hh = String(now.getHours()).padStart(2, "0");
-                    const mm = String(now.getMinutes()).padStart(2, "0");
-                    val = `${val}T${hh}:${mm}`;
-                  }
-                  setDueDate(val);
-                  scheduleAutoSave(title, details, val);
-                }}
-                readOnly={!canEdit}
-                style={{ ...inputBase, fontSize: 12, fontFamily: "'DM Mono', monospace", color: overdue ? "#f28b82" : "#b8b0c8" }}
-                onFocus={e => {
-                  e.currentTarget.style.background = "rgba(255,255,255,0.05)";
-                  if (canEdit && !dueDate) {
-                    const now = new Date();
-                    const pad = (n: number) => String(n).padStart(2, "0");
-                    const local = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}`;
-                    setDueDate(local);
-                  }
-                }}
-                onBlur={e  => e.currentTarget.style.background = "transparent"}
-              />
+              <div style={{ display: "flex", gap: 6 }}>
+                {/* Champ date */}
+                <input
+                  type="date"
+                  value={dueDatePart}
+                  onChange={e => {
+                    if (!canEdit) return;
+                    const newDatePart = e.target.value;
+                    if (!newDatePart) {
+                      // Effacement de la date → tout vider
+                      setDueDatePart("");
+                      setDueTimePart("");
+                      setDueDate("");
+                      scheduleAutoSave(title, details, "");
+                      return;
+                    }
+                    // Injecter l'heure courante si le champ heure était vide
+                    let timePart = dueTimePart;
+                    if (!timePart) {
+                      const now = new Date();
+                      timePart = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
+                      setDueTimePart(timePart);
+                    }
+                    const combined = `${newDatePart}T${timePart}`;
+                    setDueDatePart(newDatePart);
+                    setDueDate(combined);
+                    scheduleAutoSave(title, details, combined);
+                  }}
+                  readOnly={!canEdit}
+                  style={{ ...inputBase, flex: 1, fontSize: 12, fontFamily: "'DM Mono', monospace", color: overdue ? "#f28b82" : "#b8b0c8" }}
+                  onFocus={e => { e.currentTarget.style.background = "rgba(255,255,255,0.05)"; }}
+                  onBlur={e  => e.currentTarget.style.background = "transparent"}
+                />
+                {/* Champ heure — toujours présent pour éviter l'auto-focus au montage */}
+                <input
+                  ref={timeInputRef}
+                  type="time"
+                  tabIndex={-1}
+                  value={dueTimePart}
+                  onChange={e => {
+                    if (!canEdit) return;
+                    const newTimePart = e.target.value;
+                    setDueTimePart(newTimePart);
+                    const combined = dueDatePart ? `${dueDatePart}T${newTimePart}` : "";
+                    setDueDate(combined);
+                    scheduleAutoSave(title, details, combined);
+                  }}
+                  readOnly={!canEdit}
+                  style={{ ...inputBase, width: 90, fontSize: 12, fontFamily: "'DM Mono', monospace", color: overdue ? "#f28b82" : "#b8b0c8", flexShrink: 0, opacity: dueDatePart ? 1 : 0, pointerEvents: dueDatePart ? "auto" : "none", transition: "opacity 0.15s" }}
+                  onFocus={e => { e.currentTarget.style.background = "rgba(255,255,255,0.05)"; }}
+                  onBlur={e  => e.currentTarget.style.background = "transparent"}
+                />
+              </div>
               {dueDate && overdue && <span style={{ fontSize: 10, fontWeight: 600, padding: "2px 7px", borderRadius: 999, background: "rgba(242,139,130,0.12)", border: "1px solid rgba(242,139,130,0.25)", color: "#f28b82", letterSpacing: "0.05em", textTransform: "uppercase", marginTop: 4, display: "inline-block" }}>En retard</span>}
-              {dueDate && canEdit && <button onClick={() => { setDueDate(""); scheduleAutoSave(title, details, ""); }} style={{ display: "block", marginTop: 3, fontSize: 11, color: "#7a7288", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", padding: "2px 8px" }}>× Effacer</button>}
+              {dueDate && canEdit && <button onClick={() => { setDueDatePart(""); setDueTimePart(""); setDueDate(""); scheduleAutoSave(title, details, ""); }} style={{ display: "block", marginTop: 3, fontSize: 11, color: "#7a7288", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", padding: "2px 8px" }}>× Effacer</button>}
             </div>
 
             {/* Créateur (lecture seule) */}
@@ -541,10 +569,9 @@ export default function TaskDetailModal({ task, columnName, members = [], onClos
                     {members.map(m => (
                       <div
                         key={m.id}
-                        onClick={() => handleAssigneeChange(m.id)}
-                        style={{ padding: "6px 8px", cursor: "pointer", background: assigneeId === m.id ? "rgba(176,166,255,0.08)" : "transparent", transition: "background 0.1s" }}
+                        style={{ padding: "6px 8px", background: assigneeId === m.id ? "rgba(176,166,255,0.08)" : "transparent", transition: "background 0.1s" }}
                       >
-                        <UserCard user={m} accent="#b0a6ff" selected={assigneeId === m.id} />
+                        <UserCard user={m} accent="#b0a6ff" selected={assigneeId === m.id} onClick={() => handleAssigneeChange(m.id)} />
                       </div>
                     ))}
                   </div>

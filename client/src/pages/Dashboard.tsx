@@ -401,16 +401,14 @@ export default function Dashboard() {
     const col = dragColRef.current;
     if (!col || col.id === targetCol.id) return;
 
-    const current   = columns;
-    const currentIdx = current.findIndex(c => c.id === col.id);
-    const targetIdx  = current.findIndex(c => c.id === targetCol.id);
-    if (currentIdx === -1 || targetIdx === -1) return;
+    // Lire le numéro ORIGINAL de la colonne cible depuis le snapshot
+    // (reorderColLive a déjà modifié columns, donc current[targetIdx].numero serait faux)
+    const newNum = columnsSnapshot.current.find(c => c.id === targetCol.id)?.numero;
+    if (newNum == null) return;
 
-    const newNum = current[targetIdx].numero;
-
-    authFetch(ROUTES_API.columnMove(boardId, col.id), {
+    authFetch(`${ROUTES_API.columnMove(boardId, col.id)}?newNum=${newNum}`, {
       method: "PATCH",
-      body:   JSON.stringify({ newPosition: newNum }),
+      body:   "{}",
     }).catch(() => { setColumns(columnsSnapshot.current); fetchBoard(); });
 
     dragColRef.current = null;
