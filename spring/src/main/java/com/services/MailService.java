@@ -8,6 +8,14 @@ import com.entities.BoardMember;
 public interface MailService {
 
     /**
+     * Envoie un e-mail de bienvenue à un nouvel utilisateur après son inscription.
+     *
+     * @param toEmail     adresse de l'utilisateur inscrit
+     * @param firstName   prénom de l'utilisateur
+     */
+    void sendWelcome(String toEmail, String firstName);
+
+    /**
      * Notifie un utilisateur qu'il vient d'être ajouté à un tableau Kanban.
      *
      * @param toEmail       adresse de l'utilisateur invité

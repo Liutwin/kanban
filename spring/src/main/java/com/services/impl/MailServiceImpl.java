@@ -46,6 +46,26 @@ public class MailServiceImpl implements MailService {
 
     @Async
     @Override
+    public void sendWelcome(String toEmail, String firstName) {
+        try {
+            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+
+            helper.setFrom(fromAddress);
+            helper.setTo(toEmail);
+            helper.setSubject("Bienvenue sur Kanban ✦");
+            helper.setText(buildWelcomeHtml(firstName), true);
+
+            mailSender.send(message);
+            log.info("[Mail] E-mail de bienvenue envoyé à {}", toEmail);
+
+        } catch (MessagingException e) {
+            log.error("[Mail] Échec d'envoi de bienvenue à {} : {}", toEmail, e.getMessage());
+        }
+    }
+
+    @Async
+    @Override
     public void sendBoardInvitation(
             String toEmail,
             String toFirstName,
@@ -71,7 +91,83 @@ public class MailServiceImpl implements MailService {
     }
 
     // ─────────────────────────────────────────────────────────────
-    // Template HTML
+    // Template HTML – bienvenue
+    // ─────────────────────────────────────────────────────────────
+
+    private String buildWelcomeHtml(String firstName) {
+        return """
+                <!DOCTYPE html>
+                <html lang="fr">
+                <head>
+                  <meta charset="UTF-8"/>
+                  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+                </head>
+                <body style="margin:0;padding:0;background:#f4f4f5;font-family:'Segoe UI',Arial,sans-serif;">
+                  <table width="100%%" cellpadding="0" cellspacing="0" style="background:#f4f4f5;padding:40px 0;">
+                    <tr><td align="center">
+                      <table width="560" cellpadding="0" cellspacing="0"
+                             style="background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.08);">
+
+                        <!-- En-tête -->
+                        <tr>
+                          <td style="background:#1c1b1f;padding:28px 36px;text-align:center;">
+                            <span style="font-family:'DM Mono',monospace;font-size:13px;font-weight:600;
+                                         letter-spacing:0.12em;color:#e8e0f0;text-transform:uppercase;">
+                              ▦ KANBAN
+                            </span>
+                          </td>
+                        </tr>
+
+                        <!-- Corps -->
+                        <tr>
+                          <td style="padding:36px 36px 28px;">
+                            <p style="margin:0 0 8px;font-size:22px;font-weight:600;color:#1c1b1f;">
+                              Bienvenue, %s&nbsp;🎉
+                            </p>
+                            <p style="margin:0 0 24px;font-size:15px;color:#555;line-height:1.6;">
+                              Votre compte a bien été créé. Vous pouvez dès maintenant vous connecter
+                              et commencer à organiser vos projets avec des tableaux Kanban.
+                            </p>
+
+                            <!-- Bouton CTA -->
+                            <table cellpadding="0" cellspacing="0" style="margin:0 0 28px;">
+                              <tr>
+                                <td style="background:#b0a6ff;border-radius:8px;">
+                                  <a href="%s"
+                                     style="display:inline-block;padding:12px 28px;font-size:14px;
+                                            font-weight:600;color:#1c1b1f;text-decoration:none;">
+                                    Accéder à l'application →
+                                  </a>
+                                </td>
+                              </tr>
+                            </table>
+
+                            <p style="margin:0;font-size:13px;color:#888;line-height:1.5;">
+                              Si vous n'êtes pas à l'origine de cette inscription, contactez-nous immédiatement.
+                            </p>
+                          </td>
+                        </tr>
+
+                        <!-- Pied de page -->
+                        <tr>
+                          <td style="background:#f4f4f5;padding:16px 36px;text-align:center;
+                                     border-top:1px solid #e8e8e8;">
+                            <p style="margin:0;font-size:11px;color:#aaa;">
+                              Cet e-mail a été envoyé automatiquement — merci de ne pas y répondre.
+                            </p>
+                          </td>
+                        </tr>
+
+                      </table>
+                    </td></tr>
+                  </table>
+                </body>
+                </html>
+                """.formatted(firstName, baseUrl);
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // Template HTML – invitation
     // ─────────────────────────────────────────────────────────────
 
     private String buildHtml(

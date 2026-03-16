@@ -1,20 +1,48 @@
 import React, { useState, useRef, useCallback } from "react";
 import ReactDOM from "react-dom";
 
+/**
+ * Props du composant {@link Tooltip}.
+ */
 interface TooltipProps {
+  /** Texte affiché dans la bulle. */
   text: string;
+  /** Élément déclencheur — doit être un unique nœud React. */
   children: React.ReactElement;
+  /**
+   * Position souhaitée de la bulle par rapport au déclencheur.
+   * Si omise, la position est choisie automatiquement selon l'espace disponible
+   * (préférence pour `"top"`, bascule en `"bottom"` si l'espace est insuffisant).
+   */
   position?: "top" | "bottom" | "left" | "right";
 }
 
 const OFFSET = 10;
 
+/**
+ * Coordonnées absolues (en pixels, relatives au document) de la bulle du tooltip,
+ * calculées à partir du {@link DOMRect} du déclencheur.
+ */
 interface BubblePos {
+  /** Distance depuis le haut du document. */
   top:       number;
+  /** Distance depuis le bord gauche du document. */
   left:      number;
+  /** Transformation CSS permettant de centrer la bulle par rapport au point d'ancrage. */
   transform: string;
 }
 
+/**
+ * Calcule les coordonnées absolues de la bulle du tooltip dans le document.
+ *
+ * Les valeurs tiennent compte du défilement de la page (`window.scrollY/X`)
+ * afin que le portal rendu dans `document.body` soit positionné correctement
+ * même sur des pages scrollables.
+ *
+ * @param rect - Bounding rect du déclencheur, obtenu via `getBoundingClientRect()`.
+ * @param pos  - Côté sur lequel la bulle doit apparaître.
+ * @returns    Coordonnées et transformation CSS prêtes à l'emploi.
+ */
 function computePosition(
   rect: DOMRect,
   pos: "top" | "bottom" | "left" | "right",
@@ -47,6 +75,26 @@ function computePosition(
   }
 }
 
+/**
+ * Bulle d'aide contextuelle affichée au survol d'un élément.
+ *
+ * La bulle est rendue via `ReactDOM.createPortal` directement dans `document.body`,
+ * ce qui lui permet d'échapper à tout parent avec `overflow: hidden` ou `clip`
+ * (typiquement les cartes ou panneaux scrollables).
+ *
+ * Sa position est calculée à partir du `getBoundingClientRect()` du déclencheur
+ * au moment du survol, et peut être forcée via la prop `position` ou laissée en
+ * auto-détection (haut/bas selon l'espace disponible à l'écran).
+ *
+ * @example
+ * ```tsx
+ * <Tooltip text="Supprimer le tableau" position="top">
+ *   <button onClick={handleDelete}>✕</button>
+ * </Tooltip>
+ * ```
+ *
+ * @param props - {@link TooltipProps}
+ */
 export default function Tooltip({ text, children, position }: TooltipProps) {
   const [visible,  setVisible]  = useState(false);
   const [bubblePos, setBubblePos] = useState<BubblePos | null>(null);
@@ -104,7 +152,7 @@ export default function Tooltip({ text, children, position }: TooltipProps) {
   return (
     <span
       ref={wrapRef}
-      style={{ position: "relative", display: "inline-flex", alignItems: "center", justifyContent: "center", width: "fit-content" }}
+      style={{ position: "relative", display: "inline-flex", alignItems: "center", justifyContent: "center", width: "fit-content", justifySelf: "start", alignSelf: "start" }}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
     >

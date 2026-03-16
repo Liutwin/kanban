@@ -6,6 +6,7 @@ import com.dtos.UserPasswordDTO;
 import com.entities.User;
 import com.mappers.UserMapper;
 import com.repositories.UserRepository;
+import com.services.MailService;
 import com.services.UserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -24,6 +25,7 @@ public class UserServiceImpl implements UserService {
 
     private final UserRepository userRepository;
     private final UserMapper userMapper;
+    private final MailService mailService;
 
     /**
      * {@inheritDoc}
@@ -63,7 +65,11 @@ public class UserServiceImpl implements UserService {
         dto.setLastName(capitalize(dto.getLastName()));
 
         User user = userMapper.toEntityFromCreate(dto);
-        return userMapper.toDTO(userRepository.save(user));
+        UserDTO saved = userMapper.toDTO(userRepository.save(user));
+
+        mailService.sendWelcome(saved.getEmail(), saved.getFirstName());
+
+        return saved;
     }
 
     /** {@inheritDoc} */
