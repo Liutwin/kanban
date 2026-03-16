@@ -56,6 +56,7 @@ export default function Dashboard() {
   const [dragCol, setDragCol]         = useState<ColumnWithTasks | null>(null);
   const [dragColOver, setDragColOver] = useState<number | null>(null);
   const dragColRef = useRef<ColumnWithTasks | null>(null);
+  const colDropTargetRef = useRef<ColumnWithTasks | null>(null);
 
   /* ── Recherche ───────────────────────────────────────────── */
   const [searchQuery,    setSearchQuery]    = useState("");
@@ -376,44 +377,50 @@ export default function Dashboard() {
   /* ── Drag & drop colonnes ────────────────────────────────── */
 
   /**
-   * Réorganise les colonnes en temps réel pendant le drag.
-   * Calcule depuis l'état courant pour gérer les aller-retours.
+   * Réordonne les colonnes visuellement en temps réel pendant le drag.
+   * Capture la colonne cible dans colDropTargetRef AVANT le réordonnancement,
+   * car après le swap c'est la colonne draguée elle-même qui se retrouve
+   * sous le curseur — rendant targetCol inutilisable dans handleColDrop.
    */
   const reorderColLive = (targetCol: ColumnWithTasks) => {
     const col = dragColRef.current;
     if (!col || col.id === targetCol.id) return;
-
+    colDropTargetRef.current = targetCol; // numero original, avant tout swap
     setColumns(current => {
-      const currentIdx = current.findIndex(c => c.id === col.id);
-      const targetIdx  = current.findIndex(c => c.id === targetCol.id);
-      if (currentIdx === -1 || targetIdx === -1 || currentIdx === targetIdx) return current;
+      const fromIdx = current.findIndex(c => c.id === col.id);
+      const toIdx   = current.findIndex(c => c.id === targetCol.id);
+      if (fromIdx === -1 || toIdx === -1 || fromIdx === toIdx) return current;
       const reordered = [...current];
-      const [moved]   = reordered.splice(currentIdx, 1);
-      reordered.splice(targetIdx, 0, moved);
-      return reordered.map((c, i) => ({ ...c, numero: i + 1 }));
+      const [moved] = reordered.splice(fromIdx, 1);
+      reordered.splice(toIdx, 0, moved);
+      return reordered; // numéros inchangés : handleColDrop lit target.numero
     });
   };
 
   /**
-   * Finalise le drop d'une colonne : persiste le nouvel ordre via l'API.
+   * Déplace la colonne en cours de drag vers la position de la colonne cible
+   * via `PATCH /api/v1/boards/{boardId}/columns/{id}/move?newNum={num}`.
+   * Met à jour le state localement sans recharger le tableau entier.
+   *
+   * @param targetCol - Colonne sur laquelle on lâche.
    */
   const handleColDrop = (targetCol: ColumnWithTasks) => {
-    const col = dragColRef.current;
-    if (!col || col.id === targetCol.id) return;
-
-    // Lire le numéro ORIGINAL de la colonne cible depuis le snapshot
-    // (reorderColLive a déjà modifié columns, donc current[targetIdx].numero serait faux)
-    const newNum = columnsSnapshot.current.find(c => c.id === targetCol.id)?.numero;
-    if (newNum == null) return;
-
-    authFetch(`${ROUTES_API.columnMove(boardId, col.id)}?newNum=${newNum}`, {
+    // On capture dragColRef.current immédiatement : onDragEnd peut
+    // s'être déclenché avant onDrop sur certains navigateurs et
+    // avoir remis dragColRef.current à null.
+    const col    = dragColRef.current;
+    const target = colDropTargetRef.current; // capturé avant le swap live
+    colDropTargetRef.current = null;
+    if (!col || !target) { setDragCol(null); setDragColOver(null); return; }
+    const colId  = col.id;
+    const newNum = target.numero; // numero original, non modifié par reorderColLive
+    setDragCol(null);
+    setDragColOver(null);
+    // reorderColLive a déjà mis à jour l'affichage ; on persiste uniquement.
+    authFetch(`${ROUTES_API.columnMove(boardId, colId)}?newNum=${newNum}`, {
       method: "PATCH",
       body:   "{}",
     }).catch(() => { setColumns(columnsSnapshot.current); fetchBoard(); });
-
-    dragColRef.current = null;
-    setDragCol(null);
-    setDragColOver(null);
   };
 
   /* ── Helpers ─────────────────────────────────────────────── */
@@ -500,7 +507,7 @@ export default function Dashboard() {
                     const colRect = colEl?.getBoundingClientRect();
                     setDragMirror({ ox: colRect ? e.clientX - colRect.left : 20, oy: colRect ? e.clientY - colRect.top : 20, width: colEl?.offsetWidth ?? 280, kind: "col", col });
                   }}
-                  onDragEnd={() => { if (!didDrop.current) setColumns(columnsSnapshot.current); dragColRef.current = null; setDragCol(null); setDragColOver(null); setDragMirror(null); didDrop.current = false; }}
+                  onDragEnd={() => { if (!didDrop.current) setColumns(columnsSnapshot.current); dragColRef.current = null; colDropTargetRef.current = null; setDragCol(null); setDragColOver(null); setDragMirror(null); didDrop.current = false; }}
                   style={{ cursor: isReadOnly ? "default" : "grab" }}
                 >
                   <span className="col-name">{col.name}</span>
