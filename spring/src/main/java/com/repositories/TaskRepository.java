@@ -13,14 +13,12 @@ import java.util.List;
 /**
  * Repository JPA pour l'entité {@link Task}.
  * Fournit les opérations CRUD standard héritées de {@link JpaRepository}
- * ainsi que des requêtes métier pour la lecture triée et le réordonnancement
- * des tâches au sein d'une colonne.
+ * ainsi que des requêtes métier pour la lecture triée des tâches.
  *
- * <p>Le réordonnancement intra-colonne suit la même logique que la procédure
- * SQL {@code deplacer_colonne} pour les colonnes : avant de placer la tâche
- * à sa nouvelle position, {@link #shiftPositions} décale les tâches voisines
- * afin de préserver l'unicité de la contrainte
- * {@code uq_tsk_position_col (col_id, tsk_position)}.</p>
+ * <p>Le déplacement (intra et inter-colonnes) est entièrement délégué à la
+ * procédure stockée SQL {@code deplacer_tache} via
+ * {@link #deplacerTache(Long, Long, int, Long)}, qui gère le réordonnancement
+ * des positions voisines et le logging dans {@code journal_log}.</p>
  */
 @Repository
 public interface TaskRepository extends JpaRepository<Task, Long> {
@@ -55,55 +53,30 @@ public interface TaskRepository extends JpaRepository<Task, Long> {
     List<Task> findByBoardColumnIdAndPriorityOrderByPosition(Long columnId, Task.Priority priority);
 
     /**
-     * Décale la position ({@code tsk_position}) d'un ensemble de tâches
-     * d'une même colonne d'une valeur {@code delta} ({@code +1} ou {@code -1}).
+     * Appelle la procédure stockée {@code deplacer_tache} pour déplacer
+     * une tâche vers une nouvelle position, dans la même colonne ou dans
+     * une colonne différente.
      *
-     * <p>Utilisé par {@link com.services.impl.TaskServiceImpl#moveTask} pour
-     * maintenir la cohérence des positions lors d'un réordonnancement
-     * intra-colonne, de la même façon que la procédure SQL
-     * {@code deplacer_colonne} gère les colonnes :</p>
+     * <p>La procédure gère intégralement :</p>
      * <ul>
-     *   <li><b>Déplacement vers le haut</b> (nouvelle position &lt; ancienne) :
-     *       les tâches situées dans {@code [newPos .. oldPos - 1]} sont décalées
-     *       de {@code +1}.</li>
-     *   <li><b>Déplacement vers le bas</b> (nouvelle position &gt; ancienne) :
-     *       les tâches situées dans {@code [oldPos + 1 .. newPos]} sont décalées
-     *       de {@code -1}.</li>
+     *   <li>le borne-clamp de {@code p_new_pos} au maximum autorisé ;</li>
+     *   <li>le réordonnancement des tâches voisines (intra-colonne) ;</li>
+     *   <li>la fermeture du trou dans la colonne source et l'ouverture
+     *       d'une place dans la colonne cible (inter-colonnes) ;</li>
+     *   <li>l'insertion du log {@code deplacement} dans {@code journal_log}.</li>
      * </ul>
      *
-     * <p>La tâche en cours de déplacement ({@code excludeId}) est exclue de
-     * la mise à jour pour éviter de modifier sa propre position avant qu'elle
-     * ne soit repositionnée par l'appelant.</p>
-     *
-     * @param colId     l'identifiant de la colonne dans laquelle le décalage
-     *                  s'applique
-     * @param delta     valeur du décalage : {@code +1} ou {@code -1}
-     * @param from      borne inférieure inclusive de la plage à décaler
-     * @param to        borne supérieure inclusive de la plage à décaler
-     * @param excludeId identifiant de la tâche à exclure du décalage
+     * @param tskId      identifiant de la tâche à déplacer
+     * @param colIdCible identifiant de la colonne cible (peut être la colonne courante)
+     * @param newPos     position cible (0-based)
+     * @param usrAuteur  identifiant de l'utilisateur déclenchant l'action (pour le log)
      */
     @Modifying
     @Transactional
-    @Query("UPDATE Task t SET t.position = t.position + :delta " +
-            "WHERE t.boardColumn.id = :colId " +
-            "AND t.position >= :from AND t.position <= :to " +
-            "AND t.id <> :excludeId")
-    void shiftPositions(@Param("colId")     Long colId,
-                        @Param("delta")     int  delta,
-                        @Param("from")      int  from,
-                        @Param("to")        int  to,
-                        @Param("excludeId") Long excludeId);
-
-    /**
-     * Retourne le nombre de tâches présentes dans une colonne.
-     *
-     * <p>Utilisé par {@link com.services.impl.TaskServiceImpl#moveTask} pour
-     * borner la position cible au maximum existant dans la colonne, de la
-     * même façon que {@code deplacer_colonne} borne {@code p_new_num} à
-     * {@code v_max_num}.</p>
-     *
-     * @param columnId l'identifiant de la colonne
-     * @return le nombre de tâches dans la colonne
-     */
-    long countByBoardColumnId(Long columnId);
+    @Query(value = "CALL deplacer_tache(:tskId, :colIdCible, :newPos, :usrAuteur)",
+            nativeQuery = true)
+    void deplacerTache(@Param("tskId")      Long tskId,
+                       @Param("colIdCible") Long colIdCible,
+                       @Param("newPos")     int  newPos,
+                       @Param("usrAuteur")  Long usrAuteur);
 }

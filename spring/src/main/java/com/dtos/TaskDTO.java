@@ -50,6 +50,11 @@ public class TaskDTO {
     private Task.Priority priority;
 
     /**
+     * Indique si la tâche a été validée par un utilisateur.
+     */
+    private boolean isValidated;
+
+    /**
      * Position de la tâche au sein de sa colonne (index 0-based).
      *
      * <p>En lecture, reflète l'ordre d'affichage retourné par la base.

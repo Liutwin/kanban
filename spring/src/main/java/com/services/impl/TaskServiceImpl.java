@@ -14,8 +14,8 @@ import com.repositories.BoardRepository;
 import com.repositories.CommentRepository;
 import com.repositories.TaskRepository;
 import com.repositories.UserRepository;
-import com.services.FileService;
 import com.services.TaskService;
+import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -40,30 +40,26 @@ import java.util.stream.Collectors;
  *       Un {@code LECTEUR} se verra refuser ces opérations (HTTP 403).</li>
  * </ul>
  *
- * <h3>Réordonnancement intra-colonne</h3>
- * <p>{@link #moveTask} gère deux cas distincts selon que la colonne cible
- * diffère ou non de la colonne courante :</p>
- * <ul>
- *   <li><b>Inter-colonnes</b> : la tâche est placée en fin de la colonne
- *       cible, sans renuméroter la colonne source.</li>
- *   <li><b>Intra-colonne</b> : suit la logique de la procédure SQL
- *       {@code deplacer_colonne} — les tâches situées entre l'ancienne et
- *       la nouvelle position sont décalées de ±1 via
- *       {@link TaskRepository#shiftPositions} avant le repositionnement.</li>
- * </ul>
+ * <h3>Réordonnancement et déplacement</h3>
+ * <p>{@link #moveTask} délègue entièrement à la procédure stockée SQL
+ * {@code deplacer_tache}, qui gère les deux cas (intra et inter-colonnes),
+ * le clamp de la position cible, et l'insertion du log dans
+ * {@code journal_log}. Le cache JPA de la session est ensuite invalidé via
+ * {@link jakarta.persistence.EntityManager#refresh} pour retourner l'état
+ * réel persisté.</p>
  */
 @Service
 @RequiredArgsConstructor
 public class TaskServiceImpl implements TaskService {
 
-    private final TaskRepository        taskRepository;
+    private final TaskRepository       taskRepository;
     private final BoardColumnRepository boardColumnRepository;
-    private final BoardRepository       boardRepository;
+    private final BoardRepository      boardRepository;
     private final BoardMemberRepository boardMemberRepository;
-    private final CommentRepository     commentRepository;
-    private final UserRepository        userRepository;
-    private final TaskMapper            taskMapper;
-    private final FileService fileService;
+    private final CommentRepository    commentRepository;
+    private final UserRepository       userRepository;
+    private final TaskMapper           taskMapper;
+    private final EntityManager        entityManager;
 
     // =========================================================================
     // Méthodes utilitaires privées
@@ -181,6 +177,7 @@ public class TaskServiceImpl implements TaskService {
         task.setDetails(dto.getDetails());
         task.setDueDate(dto.getDueDate());
         task.setPriority(dto.getPriority() != null ? dto.getPriority() : task.getPriority());
+        task.setValidated(dto.isValidated());
         return taskMapper.toDTO(taskRepository.save(task));
     }
 
@@ -203,17 +200,11 @@ public class TaskServiceImpl implements TaskService {
     /**
      * {@inheritDoc}
      *
-     * <h4>Algorithme de réordonnancement intra-colonne</h4>
-     * <p>Identique à la procédure SQL {@code deplacer_colonne} :</p>
-     * <ol>
-     *   <li>Borne {@code targetPosition} à {@code [0 .. maxPosition]}.</li>
-     *   <li>Si {@code targetPosition == oldPosition} : rien à faire.</li>
-     *   <li>Si {@code targetPosition < oldPosition} (déplacement vers le haut) :
-     *       décale de {@code +1} les tâches dans {@code [targetPosition .. oldPosition - 1]}.</li>
-     *   <li>Si {@code targetPosition > oldPosition} (déplacement vers le bas) :
-     *       décale de {@code -1} les tâches dans {@code [oldPosition + 1 .. targetPosition]}.</li>
-     *   <li>Positionne la tâche à {@code targetPosition}.</li>
-     * </ol>
+     * <p>Délègue intégralement à la procédure stockée {@code deplacer_tache},
+     * qui gère le clamp de la position cible, le réordonnancement des tâches
+     * voisines (intra et inter-colonnes) et l'insertion du log dans
+     * {@code journal_log}. Le cache de la session JPA est ensuite invalidé
+     * via {@link EntityManager#refresh} pour retourner l'état réel persisté.</p>
      */
     @Override
     @Transactional
@@ -230,48 +221,11 @@ public class TaskServiceImpl implements TaskService {
                     "La colonne cible n'appartient pas au même tableau.");
         }
 
-        boolean sameColumn = task.getBoardColumn().getId().equals(targetColumnId);
+        taskRepository.deplacerTache(id, targetColumnId, targetPosition, requesterId);
 
-        if (sameColumn) {
-            // ---------------------------------------------------------------
-            // Réordonnancement intra-colonne
-            // ---------------------------------------------------------------
-            int oldPosition = task.getPosition();
-            // Le frontend calcule targetPosition comme index d'insertion dans la liste
-            // SANS la tâche déplacée (count-1 éléments), donc les indices valides
-            // sont [0 .. count-1] : 0 = en tête, count-1 = en queue.
-            // L'ancienne borne count-2 était fausse : elle empêchait de placer
-            // la tâche en dernière position (index count-1 = append).
-            int maxPosition = (int) taskRepository.countByBoardColumnId(targetColumnId) - 1;
-            if (maxPosition < 0) maxPosition = 0;
-            if (targetPosition > maxPosition) targetPosition = maxPosition;
-            if (targetPosition < 0)           targetPosition = 0;
-
-            // Rien à faire si même position effective
-            if (oldPosition == targetPosition) {
-                return taskMapper.toDTO(task);
-            }
-
-            if (targetPosition < oldPosition) {
-                // Déplacement vers le haut : les tâches [targetPos .. oldPos-1] décalent de +1
-                taskRepository.shiftPositions(targetColumnId, +1, targetPosition, oldPosition - 1, id);
-            } else {
-                // Déplacement vers le bas : les tâches [oldPos+1 .. targetPos] décalent de -1
-                taskRepository.shiftPositions(targetColumnId, -1, oldPosition + 1, targetPosition, id);
-            }
-
-            task.setPosition(targetPosition);
-
-        } else {
-            // ---------------------------------------------------------------
-            // Déplacement inter-colonnes : place la tâche en fin de la colonne cible
-            // ---------------------------------------------------------------
-            int newPosition = (int) taskRepository.countByBoardColumnId(targetColumnId);
-            task.setBoardColumn(targetColumn);
-            task.setPosition(newPosition);
-        }
-
-        return taskMapper.toDTO(taskRepository.save(task));
+        // Invalide le cache JPA pour lire l'état réel après les UPDATE de la procédure
+        entityManager.refresh(task);
+        return taskMapper.toDTO(task);
     }
 
     /** {@inheritDoc} */
@@ -280,7 +234,6 @@ public class TaskServiceImpl implements TaskService {
         Task task = taskRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Tâche introuvable : " + id));
         checkWriteAccess(task.getBoardColumn().getBoard().getId(), requesterId);
-        fileService.deleteByTache(id);
         commentRepository.deleteByTskId(id);
         taskRepository.deleteById(id);
     }

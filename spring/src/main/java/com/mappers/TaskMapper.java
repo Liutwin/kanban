@@ -34,6 +34,7 @@ public class TaskMapper {
                 task.getDetails(),
                 task.getDueDate(),
                 task.getPriority(),
+                task.isValidated(),
                 task.getPosition(),
                 task.getBoardColumn().getId(),
                 task.getCreator().getId(),
@@ -69,6 +70,7 @@ public class TaskMapper {
         task.setDetails(dto.getDetails());
         task.setDueDate(dto.getDueDate());
         task.setPriority(dto.getPriority() != null ? dto.getPriority() : Task.Priority.MEDIUM);
+        task.setValidated(dto.isValidated());
 
         BoardColumn boardColumn = new BoardColumn();
         boardColumn.setId(dto.getBoardColumnId());

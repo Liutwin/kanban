@@ -65,6 +65,14 @@ public class Task {
     private Priority priority = Priority.MEDIUM;
 
     /**
+     * Indique si la tâche est considérée comme effectuée.
+     * {@code true} pour un tâche validée, {@code false} sinon.
+     * Valeur par défaut : {@code false}.
+     */
+    @Column(name = "tsk_validee", nullable = false)
+    private boolean isValidated = false;
+
+    /**
      * Position de la tâche au sein de sa colonne (index 0-based).
      *
      * <p>Garantit l'ordre d'affichage dans la colonne. La contrainte
