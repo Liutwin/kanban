@@ -43,6 +43,10 @@ export default function Boards() {
   const [pendingDelete, setPendingDelete] = useState<number | null>(null);
   const [deleting, setDeleting]           = useState(false);
 
+  // Modale confirmation quitter — null = fermée, sinon = id du tableau ciblé
+  const [pendingLeave, setPendingLeave]   = useState<number | null>(null);
+  const [leaving, setLeaving]             = useState(false);
+
   /**
    * Récupère la liste des tableaux de l'utilisateur connecté depuis l'API
    * et met à jour l'état local. Ne fait rien si `user.id` n'est pas disponible.
@@ -140,6 +144,38 @@ export default function Boards() {
     }
   };
 
+  /**
+   * Ouvre la modale de confirmation de départ du tableau.
+   */
+  const askLeave = (e: React.MouseEvent, boardId: number) => {
+    e.stopPropagation();
+    setPendingLeave(boardId);
+  };
+
+  /**
+   * Confirme et exécute le départ du tableau avec mise à jour optimiste.
+   */
+  const confirmLeave = async () => {
+    if (pendingLeave === null || !user?.id) return;
+    const boardId  = pendingLeave;
+    const previous = boards;
+
+    setBoards(b => b.filter(board => board.id !== boardId));
+    setPendingLeave(null);
+    setError("");
+    setLeaving(true);
+
+    try {
+      const res = await authFetch(ROUTES_API.boardMember(boardId, user.id), { method: "DELETE" });
+      if (!res.ok) throw new Error(await extractErrorMessage(res));
+    } catch (e: unknown) {
+      setBoards(previous);
+      setError(e instanceof Error ? e.message : "Erreur lors du départ du tableau.");
+    } finally {
+      setLeaving(false);
+    }
+  };
+
   /** Retourne le libellé français du rôle. */
   const roleLabel = (role: Role) =>
     role === "admin" ? "Admin" : role === "editeur" ? "Éditeur" : "Lecteur";
@@ -148,7 +184,8 @@ export default function Boards() {
   const roleClass = (role: Role) =>
     role === "admin" ? "role-admin" : role === "editeur" ? "role-editeur" : "role-lecteur";
 
-  const pendingBoardName = boards.find(b => b.id === pendingDelete)?.name ?? "";
+  const pendingBoardName  = boards.find(b => b.id === pendingDelete)?.name ?? "";
+  const pendingLeaveName  = boards.find(b => b.id === pendingLeave)?.name  ?? "";
 
   return (
     <Layout title="Mes tableaux">
@@ -203,6 +240,17 @@ export default function Boards() {
                         aria-label="Supprimer le tableau"
                       >
                         ✕
+                      </button>
+                    </Tooltip>
+                  )}
+                  {board.creatorId !== user?.id && (
+                    <Tooltip text="Quitter le tableau" position="top">
+                      <button
+                        className="board-leave-btn"
+                        onClick={e => askLeave(e, board.id)}
+                        aria-label="Quitter le tableau"
+                      >
+                        ⤴
                       </button>
                     </Tooltip>
                   )}
@@ -281,6 +329,34 @@ export default function Boards() {
               </button>
               <button type="button" className="btn btn-danger" onClick={confirmDelete} disabled={deleting}>
                 {deleting ? "Suppression…" : "Supprimer"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* ── Modale : confirmation quitter tableau ─────────── */}
+      {pendingLeave !== null && (
+        <div className="modal-overlay" onClick={() => setPendingLeave(null)}>
+          <div className="modal" style={{ maxWidth: 400 }} onClick={e => e.stopPropagation()}>
+
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 18 }}>
+              <h2 className="modal-title" style={{ margin: 0 }}>Quitter le tableau</h2>
+              <ModalCloseButton onClick={() => setPendingLeave(null)} />
+            </div>
+
+            <p style={{ fontSize: 14, color: "var(--text-2)", lineHeight: 1.6, margin: "0 0 6px" }}>
+              Vous allez quitter le tableau <strong style={{ color: "var(--text)", fontWeight: 700 }}>«&nbsp;{pendingLeaveName}&nbsp;»</strong>.
+            </p>
+            <p style={{ fontSize: 13, color: "var(--text-3)", margin: "0 0 24px", fontFamily: "'DM Mono', monospace" }}>
+              Vous n'y aurez plus accès à moins d'y être ré-invité.
+            </p>
+
+            <div className="modal-actions">
+              <button type="button" className="btn btn-ghost" onClick={() => setPendingLeave(null)}>
+                Annuler
+              </button>
+              <button type="button" className="btn btn-danger" onClick={confirmLeave} disabled={leaving}>
+                {leaving ? "Départ…" : "Quitter"}
               </button>
             </div>
           </div>

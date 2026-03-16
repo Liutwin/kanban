@@ -89,9 +89,13 @@
 }
 
 .board-card-header {
-  display: grid;
-  grid-template-columns: 40px 1fr 40px;
+  display: flex;
   align-items: center;
+  gap: 4px;
+}
+
+.board-card-header .board-icon {
+  margin-right: auto;
 }
 
 .board-icon {
@@ -113,7 +117,6 @@
 
 /* ── Role badges ──────────────────────────────────────────── */
 .role-badge {
-  justify-self: center;
   font-size: 10px;
   font-family: 'DM Mono', monospace;
   font-weight: 500;
@@ -232,6 +235,26 @@
 
 .board-delete-btn:hover {
   background-color: rgba(248, 113, 113, 0.15);
+}
+
+/* ── Leave button ─────────────────────────────────────────── */
+.board-leave-btn {
+  background: none;
+  border: none;
+  color: transparent;
+  cursor: pointer;
+  font-size: 0.95rem;
+  padding: 2px 6px;
+  border-radius: 4px;
+  transition: color 0.15s ease, background-color 0.15s ease;
+}
+
+.board-card:hover .board-leave-btn {
+  color: var(--accent-2, #7ec8e3);
+}
+
+.board-leave-btn:hover {
+  background-color: rgba(126, 200, 227, 0.15);
 }
 
 /* ── Boards title ─────────────────────────────────────────── */

@@ -71,6 +71,9 @@ export default function MembersPanel({ boardId, currentUserId, currentRole, boar
   // Confirmation inline de suppression
   const [pendingRemove, setPendingRemove] = useState<MemberWithUser | null>(null);
 
+  // Confirmation inline de départ du tableau
+  const [confirmLeave, setConfirmLeave]   = useState(false);
+
   const panelRef = useRef<HTMLDivElement>(null);
   const isAdmin  = currentRole === "admin";
 
@@ -157,6 +160,19 @@ export default function MembersPanel({ boardId, currentUserId, currentRole, boar
     const res = await authFetch(ROUTES_API.boardMember(boardId, userId), { method: "DELETE" });
     if (res.ok) setMembers(m => m.filter(x => x.userId !== userId));
     else setInviteError("Erreur lors du retrait du membre.");
+  };
+
+  // ── Quitter le tableau ────────────────────────────────────
+  const handleLeave = async () => {
+    setConfirmLeave(false);
+    const res = await authFetch(ROUTES_API.boardMember(boardId, currentUserId), { method: "DELETE" });
+    if (res.ok) {
+      onClose();
+      // Redirige vers la liste des tableaux
+      window.location.href = "/boards";
+    } else {
+      setInviteError("Erreur lors du départ du tableau.");
+    }
   };
 
   // ── Recherche / autocomplétion ─────────────────────────────
@@ -516,6 +532,46 @@ export default function MembersPanel({ boardId, currentUserId, currentRole, boar
           </div>
           {inviteError && (
             <p style={{ margin: "6px 0 0", fontSize: 12, color: "var(--danger)", lineHeight: 1.4 }}>⚠ {inviteError}</p>
+          )}
+        </div>
+      )}
+      {/* Quitter le tableau — visible pour tous sauf le créateur */}
+      {boardCreatorId !== undefined && currentUserId !== boardCreatorId && (
+        <div style={{ borderTop: "1px solid var(--border)", padding: "10px 12px 12px" }}>
+          {!confirmLeave ? (
+            <button
+              onClick={() => setConfirmLeave(true)}
+              style={{ width: "100%", background: "transparent", border: "1px solid rgba(242,139,130,0.25)", borderRadius: 8, color: "var(--danger)", fontSize: 12, padding: "7px 12px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 6, transition: "background 0.15s, border-color 0.15s" }}
+              onMouseEnter={e => { e.currentTarget.style.background = "rgba(242,139,130,0.08)"; e.currentTarget.style.borderColor = "rgba(242,139,130,0.5)"; }}
+              onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.borderColor = "rgba(242,139,130,0.25)"; }}
+            >
+              <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
+                <path d="M6 3H3a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                <path d="M10 11l3-3-3-3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                <path d="M13 8H6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+              </svg>
+              Quitter ce tableau
+            </button>
+          ) : (
+            <div style={{ background: "rgba(242,139,130,0.08)", border: "1px solid rgba(242,139,130,0.25)", borderRadius: 10, padding: "12px 14px" }}>
+              <p style={{ margin: "0 0 10px", fontSize: 12, color: "var(--text)", lineHeight: 1.5 }}>
+                Quitter ce tableau ? Vous n'y aurez plus accès.
+              </p>
+              <div style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}>
+                <button
+                  onClick={() => setConfirmLeave(false)}
+                  style={{ background: "var(--surface3)", border: "1px solid var(--border2)", borderRadius: 7, color: "var(--text-2)", fontSize: 12, padding: "5px 14px", cursor: "pointer" }}
+                >
+                  Annuler
+                </button>
+                <button
+                  onClick={handleLeave}
+                  style={{ background: "rgba(242,139,130,0.15)", border: "1px solid rgba(242,139,130,0.35)", borderRadius: 7, color: "var(--danger)", fontSize: 12, fontWeight: 600, padding: "5px 14px", cursor: "pointer" }}
+                >
+                  Quitter
+                </button>
+              </div>
+            </div>
           )}
         </div>
       )}
