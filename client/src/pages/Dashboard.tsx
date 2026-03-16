@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useCallback, useLayoutEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { extractErrorMessage } from "../utils/apiHelpers";
 import Layout from "../components/Layout";
@@ -33,7 +33,6 @@ export default function Dashboard() {
 
   // Modale tâche
   const [taskModal, setTaskModal] = useState<{ colId: number } | null>(null);
-  const [editTask, setEditTask]   = useState<Task | null>(null);
   const [taskForm, setTaskForm]   = useState({
     title: "", details: "", dueDate: "", priority: "moyenne" as Priority,
   });
@@ -93,6 +92,16 @@ export default function Dashboard() {
   const [colName, setColName]     = useState("");
   const [colError, setColError]   = useState("");
   const [colSaving, setColSaving] = useState(false);
+
+  // Édition inline du nom du tableau (admin uniquement)
+  const [editingBoardName, setEditingBoardName] = useState(false);
+  const [boardNameDraft, setBoardNameDraft]     = useState("");
+  const boardNameInputRef = useRef<HTMLInputElement>(null);
+
+  // Édition inline des noms de colonnes (admin + éditeur)
+  const [editingColId, setEditingColId]   = useState<number | null>(null);
+  const [colNameDraft, setColNameDraft]   = useState("");
+  const colNameInputRef = useRef<HTMLInputElement>(null);
 
   /* ── Chargement ──────────────────────────────────────────── */
 
@@ -175,22 +184,9 @@ export default function Dashboard() {
   /* ── CRUD tâches ─────────────────────────────────────────── */
 
   const openCreateTask = (colId: number) => {
-    setEditTask(null);
     setTaskForm({ title: "", details: "", dueDate: "", priority: "moyenne" });
     setTaskError("");
     setTaskModal({ colId });
-  };
-
-  const openEditTask = (task: Task) => {
-    setEditTask(task);
-    setTaskForm({
-      title:    task.title,
-      details:  task.details ?? "",
-      dueDate:  task.dueDate ? task.dueDate.slice(0, 16) : "",
-      priority: task.priority,
-    });
-    setTaskError("");
-    setTaskModal({ colId: task.boardColumnId });
   };
 
   const handleSaveTask = async (e: React.FormEvent) => {
@@ -207,18 +203,12 @@ export default function Dashboard() {
         boardColumnId: taskModal!.colId,
         creatorId:     user!.id,
       };
-      const res = editTask
-        ? await authFetch(ROUTES_API.task(editTask.id), { method: "PUT",  body: JSON.stringify(body) })
-        : await authFetch(ROUTES_API.tasks,             { method: "POST", body: JSON.stringify(body) });
+      const res = await authFetch(ROUTES_API.tasks, { method: "POST", body: JSON.stringify(body) });
       if (!res.ok) throw new Error(await extractErrorMessage(res));
       const savedTask: Task = await res.json();
-      setColumns(cols => cols.map(c => {
-        if (editTask) {
-          return { ...c, tasks: c.tasks.map(t => t.id === savedTask.id ? savedTask : t) };
-        } else {
-          return c.id === taskModal!.colId ? { ...c, tasks: [...c.tasks, savedTask] } : c;
-        }
-      }));
+      setColumns(cols => cols.map(c =>
+        c.id === taskModal!.colId ? { ...c, tasks: [...c.tasks, savedTask] } : c
+      ));
       setTaskModal(null);
     } catch (e: unknown) {
       setTaskError(e instanceof Error ? e.message : "Erreur.");
@@ -269,6 +259,50 @@ export default function Dashboard() {
     } else {
       fetchBoard();
     }
+  };
+
+  /* ── Édition inline du nom du tableau ───────────────────── */
+
+  const startEditBoardName = () => {
+    setBoardNameDraft(boardName);
+    setEditingBoardName(true);
+  };
+
+  const commitBoardName = async () => {
+    const trimmed = boardNameDraft.trim();
+    setEditingBoardName(false);
+    if (!trimmed || trimmed === boardName) return;
+    const prev = boardName;
+    setBoardName(trimmed);
+    try {
+      const res = await authFetch(ROUTES_API.board(boardId), {
+        method: "PUT",
+        body: JSON.stringify({ name: trimmed }),
+      });
+      if (!res.ok) { setBoardName(prev); }
+    } catch { setBoardName(prev); }
+  };
+
+  /* ── Édition inline du nom d'une colonne ────────────────── */
+
+  const startEditColName = (col: ColumnWithTasks) => {
+    setColNameDraft(col.name);
+    setEditingColId(col.id);
+  };
+
+  const commitColName = async (col: ColumnWithTasks) => {
+    const trimmed = colNameDraft.trim();
+    setEditingColId(null);
+    if (!trimmed || trimmed === col.name) return;
+    const prev = col.name;
+    setColumns(cols => cols.map(c => c.id === col.id ? { ...c, name: trimmed } : c));
+    try {
+      const res = await authFetch(ROUTES_API.column(boardId, col.id), {
+        method: "PUT",
+        body: JSON.stringify({ name: trimmed }),
+      });
+      if (!res.ok) { setColumns(cols => cols.map(c => c.id === col.id ? { ...c, name: prev } : c)); }
+    } catch { setColumns(cols => cols.map(c => c.id === col.id ? { ...c, name: prev } : c)); }
   };
 
   /* ── Drag & drop ─────────────────────────────────────────── */
@@ -446,6 +480,9 @@ export default function Dashboard() {
   const isOverdue = (dt: string | null | undefined) =>
     dt ? new Date(dt) < new Date() : false;
 
+  useLayoutEffect(() => { if (editingBoardName) boardNameInputRef.current?.focus(); }, [editingBoardName]);
+  useLayoutEffect(() => { if (editingColId !== null) colNameInputRef.current?.focus(); }, [editingColId]);
+
   /* ── Pixel transparent pour masquer le ghost natif ─────────── */
   const transparentPixel = (() => {
     const c = document.createElement("canvas");
@@ -472,6 +509,32 @@ export default function Dashboard() {
           ← Retour aux tableaux
         </button>
 
+        {/* Nom du tableau éditable (admin uniquement, double-clic) */}
+        {boardName && (
+          <div className="board-name-heading">
+            {editingBoardName ? (
+              <input
+                ref={boardNameInputRef}
+                className="board-name-input"
+                value={boardNameDraft}
+                maxLength={50}
+                onChange={e => setBoardNameDraft(e.target.value)}
+                onBlur={commitBoardName}
+                onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); commitBoardName(); } if (e.key === "Escape") setEditingBoardName(false); }}
+              />
+            ) : (
+              <h1
+                className="board-name-title"
+                title={currentRole === "admin" ? "Double-cliquer pour renommer" : undefined}
+                onDoubleClick={() => { if (currentRole === "admin") startEditBoardName(); }}
+                style={{ cursor: currentRole === "admin" ? "text" : "default" }}
+              >
+                {boardName}
+              </h1>
+            )}
+          </div>
+        )}
+
         {loading && (
           <div className="loader">
             <span className="spinner" style={{ borderTopColor: "#a3e635" }} /> Chargement…
@@ -490,7 +553,7 @@ export default function Dashboard() {
                 onDragLeave={() => { setDragColOver(null); }}
                 onDrop={e => { e.preventDefault(); didDrop.current = true; setDropTarget(null); setDragMirror(null); if (dragTaskRef.current) { handleDrop(col.id, dragTaskRef.current); } else if (!isReadOnly) { handleColDrop(col); } }}
               >
-                <div
+                  <div
                   className="col-header"
                   draggable={!isReadOnly}
                   onDragStart={e => {
@@ -510,7 +573,27 @@ export default function Dashboard() {
                   onDragEnd={() => { if (!didDrop.current) setColumns(columnsSnapshot.current); dragColRef.current = null; colDropTargetRef.current = null; setDragCol(null); setDragColOver(null); setDragMirror(null); didDrop.current = false; }}
                   style={{ cursor: isReadOnly ? "default" : "grab" }}
                 >
-                  <span className="col-name">{col.name}</span>
+                  {editingColId === col.id ? (
+                    <input
+                      ref={colNameInputRef}
+                      className="col-name-input"
+                      value={colNameDraft}
+                      maxLength={50}
+                      onChange={e => setColNameDraft(e.target.value)}
+                      onBlur={() => commitColName(col)}
+                      onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); commitColName(col); } if (e.key === "Escape") { setEditingColId(null); } }}
+                      onClick={e => e.stopPropagation()}
+                      onDragStart={e => e.stopPropagation()}
+                      style={{ flex: 1 }}
+                    />
+                  ) : (
+                    <span
+                      className="col-name"
+                      title={!isReadOnly ? "Cliquer pour renommer" : undefined}
+                      onDoubleClick={e => { if (!isReadOnly) { e.stopPropagation(); startEditColName(col); } }}
+                      style={{ cursor: !isReadOnly ? "text" : "default" }}
+                    >{col.name}</span>
+                  )}
                   <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                     <span className="col-count">{filterTasks(col.tasks).length}{(searchQuery || searchPriority || searchAssignee !== "") && filterTasks(col.tasks).length !== col.tasks.length ? `/${col.tasks.length}` : ""}</span>
                     {!isReadOnly && (
@@ -595,9 +678,6 @@ export default function Dashboard() {
                           </span>
                           {!isReadOnly && (
                             <div className="task-actions">
-                              <Tooltip text="Modifier" position="top">
-                                <button className="icon-btn" onClick={e => { e.stopPropagation(); openEditTask(task); }}>✎</button>
-                              </Tooltip>
                               <Tooltip text="Supprimer" position="top">
                                 <button className="icon-btn danger" onClick={e => { e.stopPropagation(); handleDeleteTask(task.id); }}>✕</button>
                               </Tooltip>
@@ -689,11 +769,11 @@ export default function Dashboard() {
         />
       )}
 
-      {/* Modale création / édition de tâche */}
+      {/* Modale création de tâche */}
       {taskModal && (
         <div className="modal-overlay" onClick={() => setTaskModal(null)}>
           <div className="modal" style={{ maxWidth: 480 }} onClick={e => e.stopPropagation()}>
-            <h2 className="modal-title">{editTask ? "Modifier la tâche" : "Nouvelle tâche"}</h2>
+            <h2 className="modal-title">Nouvelle tâche</h2>
             <form onSubmit={handleSaveTask} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
               {taskError && <div className="alert alert-error">⚠ {taskError}</div>}
 
@@ -732,7 +812,7 @@ export default function Dashboard() {
               <div className="modal-actions">
                 <button type="button" className="btn btn-ghost" onClick={() => setTaskModal(null)}>Annuler</button>
                 <button type="submit" className="btn btn-primary" disabled={saving}>
-                  {saving ? "Sauvegarde…" : editTask ? "Enregistrer" : "Créer"}
+                  {saving ? "Sauvegarde…" : "Créer"}
                 </button>
               </div>
             </form>
