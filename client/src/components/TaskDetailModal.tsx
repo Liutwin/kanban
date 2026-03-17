@@ -810,6 +810,29 @@ export default function TaskDetailModal({ task, columnName, members = [], onClos
                   }
                 </div>
 
+                {/* Raccourci "M'assigner" / "Retirer" */}
+                {canEdit && user?.id != null && (
+                  assigneeId === user.id ? (
+                    <button
+                      onClick={() => handleAssigneeChange(null)}
+                      onMouseEnter={e => { e.currentTarget.style.background = "rgba(242,139,130,0.12)"; e.currentTarget.style.borderColor = "rgba(242,139,130,0.35)"; }}
+                      onMouseLeave={e => { e.currentTarget.style.background = "rgba(255,255,255,0.03)"; e.currentTarget.style.borderColor = "rgba(255,255,255,0.08)"; }}
+                      style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, width: "100%", marginTop: 6, padding: "7px 12px", borderRadius: 10, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", color: "#f28b82", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", transition: "all 0.15s", letterSpacing: "0.01em" }}
+                    >
+                      × Retirer
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => handleAssigneeChange(user.id)}
+                      onMouseEnter={e => { e.currentTarget.style.background = "rgba(176,166,255,0.12)"; e.currentTarget.style.borderColor = "rgba(176,166,255,0.35)"; }}
+                      onMouseLeave={e => { e.currentTarget.style.background = "rgba(255,255,255,0.03)"; e.currentTarget.style.borderColor = "rgba(255,255,255,0.08)"; }}
+                      style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, width: "100%", marginTop: 6, padding: "7px 12px", borderRadius: 10, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", color: "#b0a6ff", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", transition: "all 0.15s", letterSpacing: "0.01em" }}
+                    >
+                      🙋 M'assigner
+                    </button>
+                  )
+                )}
+
                 {/* Dropdown membres */}
                 {assigneeOpen && canEdit && members.length > 0 && (
                   <div style={{ position: "absolute", top: "calc(100% + 6px)", left: 0, right: 0, background: "#322f38", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 12, overflow: "hidden", boxShadow: "0 8px 24px rgba(0,0,0,0.4)", zIndex: 10, maxHeight: 220, overflowY: "auto" }}>
