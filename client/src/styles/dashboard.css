@@ -380,6 +380,10 @@
   color: var(--danger);
 }
 
+.task-date.validated {
+  color: #81c995;
+}
+
 .task-assignee {
   font-size: 11px;
   color: var(--text-3);

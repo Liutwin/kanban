@@ -697,27 +697,40 @@ export default function TaskDetailModal({ task, columnName, members = [], onClos
             {/* Date limite */}
             <div>
               <Label>⏰ Date limite</Label>
-              <input
-                key={`date-${task.id}-${dueDate === "" ? "empty" : "set"}`}
-                type="datetime-local"
-                defaultValue={dueDate}
-                onChange={e => {
-                  if (!canEdit) return;
-                  let val = e.target.value;
-                  if (val && val.length === 10) {
-                    const now = new Date();
-                    const hh = String(now.getHours()).padStart(2, "0");
-                    const mm = String(now.getMinutes()).padStart(2, "0");
-                    val = `${val}T${hh}:${mm}`;
-                  }
-                  setDueDate(val);
-                  scheduleAutoSave(title, details, val);
-                }}
-                readOnly={!canEdit}
-                style={{ ...inputBase, fontSize: 12, fontFamily: "'DM Mono', monospace", color: overdue ? "#f28b82" : "#b8b0c8" }}
-                onFocus={e => { e.currentTarget.style.background = "rgba(255,255,255,0.05)"; }}
-                onBlur={e  => e.currentTarget.style.background = "transparent"}
-              />
+              <div style={{ display: "flex", gap: 6 }}>
+                <input
+                  type="date"
+                  value={dueDate ? dueDate.slice(0, 10) : ""}
+                  onChange={e => {
+                    if (!canEdit) return;
+                    const d = e.target.value;
+                    const t = dueDate ? dueDate.slice(11, 16) : "12:00";
+                    const val = d ? `${d}T${t}` : "";
+                    setDueDate(val);
+                    scheduleAutoSave(title, details, val);
+                  }}
+                  readOnly={!canEdit}
+                  style={{ ...inputBase, fontSize: 12, fontFamily: "'DM Mono', monospace", color: overdue ? "#f28b82" : "#b8b0c8", flex: 1 }}
+                  onFocus={e => { e.currentTarget.style.background = "rgba(255,255,255,0.05)"; }}
+                  onBlur={e  => e.currentTarget.style.background = "transparent"}
+                />
+                <input
+                  type="time"
+                  value={dueDate ? dueDate.slice(11, 16) : ""}
+                  onChange={e => {
+                    if (!canEdit) return;
+                    const t = e.target.value;
+                    const d = dueDate ? dueDate.slice(0, 10) : new Date().toISOString().slice(0, 10);
+                    const val = t ? `${d}T${t}` : dueDate ? dueDate.slice(0, 10) + "T00:00" : "";
+                    setDueDate(val);
+                    scheduleAutoSave(title, details, val);
+                  }}
+                  readOnly={!canEdit}
+                  style={{ ...inputBase, fontSize: 12, fontFamily: "'DM Mono', monospace", color: overdue ? "#f28b82" : "#b8b0c8", width: 80 }}
+                  onFocus={e => { e.currentTarget.style.background = "rgba(255,255,255,0.05)"; }}
+                  onBlur={e  => e.currentTarget.style.background = "transparent"}
+                />
+              </div>
               {dueDate && overdue && <span style={{ fontSize: 10, fontWeight: 600, padding: "2px 7px", borderRadius: 999, background: "rgba(242,139,130,0.12)", border: "1px solid rgba(242,139,130,0.25)", color: "#f28b82", letterSpacing: "0.05em", textTransform: "uppercase", marginTop: 4, display: "inline-block" }}>En retard</span>}
               {dueDate && canEdit && <button onClick={() => { setDueDate(""); scheduleAutoSave(title, details, ""); }} style={{ display: "block", marginTop: 3, fontSize: 11, color: "#7a7288", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", padding: "2px 8px" }}>× Effacer</button>}
             </div>
@@ -813,9 +826,11 @@ export default function TaskDetailModal({ task, columnName, members = [], onClos
                       <div
                         key={m.id}
                         onClick={() => handleAssigneeChange(m.id)}
-                        style={{ padding: "6px 8px", cursor: "pointer", background: assigneeId === m.id ? "rgba(176,166,255,0.08)" : "transparent", transition: "background 0.1s" }}
+                        onMouseEnter={e => { e.currentTarget.style.background = assigneeId === m.id ? "rgba(176,166,255,0.14)" : "rgba(255,255,255,0.06)"; }}
+                        onMouseLeave={e => { e.currentTarget.style.background = assigneeId === m.id ? "rgba(176,166,255,0.08)" : "transparent"; }}
+                        style={{ padding: "6px 8px", cursor: "pointer", background: assigneeId === m.id ? "rgba(176,166,255,0.08)" : "transparent", transition: "background 0.15s" }}
                       >
-                        <UserCard user={m} accent="#b0a6ff" selected={assigneeId === m.id} />
+                        <UserCard user={m} accent="#b0a6ff" selected={assigneeId === m.id} onClick={() => {}} />
                       </div>
                     ))}
                   </div>

@@ -540,6 +540,18 @@ export default function Dashboard() {
   const isOverdue = (dt: string | null | undefined) =>
     dt ? new Date(dt) < new Date() : false;
 
+  const overdueLabel = (dt: string) => {
+    const diff = Date.now() - new Date(dt).getTime();
+    const mins = Math.floor(diff / 60000);
+    if (mins < 60) return `En retard de ${mins} min`;
+    const hrs = Math.floor(mins / 60);
+    if (hrs < 24) return `En retard de ${hrs}h`;
+    const days = Math.floor(hrs / 24);
+    if (days < 30) return `En retard de ${days}j`;
+    const months = Math.floor(days / 30);
+    return `En retard de ${months} mois`;
+  };
+
   useLayoutEffect(() => { if (editingBoardName) boardNameInputRef.current?.focus(); }, [editingBoardName]);
   useLayoutEffect(() => { if (editingColId !== null) colNameInputRef.current?.focus(); }, [editingColId]);
 
@@ -830,13 +842,15 @@ export default function Dashboard() {
 
                         {task.details && <p className="task-details">{task.details}</p>}
 
-                        {(task.dueDate || task.assignedId) && (
+                        {(task.dueDate || task.assignedId || task.validated) && (
                           <div className="task-footer">
-                            {task.dueDate
-                              ? <span className={`task-date ${isOverdue(task.dueDate) ? "overdue" : ""}`}>
-                                  ⏰ {formatDate(task.dueDate)}
-                                </span>
-                              : <span />
+                            {task.validated
+                              ? <span className="task-date validated">✅ Terminée</span>
+                              : task.dueDate
+                                ? <span className={`task-date ${isOverdue(task.dueDate) ? "overdue" : ""}`}>
+                                    {isOverdue(task.dueDate) ? `⚠️ ${overdueLabel(task.dueDate)}` : `⏰ ${formatDate(task.dueDate)}`}
+                                  </span>
+                                : <span />
                             }
                             {task.assignedId && (() => {
                               const assignee = resolveUser(task.assignedId);
@@ -1008,9 +1022,14 @@ export default function Dashboard() {
               </div>
               <p className="task-title">{dragMirror.task.title}</p>
               {dragMirror.task.details && <p className="task-details">{dragMirror.task.details}</p>}
-              {dragMirror.task.dueDate && (
+              {(dragMirror.task.dueDate || dragMirror.task.validated) && (
                 <div className="task-footer">
-                  <span className={`task-date ${isOverdue(dragMirror.task.dueDate) ? "overdue" : ""}`}>⏰ {formatDate(dragMirror.task.dueDate)}</span>
+                  {dragMirror.task.validated
+                    ? <span className="task-date validated">✅ Terminée</span>
+                    : <span className={`task-date ${isOverdue(dragMirror.task.dueDate!) ? "overdue" : ""}`}>
+                        {isOverdue(dragMirror.task.dueDate!) ? `⚠️ ${overdueLabel(dragMirror.task.dueDate!)}` : `⏰ ${formatDate(dragMirror.task.dueDate)}`}
+                      </span>
+                  }
                 </div>
               )}
             </div>

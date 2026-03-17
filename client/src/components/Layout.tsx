@@ -365,7 +365,7 @@ export default function Layout({ children, title, boardId, boardRole, boardCreat
                       : <circle cx="6" cy="6" r="5" stroke="currentColor" strokeWidth="1.5"/>
                     }
                   </svg>
-                  {hideCompleted ? "Validées masquées" : "Masquer validées"}
+                  Masquer validées
                 </button>
 
                 {/* Filtre Assigné — dropdown checkboxes */}
