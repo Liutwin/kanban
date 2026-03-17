@@ -625,15 +625,18 @@ export default function Dashboard() {
                 onBlur={commitBoardName}
                 onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); commitBoardName(); } if (e.key === "Escape") setEditingBoardName(false); }}
               />
+            ) : currentRole === "admin" ? (
+              <Tooltip text="Double-cliquer pour renommer">
+                <h1
+                  className="board-name-title"
+                  onDoubleClick={() => startEditBoardName()}
+                  style={{ cursor: "text" }}
+                >
+                  {boardName}
+                </h1>
+              </Tooltip>
             ) : (
-              <h1
-                className="board-name-title"
-                title={currentRole === "admin" ? "Double-cliquer pour renommer" : undefined}
-                onDoubleClick={() => { if (currentRole === "admin") startEditBoardName(); }}
-                style={{ cursor: currentRole === "admin" ? "text" : "default" }}
-              >
-                {boardName}
-              </h1>
+              <h1 className="board-name-title">{boardName}</h1>
             )}
           </div>
         )}
@@ -690,15 +693,20 @@ export default function Dashboard() {
                       style={{ flex: 1 }}
                     />
                   ) : (
-                    <span
-                      className="col-name"
-                      title={!isReadOnly ? "Cliquer pour renommer" : undefined}
-                      onDoubleClick={e => { if (!isReadOnly) { e.stopPropagation(); startEditColName(col); } }}
-                      style={{ cursor: !isReadOnly ? "text" : "default" }}
-                    >{col.name}</span>
+                    !isReadOnly ? (
+                      <Tooltip text="Double-cliquer pour renommer">
+                        <span
+                          className="col-name"
+                          onDoubleClick={e => { e.stopPropagation(); startEditColName(col); }}
+                          style={{ cursor: "text" }}
+                        >{col.name}</span>
+                      </Tooltip>
+                    ) : (
+                      <span className="col-name">{col.name}</span>
+                    )
                   )}
                   <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                    <span className="col-count">{filterTasks(col.tasks, col.id).length}{(searchQuery.trim() || searchPriorities.size > 0 || searchAssignees.size > 0 || hideCompleted) && filterTasks(col.tasks, col.id).length !== col.tasks.length ? `/${col.tasks.length}` : ""}</span>
+                    <span className="col-count">{filterTasks(col.tasks, col.id).length}{(searchQuery.trim() || searchPriorities.size > 0 || searchAssignees.size > 0 || hideCompleted) && filterTasks(col.tasks, col.id).length !== col.tasks.length ? `/${col.tasks.length}` : ""} {col.tasks.length > 1 ? "tâches" : "tâche"}</span>
                     {!isReadOnly && (
                       <Tooltip text="Supprimer la colonne">
                         <button

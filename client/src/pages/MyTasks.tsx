@@ -57,6 +57,18 @@ const formatDate = (dt?: string | null) =>
  */
 const isOverdue = (dt?: string | null) => !!dt && new Date(dt) < new Date();
 
+const overdueLabel = (dt: string) => {
+  const diff = Date.now() - new Date(dt).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 60) return `En retard de ${mins} min`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `En retard de ${hrs}h`;
+  const days = Math.floor(hrs / 24);
+  if (days < 30) return `En retard de ${days}j`;
+  const months = Math.floor(days / 30);
+  return `En retard de ${months} mois`;
+};
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Composant principal
 // ─────────────────────────────────────────────────────────────────────────────
@@ -237,7 +249,7 @@ export default function MyTasks() {
     return <span style={{ color: "var(--accent)", fontSize: 10 }}>{sortDir === "asc" ? "↑" : "↓"}</span>;
   };
 
-  const overdueCount = tasks.filter(t => isOverdue(t.dueDate)).length;
+  const overdueCount = tasks.filter(t => isOverdue(t.dueDate) && !t.validated).length;
 
   // ── Rendu ─────────────────────────────────────────────────
 
@@ -510,16 +522,20 @@ function TaskRow({ task, showBoard, onOpen }: {
         </p>
       </div>
 
-      {/* Date limite */}
+      {/* Date limite / Statut */}
       <div style={{ textAlign: "right", flexShrink: 0 }}>
-        {date ? (
+        {task.validated ? (
+          <span style={{ fontSize: 12, fontWeight: 600, color: "#81c995" }}>
+            ✅ Terminée
+          </span>
+        ) : date ? (
           <>
             <span style={{ fontSize: 12, fontFamily: "'DM Mono', monospace", color: overdue ? "#f28b82" : "var(--text-3)", fontWeight: overdue ? 600 : 400 }}>
-              ⏰ {date}
+              {overdue ? "⚠️" : "⏰"} {date}
             </span>
             {overdue && (
-              <span style={{ display: "block", fontSize: 10, fontWeight: 700, color: "#f28b82", letterSpacing: "0.05em", textTransform: "uppercase", marginTop: 2 }}>
-                En retard
+              <span style={{ display: "block", fontSize: 10, fontWeight: 700, color: "#f28b82", letterSpacing: "0.05em", marginTop: 2 }}>
+                {overdueLabel(task.dueDate!)}
               </span>
             )}
           </>
@@ -532,11 +548,11 @@ function TaskRow({ task, showBoard, onOpen }: {
       <button
         onClick={e => { e.stopPropagation(); navigate(`/boards/${task.boardId}`); }}
         title="Voir le tableau"
-        style={{ background: "none", border: "1px solid var(--border2)", borderRadius: 8, color: "var(--text-3)", cursor: "pointer", fontSize: 13, width: 28, height: 28, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, transition: "all 0.15s" }}
+        style={{ background: "none", border: "1px solid var(--border2)", borderRadius: 8, color: "var(--text-3)", cursor: "pointer", fontSize: 11, fontWeight: 500, fontFamily: "inherit", padding: "0 10px", height: 28, display: "flex", alignItems: "center", justifyContent: "center", gap: 4, flexShrink: 0, transition: "all 0.15s", whiteSpace: "nowrap" }}
         onMouseEnter={e => { e.currentTarget.style.color = "var(--accent)"; e.currentTarget.style.borderColor = "rgba(176,166,255,0.35)"; e.currentTarget.style.background = "var(--accent-dim)"; }}
         onMouseLeave={e => { e.currentTarget.style.color = "var(--text-3)"; e.currentTarget.style.borderColor = "var(--border2)"; e.currentTarget.style.background = "none"; }}
       >
-        →
+        Tableau →
       </button>
     </div>
   );
