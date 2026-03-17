@@ -14,6 +14,7 @@ import com.repositories.BoardRepository;
 import com.repositories.CommentRepository;
 import com.repositories.TaskRepository;
 import com.repositories.UserRepository;
+import com.services.MailService;
 import com.services.TaskService;
 import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
@@ -60,6 +61,7 @@ public class TaskServiceImpl implements TaskService {
     private final UserRepository       userRepository;
     private final TaskMapper           taskMapper;
     private final EntityManager        entityManager;
+    private final MailService          mailService;
 
     // =========================================================================
     // Méthodes utilitaires privées
@@ -193,6 +195,20 @@ public class TaskServiceImpl implements TaskService {
             User assignee = userRepository.findById(assigneeId)
                     .orElseThrow(() -> new RuntimeException("Utilisateur introuvable : " + assigneeId));
             task.setAssigned(assignee);
+
+            // Notification mail uniquement si l'assigné n'est pas la personne qui assigne
+            if (!assigneeId.equals(requesterId)) {
+                User assigner = userRepository.findById(requesterId)
+                        .orElseThrow(() -> new RuntimeException("Utilisateur introuvable : " + requesterId));
+                String boardName = task.getBoardColumn().getBoard().getName();
+                mailService.sendTaskAssigned(
+                        assignee.getEmail(),
+                        assignee.getFirstName(),
+                        task.getTitle(),
+                        boardName,
+                        assigner.getFirstName() + " " + assigner.getLastName()
+                );
+            }
         }
         return taskMapper.toDTO(taskRepository.save(task));
     }
@@ -226,6 +242,26 @@ public class TaskServiceImpl implements TaskService {
         // Invalide le cache JPA pour lire l'état réel après les UPDATE de la procédure
         entityManager.refresh(task);
         return taskMapper.toDTO(task);
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public List<TaskDTO> searchTasks(
+            Long boardId,
+            String keyword,
+            Long assignedId,
+            String priority,
+            Long requesterId
+    ) {
+        checkReadAccess(boardId, requesterId);
+        // Normalise le mot-clé : chaîne vide → null (ignoré dans la requête SQL)
+        String kw = (keyword != null && !keyword.isBlank()) ? keyword.trim() : null;
+        // Normalise la priorité : chaîne vide → null
+        String prio = (priority != null && !priority.isBlank()) ? priority.trim() : null;
+        return taskRepository.searchTasks(boardId, kw, assignedId, prio)
+                .stream()
+                .map(taskMapper::toDTO)
+                .collect(Collectors.toList());
     }
 
     /** {@inheritDoc} */

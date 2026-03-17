@@ -2,12 +2,14 @@ package com.services.impl;
 
 import com.dtos.CommentDTO;
 import com.entities.Comment;
+import com.entities.Task;
 import com.mappers.CommentMapper;
 import com.repositories.CommentRepository;
 import com.repositories.FileRepository;
 import com.repositories.TaskRepository;
 import com.repositories.UserRepository;
 import com.services.CommentService;
+import com.services.MailService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -29,6 +31,7 @@ public class CommentServiceImpl implements CommentService {
     private final CommentMapper commentMapper;
     private final TaskRepository taskRepository;   // vérif cohérence MariaDB
     private final UserRepository userRepository;   // vérif cohérence MariaDB
+    private final MailService    mailService;
 
     /** {@inheritDoc} */
     @Override
@@ -49,14 +52,31 @@ public class CommentServiceImpl implements CommentService {
     @Override
     public CommentDTO addComment(CommentDTO dto) {
         // Vérification de cohérence inter-bases
-        if (!taskRepository.existsById(dto.getTskId()))
-            throw new RuntimeException("Tâche introuvable : " + dto.getTskId());
+        Task task = taskRepository.findById(dto.getTskId())
+                .orElseThrow(() -> new RuntimeException("Tâche introuvable : " + dto.getTskId()));
         if (!userRepository.existsById(dto.getUsrId()))
             throw new RuntimeException("Utilisateur introuvable : " + dto.getUsrId());
 
         Comment comment = commentMapper.toEntity(dto);
         comment.setDate(Instant.now()); // date forcée côté serveur
-        return commentMapper.toDTO(commentRepository.save(comment));
+        CommentDTO saved = commentMapper.toDTO(commentRepository.save(comment));
+
+        // Notifie l'assigné·e si : tâche assignée, l'auteur du commentaire n'est pas l'assigné·e
+        if (task.getAssigned() != null && !task.getAssigned().getId().equals(dto.getUsrId())) {
+            userRepository.findById(dto.getUsrId()).ifPresent(commenter -> {
+                String boardName = task.getBoardColumn().getBoard().getName();
+                mailService.sendTaskCommented(
+                        task.getAssigned().getEmail(),
+                        task.getAssigned().getFirstName(),
+                        task.getTitle(),
+                        boardName,
+                        commenter.getFirstName() + " " + commenter.getLastName(),
+                        dto.getContent()
+                );
+            });
+        }
+
+        return saved;
     }
 
     /** {@inheritDoc} */

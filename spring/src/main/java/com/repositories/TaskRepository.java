@@ -53,6 +53,44 @@ public interface TaskRepository extends JpaRepository<Task, Long> {
     List<Task> findByBoardColumnIdAndPriorityOrderByPosition(Long columnId, Task.Priority priority);
 
     /**
+     * Recherche des tâches dans un tableau par mot-clé (titre ou détails),
+     * utilisateur assigné et/ou priorité. Tous les critères sont optionnels
+     * et combinés avec AND.
+     *
+     * <p>Requête SQL native pour contourner les limitations de JPQL avec
+     * les paramètres nullable de type Enum ({@code IS NULL} non supporté
+     * de manière fiable par Hibernate sur les Enum mappés).</p>
+     *
+     * @param boardId    l'identifiant du tableau dans lequel chercher
+     * @param keyword    sous-chaîne recherchée dans le titre ou les détails
+     *                   (insensible à la casse) ; {@code null} pour ignorer
+     * @param assignedId l'identifiant de l'utilisateur assigné à filtrer ;
+     *                   {@code null} pour ignorer
+     * @param priority   la valeur SQL de la priorité à filtrer
+     *                   ({@code "basse"}, {@code "moyenne"}, {@code "haute"}) ;
+     *                   {@code null} pour ignorer
+     * @return liste des tâches correspondant à tous les critères fournis,
+     *         triée par colonne puis par position
+     */
+    @Query(value = """
+        SELECT t.* FROM tache_tsk t
+        JOIN colonne_col c ON c.col_id  = t.col_id
+        JOIN tableau_tab b ON b.tab_id  = c.tab_id
+        WHERE b.tab_id = :boardId
+          AND (:keyword    IS NULL OR LOWER(t.tsk_titre)   LIKE LOWER(CONCAT('%', :keyword, '%'))
+                                  OR LOWER(t.tsk_details)  LIKE LOWER(CONCAT('%', :keyword, '%')))
+          AND (:assignedId IS NULL OR t.usr_assignee = :assignedId)
+          AND (:priority   IS NULL OR t.tsk_priorite = :priority)
+        ORDER BY c.col_numero ASC, t.tsk_position ASC
+    """, nativeQuery = true)
+    List<Task> searchTasks(
+            @Param("boardId")    Long   boardId,
+            @Param("keyword")    String keyword,
+            @Param("assignedId") Long   assignedId,
+            @Param("priority")   String priority
+    );
+
+    /**
      * Appelle la procédure stockée {@code deplacer_tache} pour déplacer
      * une tâche vers une nouvelle position, dans la même colonne ou dans
      * une colonne différente.

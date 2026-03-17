@@ -694,15 +694,7 @@ export default function TaskDetailModal({ task, columnName, members = [], onClos
                 }}
                 readOnly={!canEdit}
                 style={{ ...inputBase, fontSize: 12, fontFamily: "'DM Mono', monospace", color: overdue ? "#f28b82" : "#b8b0c8" }}
-                onFocus={e => {
-                  e.currentTarget.style.background = "rgba(255,255,255,0.05)";
-                  if (canEdit && !dueDate) {
-                    const now = new Date();
-                    const pad = (n: number) => String(n).padStart(2, "0");
-                    const local = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}`;
-                    setDueDate(local);
-                  }
-                }}
+                onFocus={e => e.currentTarget.style.background = "rgba(255,255,255,0.05)"}
                 onBlur={e  => e.currentTarget.style.background = "transparent"}
               />
               {dueDate && overdue && <span style={{ fontSize: 10, fontWeight: 600, padding: "2px 7px", borderRadius: 999, background: "rgba(242,139,130,0.12)", border: "1px solid rgba(242,139,130,0.25)", color: "#f28b82", letterSpacing: "0.05em", textTransform: "uppercase", marginTop: 4, display: "inline-block" }}>En retard</span>}

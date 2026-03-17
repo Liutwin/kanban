@@ -90,6 +90,59 @@ public class MailServiceImpl implements MailService {
         }
     }
 
+    @Async
+    @Override
+    public void sendTaskAssigned(
+            String toEmail,
+            String toFirstName,
+            String taskTitle,
+            String boardName,
+            String assignerName
+    ) {
+        try {
+            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+
+            helper.setFrom(fromAddress);
+            helper.setTo(toEmail);
+            helper.setSubject("Tâche assignée : « " + taskTitle + " »");
+            helper.setText(buildTaskAssignedHtml(toFirstName, taskTitle, boardName, assignerName), true);
+
+            mailSender.send(message);
+            log.info("[Mail] Notification d'assignation envoyée à {} pour la tâche '{}'", toEmail, taskTitle);
+
+        } catch (MessagingException e) {
+            log.error("[Mail] Échec d'envoi d'assignation à {} : {}", toEmail, e.getMessage());
+        }
+    }
+
+    @Async
+    @Override
+    public void sendTaskCommented(
+            String toEmail,
+            String toFirstName,
+            String taskTitle,
+            String boardName,
+            String commenterName,
+            String commentPreview
+    ) {
+        try {
+            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+
+            helper.setFrom(fromAddress);
+            helper.setTo(toEmail);
+            helper.setSubject("Nouveau commentaire sur « " + taskTitle + " »");
+            helper.setText(buildTaskCommentedHtml(toFirstName, taskTitle, boardName, commenterName, commentPreview), true);
+
+            mailSender.send(message);
+            log.info("[Mail] Notification de commentaire envoyée à {} pour la tâche '{}'", toEmail, taskTitle);
+
+        } catch (MessagingException e) {
+            log.error("[Mail] Échec d'envoi de commentaire à {} : {}", toEmail, e.getMessage());
+        }
+    }
+
     // ─────────────────────────────────────────────────────────────
     // Template HTML – bienvenue
     // ─────────────────────────────────────────────────────────────
@@ -252,5 +305,186 @@ public class MailServiceImpl implements MailService {
                 </body>
                 </html>
                 """.formatted(firstName, inviterName, boardName, roleLabel, baseUrl);
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // Template HTML – assignation de tâche
+    // ─────────────────────────────────────────────────────────────
+
+    private String buildTaskAssignedHtml(
+            String firstName,
+            String taskTitle,
+            String boardName,
+            String assignerName
+    ) {
+        return """
+                <!DOCTYPE html>
+                <html lang="fr">
+                <head>
+                  <meta charset="UTF-8"/>
+                  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+                </head>
+                <body style="margin:0;padding:0;background:#f4f4f5;font-family:'Segoe UI',Arial,sans-serif;">
+                  <table width="100%%" cellpadding="0" cellspacing="0" style="background:#f4f4f5;padding:40px 0;">
+                    <tr><td align="center">
+                      <table width="560" cellpadding="0" cellspacing="0"
+                             style="background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.08);">
+
+                        <!-- En-tête -->
+                        <tr>
+                          <td style="background:#1c1b1f;padding:28px 36px;text-align:center;">
+                            <span style="font-family:'DM Mono',monospace;font-size:13px;font-weight:600;
+                                         letter-spacing:0.12em;color:#e8e0f0;text-transform:uppercase;">
+                              ▦ KANBAN
+                            </span>
+                          </td>
+                        </tr>
+
+                        <!-- Corps -->
+                        <tr>
+                          <td style="padding:36px 36px 28px;">
+                            <p style="margin:0 0 8px;font-size:22px;font-weight:600;color:#1c1b1f;">
+                              Bonjour %s&nbsp;📋
+                            </p>
+                            <p style="margin:0 0 24px;font-size:15px;color:#555;line-height:1.6;">
+                              <strong>%s</strong> vous a assigné·e à la tâche
+                              <strong>« %s »</strong> dans le tableau
+                              <strong style="color:#7c6ff0;">%s</strong>.
+                            </p>
+
+                            <!-- Bouton CTA -->
+                            <table cellpadding="0" cellspacing="0" style="margin:0 0 28px;">
+                              <tr>
+                                <td style="background:#b0a6ff;border-radius:8px;">
+                                  <a href="%s"
+                                     style="display:inline-block;padding:12px 28px;font-size:14px;
+                                            font-weight:600;color:#1c1b1f;text-decoration:none;">
+                                    Voir la tâche →
+                                  </a>
+                                </td>
+                              </tr>
+                            </table>
+
+                            <p style="margin:0;font-size:13px;color:#888;line-height:1.5;">
+                              Si vous pensez que cette assignation est une erreur, contactez l'administrateur du tableau.
+                            </p>
+                          </td>
+                        </tr>
+
+                        <!-- Pied de page -->
+                        <tr>
+                          <td style="background:#f4f4f5;padding:16px 36px;text-align:center;
+                                     border-top:1px solid #e8e8e8;">
+                            <p style="margin:0;font-size:11px;color:#aaa;">
+                              Cet e-mail a été envoyé automatiquement — merci de ne pas y répondre.
+                            </p>
+                          </td>
+                        </tr>
+
+                      </table>
+                    </td></tr>
+                  </table>
+                </body>
+                </html>
+                """.formatted(firstName, assignerName, taskTitle, boardName, baseUrl);
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // Template HTML – nouveau commentaire
+    // ─────────────────────────────────────────────────────────────
+
+    private String buildTaskCommentedHtml(
+            String firstName,
+            String taskTitle,
+            String boardName,
+            String commenterName,
+            String commentPreview
+    ) {
+        // Tronque l'aperçu à 120 caractères pour éviter un mail trop long
+        String preview = commentPreview != null && commentPreview.length() > 120
+                ? commentPreview.substring(0, 120) + "…"
+                : commentPreview;
+
+        return """
+                <!DOCTYPE html>
+                <html lang="fr">
+                <head>
+                  <meta charset="UTF-8"/>
+                  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+                </head>
+                <body style="margin:0;padding:0;background:#f4f4f5;font-family:'Segoe UI',Arial,sans-serif;">
+                  <table width="100%%" cellpadding="0" cellspacing="0" style="background:#f4f4f5;padding:40px 0;">
+                    <tr><td align="center">
+                      <table width="560" cellpadding="0" cellspacing="0"
+                             style="background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.08);">
+
+                        <!-- En-tête -->
+                        <tr>
+                          <td style="background:#1c1b1f;padding:28px 36px;text-align:center;">
+                            <span style="font-family:'DM Mono',monospace;font-size:13px;font-weight:600;
+                                         letter-spacing:0.12em;color:#e8e0f0;text-transform:uppercase;">
+                              ▦ KANBAN
+                            </span>
+                          </td>
+                        </tr>
+
+                        <!-- Corps -->
+                        <tr>
+                          <td style="padding:36px 36px 28px;">
+                            <p style="margin:0 0 8px;font-size:22px;font-weight:600;color:#1c1b1f;">
+                              Bonjour %s&nbsp;💬
+                            </p>
+                            <p style="margin:0 0 16px;font-size:15px;color:#555;line-height:1.6;">
+                              <strong>%s</strong> a commenté la tâche
+                              <strong>« %s »</strong> dans le tableau
+                              <strong style="color:#7c6ff0;">%s</strong>&nbsp;:
+                            </p>
+
+                            <!-- Aperçu du commentaire -->
+                            <table cellpadding="0" cellspacing="0" width="100%%" style="margin:0 0 24px;">
+                              <tr>
+                                <td style="background:#f8f7ff;border-left:4px solid #b0a6ff;
+                                           border-radius:0 8px 8px 0;padding:14px 18px;">
+                                  <p style="margin:0;font-size:14px;color:#444;line-height:1.6;
+                                            font-style:italic;">%s</p>
+                                </td>
+                              </tr>
+                            </table>
+
+                            <!-- Bouton CTA -->
+                            <table cellpadding="0" cellspacing="0" style="margin:0 0 28px;">
+                              <tr>
+                                <td style="background:#b0a6ff;border-radius:8px;">
+                                  <a href="%s"
+                                     style="display:inline-block;padding:12px 28px;font-size:14px;
+                                            font-weight:600;color:#1c1b1f;text-decoration:none;">
+                                    Voir la discussion →
+                                  </a>
+                                </td>
+                              </tr>
+                            </table>
+
+                            <p style="margin:0;font-size:13px;color:#888;line-height:1.5;">
+                              Vous recevez cette notification car vous êtes assigné·e à cette tâche.
+                            </p>
+                          </td>
+                        </tr>
+
+                        <!-- Pied de page -->
+                        <tr>
+                          <td style="background:#f4f4f5;padding:16px 36px;text-align:center;
+                                     border-top:1px solid #e8e8e8;">
+                            <p style="margin:0;font-size:11px;color:#aaa;">
+                              Cet e-mail a été envoyé automatiquement — merci de ne pas y répondre.
+                            </p>
+                          </td>
+                        </tr>
+
+                      </table>
+                    </td></tr>
+                  </table>
+                </body>
+                </html>
+                """.formatted(firstName, commenterName, taskTitle, boardName, preview, baseUrl);
     }
 }

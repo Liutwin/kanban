@@ -216,6 +216,41 @@ public class TaskController {
     }
 
     /**
+     * Recherche des tâches dans un tableau selon des critères optionnels.
+     *
+     * <p>Tous les paramètres de filtre sont optionnels et combinés avec AND :</p>
+     * <ul>
+     *   <li>{@code keyword} — sous-chaîne recherchée dans le titre ou les
+     *       détails, insensible à la casse ;</li>
+     *   <li>{@code assignedId} — identifiant de l'utilisateur assigné ;</li>
+     *   <li>{@code priority} — niveau de priorité ({@code basse},
+     *       {@code moyenne} ou {@code haute}).</li>
+     * </ul>
+     *
+     * <p>Retourne HTTP 403 si l'utilisateur n'est pas membre du tableau.</p>
+     *
+     * @param boardId     l'identifiant du tableau dans lequel chercher
+     * @param keyword     sous-chaîne à rechercher dans le titre ou les détails
+     * @param assignedId  identifiant de l'utilisateur assigné à filtrer
+     * @param priority    niveau de priorité à filtrer
+     * @param requesterId l'identifiant de l'utilisateur connecté, fourni par
+     *                    Deno via l'en-tête {@code X-User-Id}
+     * @return liste de {@link TaskDTO} triée par colonne puis par position,
+     *         avec statut HTTP 200
+     */
+    @Operation(summary = "Rechercher des tâches par mot-clé, utilisateur ou priorité")
+    @GetMapping("/search")
+    public ResponseEntity<List<TaskDTO>> searchTasks(
+            @RequestParam Long boardId,
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) Long assignedId,
+            @RequestParam(required = false) String priority,
+            @RequestHeader("X-User-Id") Long requesterId) {
+        return ResponseEntity.ok(
+                taskService.searchTasks(boardId, keyword, assignedId, priority, requesterId));
+    }
+
+    /**
      * Supprime une tâche et tous ses commentaires associés.
      *
      * <p>Retourne HTTP 403 si l'utilisateur n'est pas membre du tableau

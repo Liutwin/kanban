@@ -39,6 +39,22 @@ export default function Dashboard() {
   const [saving, setSaving]       = useState(false);
   const [taskError, setTaskError] = useState("");
 
+  // Modale de confirmation de suppression générique
+  const [confirmModal, setConfirmModal] = useState<{
+    message: string;
+    onConfirm: () => void;
+  } | null>(null);
+
+  const askConfirm = (message: string, onConfirm: () => void) =>
+    setConfirmModal({ message, onConfirm });
+
+  useEffect(() => {
+    if (!confirmModal) return;
+    const handler = (e: KeyboardEvent) => { if (e.key === "Escape") setConfirmModal(null); };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, [confirmModal]);
+
   // Modale détail tâche
   const [detailTask, setDetailTask] = useState<Task | null>(null);
 
@@ -218,13 +234,14 @@ export default function Dashboard() {
   };
 
   const handleDeleteTask = async (taskId: number) => {
-    if (!confirm("Supprimer cette tâche ?")) return;
-    const res = await authFetch(ROUTES_API.task(taskId), { method: "DELETE" });
-    if (res.ok) {
-      setColumns(cols => cols.map(c => ({ ...c, tasks: c.tasks.filter(t => t.id !== taskId) })));
-    } else {
-      fetchBoard();
-    }
+    askConfirm("Supprimer cette tâche ?", async () => {
+      const res = await authFetch(ROUTES_API.task(taskId), { method: "DELETE" });
+      if (res.ok) {
+        setColumns(cols => cols.map(c => ({ ...c, tasks: c.tasks.filter(t => t.id !== taskId) })));
+      } else {
+        fetchBoard();
+      }
+    });
   };
 
   /* ── Colonnes ────────────────────────────────────────────── */
@@ -252,13 +269,14 @@ export default function Dashboard() {
   };
 
   const handleDeleteColumn = async (colId: number) => {
-    if (!confirm("Supprimer cette colonne et toutes ses tâches ?")) return;
-    const res = await authFetch(ROUTES_API.column(boardId, colId), { method: "DELETE" });
-    if (res.ok) {
-      setColumns(cols => cols.filter(c => c.id !== colId));
-    } else {
-      fetchBoard();
-    }
+    askConfirm("Supprimer cette colonne et toutes ses tâches ?", async () => {
+      const res = await authFetch(ROUTES_API.column(boardId, colId), { method: "DELETE" });
+      if (res.ok) {
+        setColumns(cols => cols.filter(c => c.id !== colId));
+      } else {
+        fetchBoard();
+      }
+    });
   };
 
   /* ── Édition inline du nom du tableau ───────────────────── */
@@ -483,6 +501,37 @@ export default function Dashboard() {
   useLayoutEffect(() => { if (editingBoardName) boardNameInputRef.current?.focus(); }, [editingBoardName]);
   useLayoutEffect(() => { if (editingColId !== null) colNameInputRef.current?.focus(); }, [editingColId]);
 
+  /* ── Auto-scroll colonnes pendant le drag ────────────────── */
+  const scrollRafRef = useRef<number | null>(null);
+
+  const startColAutoScroll = (el: HTMLElement, clientY: number) => {
+    if (scrollRafRef.current !== null) cancelAnimationFrame(scrollRafRef.current);
+    const ZONE = 64;
+    const MAX  = 14;
+    const step = () => {
+      const rect = el.getBoundingClientRect();
+      const distTop    = clientY - rect.top;
+      const distBottom = rect.bottom - clientY;
+      if (distTop < ZONE && distTop > 0) {
+        el.scrollTop -= MAX * (1 - distTop / ZONE);
+        scrollRafRef.current = requestAnimationFrame(step);
+      } else if (distBottom < ZONE && distBottom > 0) {
+        el.scrollTop += MAX * (1 - distBottom / ZONE);
+        scrollRafRef.current = requestAnimationFrame(step);
+      } else {
+        scrollRafRef.current = null;
+      }
+    };
+    scrollRafRef.current = requestAnimationFrame(step);
+  };
+
+  const stopColAutoScroll = () => {
+    if (scrollRafRef.current !== null) {
+      cancelAnimationFrame(scrollRafRef.current);
+      scrollRafRef.current = null;
+    }
+  };
+
   /* ── Pixel transparent pour masquer le ghost natif ─────────── */
   const transparentPixel = (() => {
     const c = document.createElement("canvas");
@@ -610,12 +659,15 @@ export default function Dashboard() {
                 <div className="col-tasks"
                   onDragOver={e => {
                     e.preventDefault();
-                    // Déclenche le placeholder en bas (beforeTaskId=null) quand le curseur
-                    // entre dans la zone de tâches (colonne vide ou bas de colonne).
-                    if (dragTaskRef.current) setDropTarget({ colId: col.id, beforeTaskId: null });
+                    if (dragTaskRef.current) {
+                      setDropTarget({ colId: col.id, beforeTaskId: null });
+                      startColAutoScroll(e.currentTarget as HTMLElement, e.clientY);
+                    }
                   }}
+                  onDragLeave={() => { stopColAutoScroll(); }}
                   onDrop={e => {
                     e.preventDefault();
+                    stopColAutoScroll();
                     if (dragTaskRef.current) { didDrop.current = true; setDropTarget(null); setDragMirror(null); handleDrop(col.id, dragTaskRef.current); }
                   }}
                 >
@@ -646,10 +698,13 @@ export default function Dashboard() {
                         const cardRect = cardEl.getBoundingClientRect();
                         setDragMirror({ ox: e.clientX - cardRect.left, oy: e.clientY - cardRect.top, width: cardEl.offsetWidth, kind: "task", task });
                       }}
-                        onDragEnd={() => { if (!didDrop.current) setColumns(columnsSnapshot.current); dragTaskRef.current = null; setDragTask(null); setDropTarget(null); setDragMirror(null); lastLiveTaskKey.current = ""; didDrop.current = false; }}
+                        onDragEnd={() => { stopColAutoScroll(); if (!didDrop.current) setColumns(columnsSnapshot.current); dragTaskRef.current = null; setDragTask(null); setDropTarget(null); setDragMirror(null); lastLiveTaskKey.current = ""; didDrop.current = false; }}
                         onDragOver={e => {
                           e.preventDefault();
                           e.stopPropagation();
+                          // Auto-scroll de la colonne parente
+                          const colTasksEl = (e.currentTarget as HTMLElement).closest(".col-tasks") as HTMLElement | null;
+                          if (colTasksEl && dragTaskRef.current) startColAutoScroll(colTasksEl, e.clientY);
                           if (!dragTaskRef.current || dragTaskRef.current.id === task.id) return;
                           const dragged = dragTaskRef.current;
                           const rect    = (e.currentTarget as HTMLElement).getBoundingClientRect();
@@ -889,6 +944,29 @@ export default function Dashboard() {
               </div>
             </div>
           )}
+        </div>
+      )}
+      {/* Modale de confirmation générique */}
+      {confirmModal && (
+        <div className="modal-overlay" onClick={() => setConfirmModal(null)}>
+          <div className="modal confirm-modal" style={{ maxWidth: 380 }} onClick={e => e.stopPropagation()}>
+            <div className="confirm-modal-icon">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/>
+              </svg>
+            </div>
+            <h2 className="modal-title confirm-modal-title">{confirmModal.message}</h2>
+            <p className="confirm-modal-hint">Cette action est irréversible.</p>
+            <div className="modal-actions">
+              <button className="btn btn-ghost" onClick={() => setConfirmModal(null)}>Annuler</button>
+              <button
+                className="btn btn-danger"
+                onClick={() => { confirmModal.onConfirm(); setConfirmModal(null); }}
+              >
+                Supprimer
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </Layout>

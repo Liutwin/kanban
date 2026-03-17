@@ -139,6 +139,29 @@ public interface TaskService {
     TaskDTO moveTask(Long id, Long targetColumnId, int targetPosition, Long requesterId);
 
     /**
+     * Recherche des tâches dans un tableau selon des critères optionnels.
+     * Tous les critères sont combinés avec AND ; un critère {@code null} est ignoré.
+     *
+     * @param boardId     l'identifiant du tableau dans lequel chercher
+     * @param keyword     sous-chaîne à trouver dans le titre ou les détails
+     *                    (insensible à la casse) ; {@code null} pour ignorer
+     * @param assignedId  l'identifiant de l'utilisateur assigné à filtrer ;
+     *                    {@code null} pour ignorer
+     * @param priority    le niveau de priorité à filtrer ;
+     *                    {@code null} pour ignorer
+     * @param requesterId l'identifiant de l'utilisateur faisant la demande
+     * @return liste de {@link TaskDTO} triée par colonne puis par position
+     * @throws ForbiddenException si le requérant n'est pas membre du tableau
+     */
+    List<TaskDTO> searchTasks(
+            Long boardId,
+            String keyword,
+            Long assignedId,
+            String priority,
+            Long requesterId
+    );
+
+    /**
      * Supprime une tâche par son identifiant ainsi que tous ses commentaires.
      *
      * @param id          l'identifiant de la tâche à supprimer
