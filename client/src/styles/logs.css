@@ -303,9 +303,22 @@
 }
 
 .logs-profile-stats {
-  /* hérite de admin-stats-grid — surcharge éventuelle */
+  /* 5 cartes sur une seule ligne — surcharge le repeat(4,1fr) d'admin-stats-grid */
+  grid-template-columns: repeat(5, 1fr) !important;
   border-top: 1px solid var(--border);
   padding-top: 16px;
+}
+
+@media (max-width: 1100px) {
+  .logs-profile-stats { grid-template-columns: repeat(3, 1fr) !important; }
+}
+
+@media (max-width: 700px) {
+  .logs-profile-stats { grid-template-columns: repeat(2, 1fr) !important; }
+}
+
+@media (max-width: 400px) {
+  .logs-profile-stats { grid-template-columns: 1fr !important; }
 }
 
 /* ── Filtres date ─────────────────────────────────────────── */
