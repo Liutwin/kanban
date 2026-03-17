@@ -152,7 +152,7 @@ export default function Tooltip({ text, children, position }: TooltipProps) {
   return (
     <span
       ref={wrapRef}
-      style={{ position: "relative", display: "inline-flex", alignItems: "center", justifyContent: "center", width: "fit-content", justifySelf: "start", alignSelf: "start" }}
+      style={{ position: "relative", display: "inline-flex", alignItems: "center", justifyContent: "center", width: "fit-content" }}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
     >

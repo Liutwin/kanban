@@ -4,6 +4,7 @@ import { useAuth } from "../hooks/useAuth";
 import { ROUTES_API } from "../config/api";
 import type { Member, User } from "../model/interfaces";
 import { getAvatarStyle } from "../utils/avatarColor";
+import UserAvatar, { prefetchAvatars } from "./UserAvatar";
 
 // ─────────────────────────────────────────────────────────────
 // Types & constantes
@@ -19,6 +20,8 @@ interface MembersPanelProps {
   currentRole:    Member["role"];
   boardCreatorId?: number;
   onClose:        () => void;
+  /** Ref du bouton déclencheur — exclut ses clics du handler "clic extérieur". */
+  triggerRef?:    React.RefObject<HTMLElement>;
 }
 
 const ROLE_LABELS: Record<Member["role"], string> = {
@@ -48,7 +51,7 @@ function unwrap<T>(json: unknown): T {
 // Composant principal
 // ─────────────────────────────────────────────────────────────
 
-export default function MembersPanel({ boardId, currentUserId, currentRole, boardCreatorId, onClose }: MembersPanelProps) {
+export default function MembersPanel({ boardId, currentUserId, currentRole, boardCreatorId, onClose, triggerRef }: MembersPanelProps) {
   const { authFetch } = useAuth();
   const navigate      = useNavigate();
 
@@ -87,7 +90,8 @@ export default function MembersPanel({ boardId, currentUserId, currentRole, boar
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       const path = e.composedPath();
-      if (panelRef.current && !path.includes(panelRef.current)) {
+      if (panelRef.current && !path.includes(panelRef.current)
+          && (!triggerRef?.current || !path.includes(triggerRef.current))) {
         onCloseRef.current();
       }
     };
@@ -136,6 +140,10 @@ export default function MembersPanel({ boardId, currentUserId, currentRole, boar
       });
 
       setMembers(withUsers);
+      prefetchAvatars(
+        withUsers.filter(m => m.user).map(m => ({ id: m.userId, avatarURL: m.user!.avatarURL })),
+        authFetch,
+      );
     } finally {
       setLoading(false);
     }
@@ -343,9 +351,14 @@ export default function MembersPanel({ boardId, currentUserId, currentRole, boar
           }}>
             {/* Avatar grand + nom */}
             <div style={{ padding: "18px 16px 12px", display: "flex", flexDirection: "column", alignItems: "center", gap: 10, borderBottom: "1px solid var(--border)" }}>
-              <div style={{ width: 52, height: 52, borderRadius: "50%", background: c.background, color: c.color, fontSize: 17, fontWeight: 600, fontFamily: "'DM Mono',monospace", display: "flex", alignItems: "center", justifyContent: "center", border: `2px solid ${c.color}55` }}>
-                {getInitials(u)}
-              </div>
+              <UserAvatar
+                userId={m.userId}
+                firstName={u?.firstName ?? ""}
+                lastName={u?.lastName ?? ""}
+                hasAvatar={!!u?.avatarURL}
+                size={52}
+                style={{ border: `2px solid ${c.color}55` }}
+              />
               <div style={{ textAlign: "center" }}>
                 <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: "var(--text)" }}>{name}</p>
                 <p style={{ margin: "2px 0 0", fontSize: 11, color: "var(--text-3)" }}>{ROLE_LABELS[m.role]}</p>
@@ -389,11 +402,18 @@ export default function MembersPanel({ boardId, currentUserId, currentRole, boar
             <div key={m.userId} className="mp-row">
               <button
                 className="mp-avatar-btn"
-                style={{ background: c.background, color: c.color, border: `1px solid ${c.color}44` }}
+                style={{ background: "transparent", border: "none", padding: 0 }}
                 onClick={e => handleAvatarClick(e, m)}
                 title="Voir le profil"
               >
-                {getInitials(m.user)}
+                <UserAvatar
+                  userId={m.userId}
+                  firstName={m.user?.firstName ?? ""}
+                  lastName={m.user?.lastName ?? ""}
+                  hasAvatar={!!m.user?.avatarURL}
+                  size={34}
+                  style={{ border: `1px solid ${c.color}44` }}
+                />
               </button>
 
               <div style={{ flex: 1, minWidth: 0 }}>

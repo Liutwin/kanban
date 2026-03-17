@@ -3,6 +3,8 @@ package com.services;
 import com.dtos.UserCreateDTO;
 import com.dtos.UserDTO;
 import com.dtos.UserPasswordDTO;
+import org.springframework.core.io.Resource;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
@@ -64,4 +66,23 @@ public interface UserService {
      * @throws RuntimeException si l'utilisateur n'est pas trouvé
      */
     void deleteUser(Long id);
+
+    /**
+     * Upload et enregistre un avatar pour l'utilisateur.
+     *
+     * @param id   l'identifiant de l'utilisateur
+     * @param file le fichier image uploadé
+     * @return le {@link UserDTO} mis à jour avec l'URL de l'avatar
+     * @throws RuntimeException si l'utilisateur n'est pas trouvé ou si le fichier est invalide
+     */
+    UserDTO uploadAvatar(Long id, MultipartFile file);
+
+    /**
+     * Retourne le fichier avatar d'un utilisateur sous forme de {@link Resource}.
+     *
+     * @param id l'identifiant de l'utilisateur
+     * @return la ressource lisible
+     * @throws RuntimeException si l'utilisateur ou le fichier est introuvable
+     */
+    Resource getAvatar(Long id);
 }

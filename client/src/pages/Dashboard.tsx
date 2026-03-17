@@ -9,6 +9,7 @@ import type { Board, Column, Task, Priority, User, Member } from "../model/inter
 import "../styles/dashboard.css";
 import TaskDetailModal from "../components/TaskDetailModal";
 import Tooltip from "../components/Tooltip";
+import UserAvatar, { prefetchAvatars } from "../components/UserAvatar";
 
 interface ColumnWithTasks extends Column {
   tasks: Task[];
@@ -183,11 +184,14 @@ export default function Dashboard() {
           authFetch(ROUTES_API.user(uid)).then(r => r.ok ? r.json() as Promise<User> : null)
         )
       );
-      setMembers(
-        userResults
+      const resolvedMembers = userResults
           .filter((r): r is PromiseFulfilledResult<User> => r.status === "fulfilled" && r.value != null)
-          .map(r => r.value)
-      );
+          .map(r => r.value);
+      setMembers(resolvedMembers);
+
+      // Précharge tous les avatars en parallèle dès que la liste est connue.
+      // Les <UserAvatar> montés ensuite trouveront le cache déjà chaud.
+      prefetchAvatars(resolvedMembers, authFetch);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Erreur de chargement.");
     } finally {
@@ -865,18 +869,14 @@ export default function Dashboard() {
                               const label = assignee ? `${assignee.firstName} ${assignee.lastName}` : `#${task.assignedId}`;
                               return (
                                 <Tooltip text={label} position="top">
-                                  {assignee?.avatar
-                                    ? <img
-                                        src={assignee.avatar}
-                                        alt={label}
-                                        style={{ width: 24, height: 24, borderRadius: "50%", objectFit: "cover", border: "2px solid var(--bg-2, #2a2a2a)", flexShrink: 0 }}
-                                      />
-                                    : <span
-                                        style={{ width: 24, height: 24, borderRadius: "50%", background: assignee ? getAvatarStyle(assignee.id).background : "var(--surface3)", color: "#1c1b1f", fontSize: 10, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, border: "2px solid var(--surface)" }}
-                                      >
-                                        {assignee ? assigneeInitials(assignee) : "?"}
-                                      </span>
-                                  }
+                                  <UserAvatar
+                                    userId={task.assignedId}
+                                    firstName={assignee?.firstName ?? ""}
+                                    lastName={assignee?.lastName ?? ""}
+                                    hasAvatar={!!assignee?.avatarURL}
+                                    size={24}
+                                    style={{ border: "2px solid var(--surface)", flexShrink: 0 }}
+                                  />
                                 </Tooltip>
                               );
                             })()}
@@ -1021,11 +1021,16 @@ export default function Dashboard() {
                 <span className={`badge ${priorityClass(dragMirror.task.priority)}`}>{priorityLabel(dragMirror.task.priority)}</span>
                 {dragMirror.task.assignedId && (() => {
                   const assignee = resolveUser(dragMirror.task.assignedId);
-                  return assignee?.avatar
-                    ? <img src={assignee.avatar} alt={`${assignee.firstName} ${assignee.lastName}`} style={{ width: 24, height: 24, borderRadius: "50%", objectFit: "cover", border: "2px solid var(--surface)", flexShrink: 0 }} />
-                    : <span style={{ width: 24, height: 24, borderRadius: "50%", background: assignee ? getAvatarStyle(assignee.id).background : "var(--surface3)", color: "#1c1b1f", fontSize: 10, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, border: "2px solid var(--surface)" }}>
-                        {assignee ? assigneeInitials(assignee) : "?"}
-                      </span>;
+                  return (
+                    <UserAvatar
+                      userId={dragMirror.task.assignedId}
+                      firstName={assignee?.firstName ?? ""}
+                      lastName={assignee?.lastName ?? ""}
+                      hasAvatar={!!assignee?.avatarURL}
+                      size={24}
+                      style={{ border: "2px solid var(--surface)", flexShrink: 0 }}
+                    />
+                  );
                 })()}
               </div>
               <p className="task-title">{dragMirror.task.title}</p>

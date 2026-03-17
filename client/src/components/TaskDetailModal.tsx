@@ -4,6 +4,7 @@ import { ROUTES_API } from "../config/api";
 import { useAuth } from "../hooks/useAuth";
 import { getAvatarStyle } from "../utils/avatarColor";
 import Tooltip from "./Tooltip";
+import UserAvatar from "./UserAvatar";
 
 interface Props {
   task:       Task;
@@ -41,12 +42,14 @@ function UserCard({ user, accent = "#b0a6ff", onClick, selected }: { user: User;
         transition: "all 0.15s",
       }}
     >
-      <div style={{ width: 32, height: 32, borderRadius: "50%", flexShrink: 0, overflow: "hidden", background: getAvatarStyle(user.id).background, display: "flex", alignItems: "center", justifyContent: "center", boxShadow: `0 0 0 2px ${getAvatarStyle(user.id).from}44` }}>
-        {user.avatarURL
-          ? <img src={user.avatarURL} alt={initials(user)} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-          : <span style={{ fontSize: 11, fontWeight: 700, color: "#1c1b1f" }}>{initials(user)}</span>
-        }
-      </div>
+      <UserAvatar
+        userId={user.id}
+        firstName={user.firstName}
+        lastName={user.lastName}
+        hasAvatar={!!user.avatarURL}
+        size={32}
+        style={{ flexShrink: 0, boxShadow: `0 0 0 2px ${getAvatarStyle(user.id).from}44` }}
+      />
       <div style={{ display: "flex", flexDirection: "column", gap: 1, minWidth: 0 }}>
         <span style={{ fontSize: 13, fontWeight: 600, color: "#e8e0f0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{user.firstName} {user.lastName}</span>
         <span style={{ fontSize: 11, color: "#7a7288", fontFamily: "'DM Mono', monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{user.email}</span>
@@ -464,12 +467,14 @@ export default function TaskDetailModal({ task, columnName, members = [], onClos
                   return (
                     <div key={com.id} style={{ display: "flex", gap: 10 }}>
                       {/* Avatar */}
-                      <div style={{ width: 28, height: 28, borderRadius: "50%", flexShrink: 0, background: "linear-gradient(135deg, #b0a6ff88, #b0a6ff)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 700, color: "#1c1b1f", overflow: "hidden", marginTop: 2 }}>
-                        {author?.avatarURL
-                          ? <img src={author.avatarURL} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                          : <span>{author ? initials(author) : "?"}</span>
-                        }
-                      </div>
+                      <UserAvatar
+                        userId={com.usrId}
+                        firstName={author?.firstName ?? ""}
+                        lastName={author?.lastName ?? ""}
+                        hasAvatar={!!author?.avatarURL}
+                        size={28}
+                        style={{ flexShrink: 0, marginTop: 2 }}
+                      />
                       {/* Bulle */}
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 4 }}>
@@ -517,12 +522,14 @@ export default function TaskDetailModal({ task, columnName, members = [], onClos
 
               {/* Saisie nouveau commentaire — masquée pour les lecteurs */}
               {canEdit && <div style={{ display: "flex", gap: 8, alignItems: "flex-end" }}>
-                <div style={{ width: 28, height: 28, borderRadius: "50%", flexShrink: 0, background: "linear-gradient(135deg, #64d2c888, #64d2c8)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 700, color: "#1c1b1f", overflow: "hidden" }}>
-                  {user && members.find(m => m.id === user.id)?.avatarURL
-                    ? <img src={members.find(m => m.id === user.id)!.avatarURL} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                    : <span>{user ? `${user.firstName.charAt(0)}${user.lastName.charAt(0)}` : "?"}</span>
-                  }
-                </div>
+                <UserAvatar
+                  userId={user?.id ?? 0}
+                  firstName={user?.firstName ?? ""}
+                  lastName={user?.lastName ?? ""}
+                  hasAvatar={!!user && !!members.find(m => m.id === user.id)?.avatarURL}
+                  size={28}
+                  style={{ flexShrink: 0 }}
+                />
                 <div style={{ flex: 1, position: "relative" }}>
                   <textarea
                     ref={commentTextareaRef}
@@ -683,7 +690,9 @@ export default function TaskDetailModal({ task, columnName, members = [], onClos
                       <button
                         key={p}
                         onClick={() => { setPriority(p); setPriorityOpen(false); scheduleAutoSave(title, details, dueDate, p); }}
-                        style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", padding: "9px 14px", background: priority === p ? badgeBg(p) : "transparent", border: "none", color: priority === p ? priorityColor(p) : "#b8b0c8", fontSize: 12, fontWeight: priority === p ? 600 : 400, cursor: "pointer", fontFamily: "inherit", textAlign: "left" }}
+                        style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", padding: "9px 14px", background: priority === p ? badgeBg(p) : "transparent", border: "none", color: priority === p ? priorityColor(p) : "#b8b0c8", fontSize: 12, fontWeight: priority === p ? 600 : 400, cursor: "pointer", fontFamily: "inherit", textAlign: "left", transition: "background 0.12s, color 0.12s" }}
+                        onMouseEnter={e => { if (priority !== p) { (e.currentTarget as HTMLButtonElement).style.background = badgeBg(p); (e.currentTarget as HTMLButtonElement).style.color = priorityColor(p); } }}
+                        onMouseLeave={e => { if (priority !== p) { (e.currentTarget as HTMLButtonElement).style.background = "transparent"; (e.currentTarget as HTMLButtonElement).style.color = "#b8b0c8"; } }}
                       >
                         <span style={{ width: 6, height: 6, borderRadius: "50%", background: priorityColor(p), flexShrink: 0 }} />
                         {priorityLabel(p)}

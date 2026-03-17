@@ -7,9 +7,12 @@ import com.services.UserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
+import org.springframework.core.io.Resource;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
@@ -101,5 +104,47 @@ public class UserController {
     public ResponseEntity<Void> deleteUser(@PathVariable Long id) {
         userService.deleteUser(id);
         return ResponseEntity.noContent().build();
+    }
+
+    /**
+     * Upload un avatar pour un utilisateur.
+     * Le fichier est stocké sur disque et le chemin est enregistré dans la base.
+     *
+     * @param id   l'identifiant de l'utilisateur
+     * @param file le fichier image uploadé
+     * @return le {@link UserDTO} mis à jour avec statut HTTP 200
+     */
+    @Operation(summary = "Uploader un avatar")
+    @PostMapping(value = "/{id}/avatar", consumes = "multipart/form-data")
+    public ResponseEntity<UserDTO> uploadAvatar(@PathVariable Long id,
+                                                @RequestParam("file") MultipartFile file) {
+        return ResponseEntity.ok(userService.uploadAvatar(id, file));
+    }
+
+    /**
+     * Télécharge l'avatar d'un utilisateur.
+     *
+     * @param id l'identifiant de l'utilisateur
+     * @return le contenu de l'image avec statut HTTP 200
+     */
+    @Operation(summary = "Récupérer l'avatar d'un utilisateur")
+    @GetMapping("/{id}/avatar")
+    public ResponseEntity<Resource> getAvatar(@PathVariable Long id) {
+        Resource resource = userService.getAvatar(id);
+        // Détecte le type MIME réel du fichier (PNG, JPEG, WebP…)
+        MediaType mediaType = MediaType.IMAGE_JPEG;
+        try {
+            String filename = resource.getFilename();
+            if (filename != null) {
+                String lower = filename.toLowerCase();
+                if (lower.endsWith(".png"))       mediaType = MediaType.IMAGE_PNG;
+                else if (lower.endsWith(".gif"))   mediaType = MediaType.IMAGE_GIF;
+                else if (lower.endsWith(".webp"))  mediaType = MediaType.parseMediaType("image/webp");
+                else if (lower.endsWith(".svg"))   mediaType = MediaType.parseMediaType("image/svg+xml");
+            }
+        } catch (Exception ignored) { }
+        return ResponseEntity.ok()
+                .contentType(mediaType)
+                .body(resource);
     }
 }

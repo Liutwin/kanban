@@ -9,9 +9,19 @@ import com.repositories.UserRepository;
 import com.services.MailService;
 import com.services.UserService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.io.Resource;
+import org.springframework.core.io.UrlResource;
 import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
+import java.net.MalformedURLException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.List;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 /**
@@ -26,6 +36,10 @@ public class UserServiceImpl implements UserService {
     private final UserRepository userRepository;
     private final UserMapper userMapper;
     private final MailService mailService;
+
+    @SuppressWarnings("unused")
+    @Value("${app.upload.dir}")
+    private String uploadDir;
 
     /**
      * {@inheritDoc}
@@ -103,5 +117,65 @@ public class UserServiceImpl implements UserService {
             throw new RuntimeException("Utilisateur introuvable : " + id);
         }
         userRepository.deleteById(id);
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public UserDTO uploadAvatar(Long id, MultipartFile file) {
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Utilisateur introuvable : " + id));
+
+        // Vérification du type MIME
+        String contentType = file.getContentType();
+        if (contentType == null || !contentType.startsWith("image/")) {
+            throw new RuntimeException("Le fichier doit être une image (JPEG, PNG, GIF, WebP…)");
+        }
+
+        try {
+            // Crée le dossier avatars si nécessaire
+            Path dir = Paths.get(uploadDir, "avatars");
+            Files.createDirectories(dir);
+
+            // Supprime l'ancien avatar physique s'il existe
+            if (user.getAvatarURL() != null && !user.getAvatarURL().isBlank()) {
+                try {
+                    Files.deleteIfExists(Paths.get(user.getAvatarURL()));
+                } catch (IOException ignored) { }
+            }
+
+            // Préfixe UUID pour éviter les collisions
+            String filename = UUID.randomUUID() + "_" + file.getOriginalFilename();
+            Path destination = dir.resolve(filename);
+            file.transferTo(destination);
+
+            // Sauvegarde le chemin dans l'entité
+            user.setAvatarURL(destination.toString());
+            return userMapper.toDTO(userRepository.save(user));
+
+        } catch (IOException e) {
+            throw new RuntimeException("Erreur lors de l'enregistrement de l'avatar", e);
+        }
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public Resource getAvatar(Long id) {
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Utilisateur introuvable : " + id));
+
+        if (user.getAvatarURL() == null || user.getAvatarURL().isBlank()) {
+            throw new RuntimeException("Cet utilisateur n'a pas d'avatar");
+        }
+
+        try {
+            Path path = Paths.get(user.getAvatarURL());
+            Resource resource = new UrlResource(path.toUri());
+            if (!resource.exists() || !resource.isReadable()) {
+                throw new RuntimeException("Fichier avatar illisible : " + user.getAvatarURL());
+            }
+            return resource;
+        } catch (MalformedURLException e) {
+            throw new RuntimeException("Chemin avatar invalide : " + user.getAvatarURL(), e);
+        }
     }
 }

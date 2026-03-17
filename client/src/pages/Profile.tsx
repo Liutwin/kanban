@@ -4,6 +4,7 @@ import { getAvatarStyle } from "../utils/avatarColor";
 import { ROUTES_API } from "../config/api";
 import { useAuth } from "../hooks/useAuth";
 import { extractErrorMessage } from "../utils/apiHelpers";
+import { prefetchAvatars, invalidateAvatar, fetchAvatarOnce } from "../components/UserAvatar";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types locaux
@@ -300,19 +301,16 @@ export default function Profile() {
   const [avatarHover,     setAvatarHover]     = useState(false);
   const avatarInputRef = useRef<HTMLInputElement>(null);
 
-  /** Charge l'avatar actuel depuis le serveur (si l'utilisateur en a un). */
+  /** Charge l'avatar via le cache partagé (0 requête réseau si déjà en cache). */
   useEffect(() => {
-    if (!user?.id) return;
-    authFetch(ROUTES_API.userAvatar(user.id))
-      .then(res => {
-        if (!res.ok) return null;
-        return res.blob();
-      })
-      .then(blob => {
-        if (blob && blob.size > 0) setAvatarBlobUrl(URL.createObjectURL(blob));
-      })
-      .catch(() => {});
-  }, [user?.id]);
+    if (!user?.id || !user.avatarURL) return;
+    let cancelled = false;
+    fetchAvatarOnce(user.id, authFetch).then(url => {
+      if (!cancelled && url) setAvatarBlobUrl(url);
+    });
+    return () => { cancelled = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id, user?.avatarURL]);
 
   /** Upload un nouvel avatar (même pattern que les pièces jointes TaskDetailModal). */
   const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -326,12 +324,16 @@ export default function Profile() {
       const res = await authFetch(ROUTES_API.userAvatar(user.id), { method: "POST", body: form });
       if (!res.ok) throw new Error(await extractErrorMessage(res));
       const updated = await res.json();
-      // Recharger le blob de l'avatar
+      // Invalider le cache + recharger le nouveau blob
+      invalidateAvatar(user.id);
       const dlRes = await authFetch(ROUTES_API.userAvatar(user.id));
       if (dlRes.ok) {
         const blob = await dlRes.blob();
         if (avatarBlobUrl) URL.revokeObjectURL(avatarBlobUrl);
-        setAvatarBlobUrl(URL.createObjectURL(blob));
+        const newUrl = URL.createObjectURL(blob);
+        setAvatarBlobUrl(newUrl);
+        // Remettre en cache avec le nouveau blob
+        fetchAvatarOnce(user.id, authFetch);
       }
       // Mettre à jour le contexte auth
       if (token) {

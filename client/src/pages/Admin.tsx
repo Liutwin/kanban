@@ -5,6 +5,7 @@ import { useAuth } from "../hooks/useAuth";
 import { ROUTES_API } from "../config/api";
 import { getAvatarStyle } from "../utils/avatarColor";
 import { extractErrorMessage } from "../utils/apiHelpers";
+import UserAvatar, { prefetchAvatars } from "../components/UserAvatar";
 import { toSlug } from "../utils/slug";
 import type { User } from "../model/interfaces";
 import "../styles/admin.css";
@@ -87,40 +88,27 @@ function StatCard({ icon, value, label, accent, loading }: StatCardProps) {
  * Props du composant {@link AdminToggle}.
  */
 interface AdminToggleProps {
-  /**
-   * Valeur courante du droit administrateur, lue directement depuis les données
-   * serveur. Le composant est entièrement contrôlé : il n'a pas de state local,
-   * ce qui garantit la cohérence avec l'état réel de la base de données.
-   */
   isAdmin: boolean;
   /** Désactive le toggle et affiche un spinner pendant la requête PATCH. */
   pending: boolean;
-  /** Rappel déclenché au clic — reçoit la valeur cible (`true` = accorder). */
+  /** Désactive définitivement le toggle (ex : l'utilisateur ne peut pas se retirer ses propres droits). */
+  disabled?: boolean;
   onChange: (newValue: boolean) => void;
-  /** Libellé accessible lu par les lecteurs d'écran. */
   label: string;
 }
 
-/**
- * Toggle on/off contrôlé pour le droit administrateur.
- *
- * **Pas de state local** : la prop `isAdmin` est la seule source de vérité.
- * Cela évite le bug classique où le switch reste à sa position initiale après
- * le premier chargement parce qu'un state interne ne se synchronise jamais
- * avec les nouvelles props.
- *
- * @param props - {@link AdminToggleProps}
- */
-function AdminToggle({ isAdmin, pending, onChange, label }: AdminToggleProps) {
+function AdminToggle({ isAdmin, pending, disabled, onChange, label }: AdminToggleProps) {
+  const isDisabled = pending || disabled;
   return (
     <button
       role="switch"
       aria-checked={isAdmin}
       aria-label={label}
       className={`admin-toggle ${isAdmin ? "admin-toggle--on" : ""} ${pending ? "admin-toggle--pending" : ""}`}
-      onClick={() => !pending && onChange(!isAdmin)}
-      disabled={pending}
-      title={isAdmin ? "Retirer les droits admin" : "Accorder les droits admin"}
+      onClick={() => !isDisabled && onChange(!isAdmin)}
+      disabled={isDisabled}
+      title={disabled ? "Vous ne pouvez pas retirer vos propres droits admin" : isAdmin ? "Retirer les droits admin" : "Accorder les droits admin"}
+      style={disabled ? { opacity: 0.45, cursor: "not-allowed" } : undefined}
     >
       <span className="admin-toggle-thumb" aria-hidden="true" />
       {pending && <span className="admin-toggle-spinner" aria-hidden="true" />}
@@ -163,21 +151,19 @@ interface UserRowProps {
  * @param props - {@link UserRowProps}
  */
 function UserRow({ user, isSelf, adminPending, onToggleAdmin, onViewProfile, onDelete }: UserRowProps) {
-  const av       = getAvatarStyle(user.id);
-  const initials = `${user.firstName.charAt(0)}${user.lastName.charAt(0)}`.toUpperCase() || "?";
-
   return (
     <tr className={`admin-user-row ${isSelf ? "admin-user-row--self" : ""}`}>
 
       {/* Avatar */}
       <td className="admin-user-td admin-user-td--avatar">
-        <div
+        <UserAvatar
+          userId={user.id}
+          firstName={user.firstName}
+          lastName={user.lastName}
+          hasAvatar={!!user.avatarURL}
+          size={34}
           className="admin-user-avatar"
-          style={{ background: av.background, color: av.color }}
-          aria-hidden="true"
-        >
-          {initials}
-        </div>
+        />
       </td>
 
       {/* Nom */}
@@ -201,8 +187,13 @@ function UserRow({ user, isSelf, adminPending, onToggleAdmin, onViewProfile, onD
             pending={adminPending}
             onChange={v => onToggleAdmin(user, v)}
             label={`Droits admin — ${user.firstName} ${user.lastName}`}
+            disabled={isSelf}
           />
-          <span className={`admin-toggle-label ${user.isAdmin ? "admin-toggle-label--on" : ""}`}>
+          <span
+            className={`admin-toggle-label ${user.isAdmin ? "admin-toggle-label--on" : ""}`}
+            title={isSelf ? "Vous ne pouvez pas retirer vos propres droits admin" : undefined}
+            style={isSelf ? { opacity: 0.45, cursor: "not-allowed" } : undefined}
+          >
             {user.isAdmin ? "Admin" : "Membre"}
           </span>
         </div>
@@ -273,9 +264,6 @@ interface DeleteConfirmModalProps {
  * @param props - {@link DeleteConfirmModalProps}
  */
 function DeleteConfirmModal({ user, submitting, error, onConfirm, onCancel }: DeleteConfirmModalProps) {
-  const av       = getAvatarStyle(user.id);
-  const initials = `${user.firstName.charAt(0)}${user.lastName.charAt(0)}`.toUpperCase() || "?";
-
   return (
     <div
       className="admin-modal-overlay"
@@ -300,9 +288,14 @@ function DeleteConfirmModal({ user, submitting, error, onConfirm, onCancel }: De
         </div>
 
         <div className="admin-modal-user-preview">
-          <div className="admin-modal-user-avatar" style={{ background: av.background, color: av.color }}>
-            {initials}
-          </div>
+          <UserAvatar
+            userId={user.id}
+            firstName={user.firstName}
+            lastName={user.lastName}
+            hasAvatar={!!user.avatarURL}
+            size={42}
+            className="admin-modal-user-avatar"
+          />
           <div>
             <p className="admin-modal-user-name">{user.firstName} {user.lastName}</p>
             <p className="admin-modal-user-email">{user.email}</p>
@@ -403,7 +396,9 @@ export default function Admin() {
       const res  = await authFetchRef.current(ROUTES_API.users);
       if (!res.ok) throw new Error(await extractErrorMessage(res));
       const json = await res.json();
-      setUsers(Array.isArray(json) ? json : (json?.data ?? []));
+      const userList: AdminUser[] = Array.isArray(json) ? json : (json?.data ?? []);
+      setUsers(userList);
+      prefetchAvatars(userList, authFetchRef.current);
     } catch (e: unknown) {
       setUsersError(e instanceof Error ? e.message : "Erreur de chargement.");
     } finally {

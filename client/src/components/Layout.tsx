@@ -11,6 +11,7 @@ import SidebarIcon from '../assets/kanban-icon-sidebar.svg';
 import Tooltip from "./Tooltip";
 import MembersPanel from './MembersPanel';
 import { getAvatarStyle } from '../utils/avatarColor';
+import UserAvatar, { prefetchAvatars, fetchAvatarOnce } from './UserAvatar';
 
 /**
  * Props du composant Layout.
@@ -169,7 +170,8 @@ export default function Layout({ children, title, boardId, boardRole, boardCreat
   const [avatarMembers, setAvatarMembers] = useState<AvatarInfo[]>([]);
   const [panelOpen,     setPanelOpen]     = useState(false);
   const [topbarPopover, setTopbarPopover] = useState<AvatarInfo | null>(null);
-  const triggerRef = useRef<HTMLDivElement>(null);
+  const triggerRef    = useRef<HTMLDivElement>(null);
+  const membersBtnRef = useRef<HTMLButtonElement>(null);
 
   const fetchAvatarMembers = useCallback(async () => {
     if (!boardId) return;
@@ -194,10 +196,11 @@ export default function Layout({ children, title, boardId, boardRole, boardCreat
             const p     = json2?.data ?? json2;
             return {
               userId:    m.userId,
-              firstName: p.firstName ?? "",
-              lastName:  p.lastName  ?? "",
-              email:     p.email     ?? "",
+              firstName: p.firstName  ?? "",
+              lastName:  p.lastName   ?? "",
+              email:     p.email      ?? "",
               role:      m.role,
+              avatar:    p.avatarURL  ?? undefined,
             };
           } catch {
             return { userId: m.userId, firstName: "?", lastName: "", email: "", role: m.role };
@@ -211,10 +214,19 @@ export default function Layout({ children, title, boardId, boardRole, boardCreat
         return 0;
       });
       setAvatarMembers(enriched);
+      prefetchAvatars(enriched.map(m => ({ id: m.userId, avatarURL: m.avatar })), authFetch);
     } catch { /* silencieux */ }
   }, [boardId, user?.id]);
 
   useEffect(() => { if (boardId) fetchAvatarMembers(); }, [boardId, fetchAvatarMembers]);
+
+  // Précharge l'avatar de l'utilisateur connecté dès le montage du Layout,
+  // sans attendre user.avatarURL (absent du JWT) — 1 requête, mise en cache.
+  useEffect(() => {
+    if (!user?.id) return;
+    fetchAvatarOnce(user.id, authFetch);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]);
 
   // Ferme la popover topbar au clic en dehors
   useEffect(() => {
@@ -279,10 +291,14 @@ export default function Layout({ children, title, boardId, boardRole, boardCreat
 
         <div className="sidebar-footer">
           <div className="user-info">
-            <div className="user-avatar" title={fullName}
-            style={user?.id ? { background: getAvatarStyle(user.id).background } : undefined}>
-            {avatarInitial}
-          </div>
+            <UserAvatar
+              userId={user.id}
+              firstName={user.firstName}
+              lastName={user.lastName}
+              hasAvatar={true}
+              size={32}
+              className="user-avatar"
+            />
             <div className="user-details">
               <span className="user-name">{fullName}</span>
             </div>
@@ -413,12 +429,14 @@ export default function Layout({ children, title, boardId, boardRole, boardCreat
                                   </svg>
                                 )}
                               </span>
-                              {m.avatar
-                                ? <img src={m.avatar} alt="" style={{ width: 20, height: 20, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />
-                                : <span style={{ width: 20, height: 20, borderRadius: "50%", background: avatarStyle.background, color: "#1c1b1f", fontSize: 8, fontWeight: 700, display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                                    {m.firstName.charAt(0)}{m.lastName.charAt(0)}
-                                  </span>
-                              }
+                              <UserAvatar
+                                userId={m.userId}
+                                firstName={m.firstName}
+                                lastName={m.lastName}
+                                hasAvatar={!!m.avatar}
+                                size={20}
+                                style={{ flexShrink: 0 }}
+                              />
                               <span className="search-select-option-name">{m.firstName} {m.lastName}</span>
                             </li>
                           );
@@ -452,43 +470,55 @@ export default function Layout({ children, title, boardId, boardRole, boardCreat
                     const c = getAvatarStyle(m.userId);
                     const total = avatarMembers.length;
                     return (
-                      <div key={m.userId} style={{
+                      <div key={m.userId} className="avatar-wrapper" style={{
                         marginRight: i < total - 1 ? -6 : 0,
                         zIndex: total - i,
                         position: "relative",
                         flexShrink: 0,
+                        display: "flex",
+                        alignItems: "center",
                       }}>
                         <Tooltip text={`${m.firstName} ${m.lastName} · ${m.role === "admin" ? "Admin" : m.role === "editeur" ? "Éditeur" : "Lecteur"}`} position="bottom">
                           <button
                             className="stacked-avatar stacked-avatar--btn"
                             style={{
-                              background: c.background,
+                              background: "transparent",
                               color: c.color,
-                              // Halo au survol = couleur de départ du dégradé à 50% opacité
+                              padding: 0,
+                              overflow: "hidden",
                               ["--avatar-glow" as string]: `${c.from}80`,
                             }}
                             onClick={() => setTopbarPopover(topbarPopover?.userId === m.userId ? null : m)}
                           >
-                            {memberInitials(m)}
-                            {/* Badge rôle — haut droite, légèrement à cheval sur le bord */}
-                            {m.role === "admin" && (
-                              <span style={{
-                                position: "absolute", top: -2, right: -2,
-                                width: 12, height: 12, borderRadius: "50%",
-                                background: "#fdd663", border: "2px solid var(--surface)",
-                                display: "flex", alignItems: "center", justifyContent: "center",
-                                fontSize: 7, lineHeight: 1,
-                              }}>★</span>
-                            )}
-                            {m.role === "editeur" && (
-                              <span style={{
-                                position: "absolute", top: -1, right: -1,
-                                width: 9, height: 9, borderRadius: "50%",
-                                background: "#b0c8ff", border: "2px solid var(--surface)",
-                              }} />
-                            )}
+                            <UserAvatar
+                              userId={m.userId}
+                              firstName={m.firstName}
+                              lastName={m.lastName}
+                              hasAvatar={!!m.avatar}
+                              size={28}
+                              style={{ pointerEvents: "none" }}
+                            />
                           </button>
                         </Tooltip>
+                        {/* Badges déplacés dans l'outer div pour ne pas être coupés par overflow:hidden */}
+                        {m.role === "admin" && (
+                          <span style={{
+                            position: "absolute", top: -2, right: -2,
+                            width: 12, height: 12, borderRadius: "50%",
+                            background: "#fdd663", border: "2px solid var(--surface)",
+                            display: "flex", alignItems: "center", justifyContent: "center",
+                            fontSize: 7, lineHeight: 1, pointerEvents: "none",
+                            zIndex: 1,
+                          }}>★</span>
+                        )}
+                        {m.role === "editeur" && (
+                          <span style={{
+                            position: "absolute", top: -1, right: -1,
+                            width: 9, height: 9, borderRadius: "50%",
+                            background: "#b0c8ff", border: "2px solid var(--surface)",
+                            pointerEvents: "none", zIndex: 1,
+                          }} />
+                        )}
                       </div>
                     );
                   })}
@@ -507,9 +537,14 @@ export default function Layout({ children, title, boardId, boardRole, boardCreat
                       boxShadow: "var(--elev-4)", zIndex: 300, overflow: "hidden",
                     }}>
                       <div style={{ padding: "18px 16px 12px", display: "flex", flexDirection: "column", alignItems: "center", gap: 10, borderBottom: "1px solid var(--border)" }}>
-                        <div style={{ width: 52, height: 52, borderRadius: "50%", background: c.background, color: c.color, fontSize: 17, fontWeight: 600, fontFamily: "'DM Mono',monospace", display: "flex", alignItems: "center", justifyContent: "center", border: `2px solid ${c.to}55` }}>
-                          {memberInitials(m)}
-                        </div>
+                        <UserAvatar
+                          userId={m.userId}
+                          firstName={m.firstName}
+                          lastName={m.lastName}
+                          hasAvatar={!!m.avatar}
+                          size={52}
+                          style={{ border: `2px solid ${getAvatarStyle(m.userId).to}55` }}
+                        />
                         <div style={{ textAlign: "center" }}>
                           <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: "var(--text)" }}>{m.firstName} {m.lastName}</p>
                           <p style={{ margin: "2px 0 0", fontSize: 11, color: "var(--text-3)" }}>{ROLE_LABELS[m.role] ?? m.role}</p>
@@ -537,6 +572,7 @@ export default function Layout({ children, title, boardId, boardRole, boardCreat
                 })()}
 
                 <button
+                  ref={membersBtnRef}
                   className={`members-btn ${panelOpen ? "members-btn--active" : ""}`}
                   onClick={() => { setPanelOpen(v => !v); setTopbarPopover(null); }}
                   aria-expanded={panelOpen}
@@ -557,6 +593,7 @@ export default function Layout({ children, title, boardId, boardRole, boardCreat
                     currentRole={boardRole ?? "lecteur"}
                     boardCreatorId={boardCreatorId}
                     onClose={() => { setPanelOpen(false); fetchAvatarMembers(); }}
+                    triggerRef={membersBtnRef}
                   />
                 )}
               </div>

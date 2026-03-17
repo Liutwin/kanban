@@ -1200,11 +1200,18 @@
      font-family: 'DM Mono', monospace;
      font-size: 10px;
      font-weight: 500;
-     transition: transform 0.15s ease, box-shadow 0.15s ease;
+     transition: box-shadow 0.15s ease;
    }
-   
-   .stacked-avatar--btn:hover {
+
+   .avatar-wrapper {
+     transition: transform 0.15s ease;
+   }
+
+   .avatar-wrapper:hover {
      transform: translateY(-3px) scale(1.1);
+   }
+
+   .avatar-wrapper:hover .stacked-avatar--btn {
      /* Halo dynamique : la couleur est injectée en CSS var via style inline */
      box-shadow: 0 0 0 3px var(--avatar-glow, rgba(255,255,255,0.2));
    }
