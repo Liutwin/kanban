@@ -42,9 +42,9 @@
   display: flex;
   gap: 16px;
   overflow-x: auto;
-  overflow-y: auto;
+  overflow-y: hidden;
   padding-bottom: 16px;
-  align-items: flex-start;
+  align-items: stretch;
   flex: 1;
   min-height: 0;
 }
@@ -65,7 +65,8 @@
   flex-direction: column;
   box-shadow: var(--elev-1);
   transition: all 0.2s ease;
-  overflow: visible;
+  overflow: hidden;
+  min-height: 0;
 }
 
 .kanban-col.drag-over {
@@ -199,7 +200,14 @@
   gap: 8px;
   min-height: 56px;
   flex: 1;
+  overflow-y: auto;
+  min-height: 0;
 }
+
+.col-tasks::-webkit-scrollbar { width: 4px; }
+.col-tasks::-webkit-scrollbar-track { background: transparent; }
+.col-tasks::-webkit-scrollbar-thumb { background: var(--surface3); border-radius: 99px; }
+.col-tasks::-webkit-scrollbar-thumb:hover { background: var(--accent-dark); }
 
 /* ── Carte tâche ──────────────────────────────────────────── */
 .task-card {
