@@ -167,7 +167,7 @@ export default function Profile() {
       .catch(() => {});
   }, [user?.id]);
 
-  // Nettoyage des timers au démontage
+  // Nettoyage des timers et blob URLs au démontage
   useEffect(() => () => {
     if (infoSavedTimer.current)  clearTimeout(infoSavedTimer.current);
     if (pwdSavedTimer.current)   clearTimeout(pwdSavedTimer.current);
@@ -294,7 +294,64 @@ export default function Profile() {
   const pwdStrengthLabel = ["", "Faible", "Moyen", "Fort"][pwdStrength];
   const pwdStrengthColor = ["", "#f28b82", "#fdd663", "#81c995"][pwdStrength];
 
-  const avatarSrc = null; // Pas d'upload d'avatar pour l'instant
+  // ── Avatar ──────────────────────────────────────────────
+  const [avatarBlobUrl,   setAvatarBlobUrl]   = useState<string | null>(null);
+  const [avatarUploading, setAvatarUploading] = useState(false);
+  const [avatarHover,     setAvatarHover]     = useState(false);
+  const avatarInputRef = useRef<HTMLInputElement>(null);
+
+  /** Charge l'avatar actuel depuis le serveur (si l'utilisateur en a un). */
+  useEffect(() => {
+    if (!user?.id) return;
+    authFetch(ROUTES_API.userAvatar(user.id))
+      .then(res => {
+        if (!res.ok) return null;
+        return res.blob();
+      })
+      .then(blob => {
+        if (blob && blob.size > 0) setAvatarBlobUrl(URL.createObjectURL(blob));
+      })
+      .catch(() => {});
+  }, [user?.id]);
+
+  /** Upload un nouvel avatar (même pattern que les pièces jointes TaskDetailModal). */
+  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const picked = e.target.files?.[0];
+    if (!picked || !user?.id) return;
+    if (!picked.type.startsWith("image/")) return;
+    setAvatarUploading(true);
+    try {
+      const form = new FormData();
+      form.append("file", picked);
+      const res = await authFetch(ROUTES_API.userAvatar(user.id), { method: "POST", body: form });
+      if (!res.ok) throw new Error(await extractErrorMessage(res));
+      const updated = await res.json();
+      // Recharger le blob de l'avatar
+      const dlRes = await authFetch(ROUTES_API.userAvatar(user.id));
+      if (dlRes.ok) {
+        const blob = await dlRes.blob();
+        if (avatarBlobUrl) URL.revokeObjectURL(avatarBlobUrl);
+        setAvatarBlobUrl(URL.createObjectURL(blob));
+      }
+      // Mettre à jour le contexte auth
+      if (token) {
+        login({
+          token,
+          user: {
+            ...user,
+            avatarURL: updated.avatarURL ?? user.avatarURL,
+          },
+        });
+      }
+    } catch {
+      // silencieux — on pourrait afficher un toast
+    } finally {
+      setAvatarUploading(false);
+      if (avatarInputRef.current) avatarInputRef.current.value = "";
+    }
+  };
+
+  const avatarSrc = avatarBlobUrl;
   const userInitials = infoForm.firstName || infoForm.lastName
     ? initials(infoForm.firstName || "?", infoForm.lastName || "?")
     : user ? initials(user.firstName, user.lastName) : "?";
@@ -305,17 +362,43 @@ export default function Profile() {
 
         {/* ── En-tête profil ── */}
         <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: "var(--radius-lg)", padding: "28px 32px", display: "flex", alignItems: "center", gap: 24, boxShadow: "var(--elev-1)" }}>
-          {/* Avatar */}
+          {/* Avatar cliquable pour upload */}
           <div style={{ position: "relative", flexShrink: 0 }}>
-            <div style={{ width: 72, height: 72, borderRadius: "50%", overflow: "hidden", background: user?.id ? getAvatarStyle(user.id).background : "linear-gradient(135deg, var(--accent-dark), var(--accent))", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: `0 0 0 3px ${user?.id ? getAvatarStyle(user.id).from + '44' : 'rgba(176,166,255,0.25)'}, var(--elev-2)` }}>
+            <div
+              role="button"
+              tabIndex={0}
+              aria-label="Changer l'avatar"
+              onClick={() => avatarInputRef.current?.click()}
+              onKeyDown={e => { if (e.key === "Enter" || e.key === " ") avatarInputRef.current?.click(); }}
+              onMouseEnter={() => setAvatarHover(true)}
+              onMouseLeave={() => setAvatarHover(false)}
+              style={{ width: 72, height: 72, borderRadius: "50%", overflow: "hidden", background: user?.id ? getAvatarStyle(user.id).background : "linear-gradient(135deg, var(--accent-dark), var(--accent))", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: `0 0 0 3px ${user?.id ? getAvatarStyle(user.id).from + '44' : 'rgba(176,166,255,0.25)'}, var(--elev-2)`, cursor: "pointer", position: "relative" }}
+            >
               {avatarSrc
                 ? <img src={avatarSrc} alt="Avatar" style={{ width: "100%", height: "100%", objectFit: "cover" }} onError={e => { (e.target as HTMLImageElement).style.display = "none"; }} />
                 : <span style={{ fontSize: 24, fontWeight: 700, color: "#1c1b1f" }}>{userInitials}</span>
               }
+              {/* Overlay au survol */}
+              {(avatarHover || avatarUploading) && (
+                <div style={{ position: "absolute", inset: 0, borderRadius: "50%", background: "rgba(0,0,0,0.45)", display: "flex", alignItems: "center", justifyContent: "center", transition: "opacity 0.18s" }}>
+                  {avatarUploading
+                    ? <span style={{ display: "inline-block", width: 20, height: 20, border: "2px solid rgba(255,255,255,0.3)", borderTopColor: "#fff", borderRadius: "50%", animation: "spin 0.7s linear infinite" }} />
+                    : <span style={{ fontSize: 22, lineHeight: 1 }}>📷</span>
+                  }
+                </div>
+              )}
             </div>
+            {/* Input fichier caché */}
+            <input
+              ref={avatarInputRef}
+              type="file"
+              accept="image/*"
+              style={{ display: "none" }}
+              onChange={handleAvatarUpload}
+            />
             {/* Badge admin */}
             {user?.isAdmin && (
-              <span style={{ position: "absolute", bottom: -2, right: -2, background: "var(--accent)", color: "#1c1b1f", fontSize: 9, fontWeight: 800, padding: "2px 6px", borderRadius: 999, letterSpacing: "0.06em", textTransform: "uppercase", border: "2px solid var(--surface)" }}>
+              <span style={{ position: "absolute", bottom: -2, right: -2, background: "var(--accent)", color: "#1c1b1f", fontSize: 9, fontWeight: 800, padding: "2px 6px", borderRadius: 999, letterSpacing: "0.06em", textTransform: "uppercase", border: "2px solid var(--surface)", pointerEvents: "none" }}>
                 Admin
               </span>
             )}

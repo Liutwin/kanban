@@ -387,7 +387,7 @@ export default function TaskDetailModal({ task, columnName, members = [], onClos
       onClick={handleClose}
     >
       <div
-        style={{ background: "#2b2930", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 20, width: "min(720px, 95vw)", maxHeight: "90vh", overflow: "hidden", display: "flex", flexDirection: "column", boxShadow: "0 24px 64px rgba(0,0,0,0.55)", animation: "slideUp 0.22s cubic-bezier(0.16,1,0.3,1)" }}
+        style={{ background: "#2b2930", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 20, width: "min(820px, 95vw)", maxHeight: "90vh", overflow: "hidden", display: "flex", flexDirection: "column", boxShadow: "0 24px 64px rgba(0,0,0,0.55)", animation: "slideUp 0.22s cubic-bezier(0.16,1,0.3,1)" }}
         onClick={e => e.stopPropagation()}
       >
         {/* Bande priorité */}
