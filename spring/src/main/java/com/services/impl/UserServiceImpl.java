@@ -80,6 +80,7 @@ public class UserServiceImpl implements UserService {
         user.setEmail(dto.getEmail());
         user.setLastName(dto.getLastName());
         user.setFirstName(dto.getFirstName());
+        user.setAdmin(dto.isAdmin());
         return userMapper.toDTO(userRepository.save(user));
     }
 

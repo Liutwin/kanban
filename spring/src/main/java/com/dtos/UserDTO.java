@@ -44,6 +44,9 @@ public class UserDTO {
 
     /**
      * Indique si l'utilisateur est administrateur de l'application.
+     * @JsonProperty force Jackson à sérialiser "isAdmin" (et non "admin",
+     * que Lombok génèrerait via le getter isAdmin() selon la convention JavaBeans).
      */
+    @JsonProperty("isAdmin")
     private boolean isAdmin;
 }
