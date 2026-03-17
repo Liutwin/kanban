@@ -128,3 +128,25 @@ export interface UserPassword {
   oldPassword: string;
   newPassword: string;
 }
+
+/**
+ * Profil enrichi d'un utilisateur — `GET /api/v1/users/profiles/{id}`.
+ * Correspond à la vue `vue_profil_utilisateur` côté MariaDB.
+ * Noms de champs conformes à UserViewDTO.java (sérialisation Jackson/Lombok).
+ * Note : `isAdmin` est sérialisé en `admin` par Jackson (getter `isAdmin()` → strip "is").
+ */
+export interface UserProfileDTO {
+  id:             number;
+  firstName:      string;
+  lastName:       string;
+  email:          string;
+  avatarURL?:     string;
+  /** Sérialisé "admin" (pas "isAdmin") — Lombok boolean + Jackson sans @JsonProperty */
+  admin:          boolean;
+  boardsCreated:  number;
+  participations: number;
+  tasksCreated:   number;
+  tasksAssigned:  number;
+  actions:        number;
+  lastActivity?:  string;
+}

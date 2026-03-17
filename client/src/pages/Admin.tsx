@@ -1,9 +1,11 @@
 import { useState, useEffect, useCallback, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import Layout from "../components/Layout";
 import { useAuth } from "../hooks/useAuth";
 import { ROUTES_API } from "../config/api";
 import { getAvatarStyle } from "../utils/avatarColor";
 import { extractErrorMessage } from "../utils/apiHelpers";
+import { toSlug } from "../utils/slug";
 import type { User } from "../model/interfaces";
 import "../styles/admin.css";
 
@@ -142,6 +144,8 @@ interface UserRowProps {
   adminPending: boolean;
   /** Rappel déclenché au changement du toggle admin. */
   onToggleAdmin: (user: AdminUser, newValue: boolean) => void;
+  /** Rappel déclenché quand on clique sur "Voir le profil". */
+  onViewProfile: (user: AdminUser) => void;
   /** Rappel déclenché quand on clique sur "Supprimer". */
   onDelete: (user: AdminUser) => void;
 }
@@ -158,7 +162,7 @@ interface UserRowProps {
  *
  * @param props - {@link UserRowProps}
  */
-function UserRow({ user, isSelf, adminPending, onToggleAdmin, onDelete }: UserRowProps) {
+function UserRow({ user, isSelf, adminPending, onToggleAdmin, onViewProfile, onDelete }: UserRowProps) {
   const av       = getAvatarStyle(user.id);
   const initials = `${user.firstName.charAt(0)}${user.lastName.charAt(0)}`.toUpperCase() || "?";
 
@@ -202,6 +206,22 @@ function UserRow({ user, isSelf, adminPending, onToggleAdmin, onDelete }: UserRo
             {user.isAdmin ? "Admin" : "Membre"}
           </span>
         </div>
+      </td>
+
+      {/* Voir le profil */}
+      <td className="admin-user-td admin-user-td--actions">
+        <button
+          className="admin-action-btn admin-action-btn--profile"
+          onClick={() => onViewProfile(user)}
+          aria-label={`Voir le profil de ${user.firstName} ${user.lastName}`}
+          title="Voir le journal d'activité"
+        >
+          <svg width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+            <circle cx="8" cy="5.5" r="3" stroke="currentColor" strokeWidth="1.5"/>
+            <path d="M2 14c0-3 2.7-5 6-5s6 2 6 5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+          </svg>
+          Voir le profil
+        </button>
       </td>
 
       {/* Suppression — désactivée pour soi-même */}
@@ -333,6 +353,7 @@ function DeleteConfirmModal({ user, submitting, error, onConfirm, onCancel }: De
  */
 export default function Admin() {
   const { user, authFetch } = useAuth();
+  const navigate = useNavigate();
 
   /**
    * Référence stable vers `authFetch`.
@@ -390,32 +411,40 @@ export default function Admin() {
     }
   }, []); // [] stable — authFetch via ref
 
-  /** Charge les statistiques globales (boards, tasks, users, admins). */
+  /** Charge les statistiques globales (boards, tasks, users, admins).
+   *  Utilise GET /users/profiles pour récupérer le total de tâches (somme
+   *  des tasksCreated), car il n'existe pas de endpoint GET /tasks global.
+   */
   const fetchStats = useCallback(async () => {
     setLoadingStats(true);
     try {
-      const res  = await authFetchRef.current(ROUTES_API.users);
-      if (!res.ok) return;
-      const json     = await res.json();
-      const allUsers: AdminUser[] = Array.isArray(json) ? json : (json?.data ?? []);
-
-      const [boardsRes, tasksRes] = await Promise.allSettled([
+      // Appel unique : /users/profiles contient tout ce qu'il faut
+      const [profilesRes, boardsRes] = await Promise.allSettled([
+        authFetchRef.current(ROUTES_API.userProfiles),
         authFetchRef.current(ROUTES_API.boards),
-        authFetchRef.current("/api/v1/tasks"),
       ]);
 
-      const boards = boardsRes.status === "fulfilled" && boardsRes.value.ok
-        ? await boardsRes.value.json().then((j: { data?: unknown[] }) => Array.isArray(j) ? j : (j?.data ?? []))
-        : [];
-      const tasks = tasksRes.status === "fulfilled" && tasksRes.value.ok
-        ? await tasksRes.value.json().then((j: { data?: unknown[] }) => Array.isArray(j) ? j : (j?.data ?? []))
-        : [];
+      // Profils → users, adminCount, totalTasks
+      type ProfileItem = { admin: boolean; tasksCreated: number };
+      const profiles: ProfileItem[] =
+        profilesRes.status === "fulfilled" && profilesRes.value.ok
+          ? await profilesRes.value.json().then((j: unknown) =>
+              Array.isArray(j) ? j : ((j as { data?: unknown[] })?.data ?? [])
+            )
+          : [];
+
+      const boards =
+        boardsRes.status === "fulfilled" && boardsRes.value.ok
+          ? await boardsRes.value.json().then((j: unknown) =>
+              Array.isArray(j) ? j : ((j as { data?: unknown[] })?.data ?? [])
+            )
+          : [];
 
       setStats({
-        totalUsers:  allUsers.length,
+        totalUsers:  profiles.length,
         totalBoards: (boards as unknown[]).length,
-        totalTasks:  (tasks  as unknown[]).length,
-        adminCount:  allUsers.filter(u => u.isAdmin).length,
+        totalTasks:  profiles.reduce((sum, p) => sum + (p.tasksCreated ?? 0), 0),
+        adminCount:  profiles.filter(p => p.admin).length,
       });
     } catch { /* silencieux : les stats sont optionnelles */ } finally {
       setLoadingStats(false);
@@ -492,6 +521,11 @@ export default function Admin() {
       setAdminPendingIds(prev => { const s = new Set(prev); s.delete(target.id); return s; });
     }
   }, [fetchUsers]);
+
+  const handleViewProfile = useCallback((target: AdminUser) => {
+    const slug = `${toSlug(target.firstName)}-${toSlug(target.lastName)}`;
+    navigate(`/logs/${slug}`);
+  }, [navigate]);
 
   /**
    * Supprime définitivement l'utilisateur ciblé via `DELETE /api/v1/users/{id}`.
@@ -633,6 +667,7 @@ export default function Admin() {
                   <th className="admin-th" scope="col">Nom</th>
                   <th className="admin-th admin-th--email" scope="col">E-mail</th>
                   <th className="admin-th admin-th--toggle" scope="col">Administrateur</th>
+                  <th className="admin-th admin-th--actions" scope="col" aria-label="Profil" />
                   <th className="admin-th admin-th--actions" scope="col" aria-label="Actions" />
                 </tr>
               </thead>
@@ -644,6 +679,7 @@ export default function Admin() {
                     isSelf={u.id === user?.id}
                     adminPending={adminPendingIds.has(u.id)}
                     onToggleAdmin={handleToggleAdmin}
+                    onViewProfile={handleViewProfile}
                     onDelete={target => { setDeleteError(""); setDeleteTarget(target); }}
                   />
                 ))}

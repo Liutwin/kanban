@@ -262,7 +262,7 @@ export default function Layout({ children, title, boardId, boardRole, boardCreat
           </NavLink>
           <NavLink to="/logs" className={({ isActive }) => `nav-item ${isActive ? "active" : ""}`}>
             <span className="nav-icon">≡</span>
-            <span>Journal</span>
+            <span>Mes activités</span>
           </NavLink>
           <span className="nav-section-label" style={{ marginTop: "12px" }}>Compte</span>
           <NavLink to="/profile" className={({ isActive }) => `nav-item ${isActive ? "active" : ""}`}>

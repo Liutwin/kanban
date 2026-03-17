@@ -470,6 +470,18 @@
     border-color: rgba(242, 139, 130, 0.3);
     color: var(--danger);
   }
+
+  .admin-action-btn--profile {
+    background: transparent;
+    border-color: transparent;
+    color: var(--text-3);
+  }
+
+  .admin-action-btn--profile:hover {
+    background: rgba(176, 166, 255, 0.1);
+    border-color: rgba(176, 166, 255, 0.25);
+    color: var(--accent);
+  }
   
   /* ── États (chargement / erreur / vide) ──────────────────────── */
   

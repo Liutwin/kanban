@@ -29,6 +29,9 @@ export default function App() {
         <Route path="/logs" element={
           <ProtectedRoute><Logs /></ProtectedRoute>
         } />
+        <Route path="/logs/:userSlug" element={
+          <ProtectedRoute><Logs /></ProtectedRoute>
+        } />
         <Route path="/profile" element={
           <ProtectedRoute><Profile /></ProtectedRoute>
         } />

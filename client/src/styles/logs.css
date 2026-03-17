@@ -236,3 +236,125 @@
 .log-creation     { color: #b0a6ff; }
 .log-deplacement  { color: #64d2c8; }
 .log-modification { color: #fdd663; }
+
+/* ── Profil card ──────────────────────────────────────────── */
+.logs-profile-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 20px 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  box-shadow: var(--elev-1);
+}
+
+.logs-profile-identity {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.logs-profile-avatar {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'DM Mono', monospace;
+  font-size: 18px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.logs-profile-text {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-top: 4px;
+}
+
+.logs-profile-name {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.logs-profile-email {
+  font-size: 12px;
+  color: var(--text-3);
+  font-family: 'DM Mono', monospace;
+}
+
+.logs-profile-activity {
+  font-size: 11.5px;
+  color: var(--text-3);
+  margin-top: 2px;
+}
+
+.logs-profile-error {
+  font-size: 13px;
+  color: var(--danger);
+}
+
+.logs-profile-stats {
+  /* hérite de admin-stats-grid — surcharge éventuelle */
+  border-top: 1px solid var(--border);
+  padding-top: 16px;
+}
+
+/* ── Filtres date ─────────────────────────────────────────── */
+.logs-filters-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.logs-date-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-3);
+  white-space: nowrap;
+}
+
+.logs-date-input {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  font-size: 12px;
+  font-family: 'DM Mono', monospace;
+  padding: 5px 8px;
+  outline: none;
+  cursor: pointer;
+  transition: border-color 0.12s;
+  color-scheme: dark;
+}
+
+.logs-date-input:focus {
+  border-color: var(--accent);
+}
+
+.logs-date-reset {
+  background: none;
+  border: none;
+  color: var(--text-3);
+  font-size: 13px;
+  cursor: pointer;
+  padding: 4px 6px;
+  border-radius: 6px;
+  transition: color 0.12s, background 0.12s;
+}
+
+.logs-date-reset:hover {
+  color: var(--text);
+  background: var(--surface2);
+}
