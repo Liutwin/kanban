@@ -254,6 +254,23 @@ export default function TaskDetailModal({ task, columnName, members = [], onClos
     }
   }, [commentText]);
 
+  /* Resynchronise tous les champs locaux quand la tâche affichée change.
+     Sans ce effet, ouvrir une autre tâche sans démonter la modale laisse
+     les states initialisés avec les valeurs de la première tâche — exactement
+     le même bug que sur AdminToggle avec isAdmin. */
+  useEffect(() => {
+    if (debounceRef.current) { clearTimeout(debounceRef.current); debounceRef.current = null; }
+    isClosing.current = false;
+    setTitle(task.title);
+    setDetails(task.details ?? "");
+    setDueDate(task.dueDate ? task.dueDate.slice(0, 16) : "");
+    setPriority(task.priority);
+    setAssigneeId(task.assignedId ?? null);
+    setValidated(task.validated ?? false);
+    setSaveStatus("idle");
+    setError("");
+  }, [task.id]);
+
   /* Fermer les dropdowns si clic à l'extérieur */
   useEffect(() => {
     const close = () => { setPriorityOpen(false); setAssigneeOpen(false); };
@@ -273,7 +290,7 @@ export default function TaskDetailModal({ task, columnName, members = [], onClos
 
   /* Sauvegarde automatique avec debounce */
   const doSave = async (
-    t: string, det: string, dd: string, prio: Priority
+    t: string, det: string, dd: string, prio: Priority, val = validated
   ) => {
     if (!t.trim()) { setError("Le titre ne peut pas être vide."); return; }
     setError("");
@@ -286,7 +303,7 @@ export default function TaskDetailModal({ task, columnName, members = [], onClos
         priority:      prio,
         boardColumnId: task.boardColumnId,
         creatorId:     task.creatorId,
-        validated,
+        validated:     val,
       };
       const res = await authFetch(ROUTES_API.task(task.id), { method: "PUT", body: JSON.stringify(body) });
       if (!res.ok) throw new Error("Erreur lors de la sauvegarde.");
@@ -720,9 +737,9 @@ export default function TaskDetailModal({ task, columnName, members = [], onClos
                   onClick={() => {
                     const next = !validated;
                     setValidated(next);
-                    // Annule tout debounce en cours et sauvegarde immédiatement
+                    // Annule tout debounce en cours et sauvegarde immédiatement avec la nouvelle valeur
                     if (debounceRef.current) { clearTimeout(debounceRef.current); debounceRef.current = null; }
-                    doSave(title, details, dueDate, priority);
+                    doSave(title, details, dueDate, priority, next);
                   }}
                   onMouseEnter={() => setValidateHover(true)}
                   onMouseLeave={() => setValidateHover(false)}

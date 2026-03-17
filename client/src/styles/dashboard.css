@@ -244,6 +244,13 @@
   gap: 6px;
 }
 
+.task-header-right {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
 .task-actions {
   display: flex;
   gap: 4px;
@@ -253,6 +260,58 @@
 }
 
 .task-card:hover .task-actions { opacity: 1; }
+
+/* Badge position */
+.task-pos-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 26px;
+  height: 24px;
+  padding: 0 7px;
+  border-radius: var(--radius);
+  background: var(--surface3);
+  border: 1px solid var(--border2);
+  color: var(--text-3);
+  font-family: 'DM Mono', monospace;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  line-height: 1;
+  opacity: 0;
+  transition: opacity 0.15s, background 0.15s, color 0.15s, border-color 0.15s;
+  flex-shrink: 0;
+}
+.task-card:hover .task-pos-badge { opacity: 1; }
+.task-pos-badge:hover {
+  background: rgba(176,166,255,0.15);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.task-pos-badge--readonly {
+  cursor: default;
+  pointer-events: none;
+}
+
+/* Input de position inline */
+.task-pos-input {
+  width: 46px;
+  height: 24px;
+  padding: 0 6px;
+  border-radius: var(--radius);
+  border: 1px solid var(--accent);
+  background: rgba(176,166,255,0.1);
+  color: var(--accent);
+  font-family: 'DM Mono', monospace;
+  font-size: 11px;
+  font-weight: 600;
+  text-align: center;
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(176,166,255,0.15);
+  -moz-appearance: textfield;
+}
+.task-pos-input::-webkit-inner-spin-button,
+.task-pos-input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
 
 .icon-btn {
   background: var(--surface3);

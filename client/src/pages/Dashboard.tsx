@@ -128,6 +128,10 @@ export default function Dashboard() {
   const [colNameDraft, setColNameDraft]   = useState("");
   const colNameInputRef = useRef<HTMLInputElement>(null);
 
+  // Édition inline de la position d'une tâche
+  const [editingPosTaskId, setEditingPosTaskId] = useState<number | null>(null);
+  const [posDraft,         setPosDraft]         = useState("");
+
   /* ── Chargement ──────────────────────────────────────────── */
 
   const fetchBoard = async () => {
@@ -435,6 +439,31 @@ export default function Dashboard() {
     ).catch(() => { setColumns(columnsSnapshot.current); fetchBoard(); });
   };
 
+  /* ── Déplacement par position saisie ────────────────────── */
+
+  const commitPosition = useCallback((task: Task, col: ColumnWithTasks, rawValue: string) => {
+    setEditingPosTaskId(null);
+    const parsed = parseInt(rawValue, 10);
+    if (isNaN(parsed)) return;
+    // L'utilisateur saisit un numéro 1-based visible ; on le convertit en index 0-based
+    const maxPos  = col.tasks.length - 1;
+    const target  = Math.max(0, Math.min(parsed - 1, maxPos));
+    if (target === task.position) return;
+
+    // Optimistic UI : même logique que handleDrop pour la même colonne
+    columnsSnapshot.current = columns;
+    const reordered = col.tasks.filter(t => t.id !== task.id);
+    reordered.splice(target, 0, task);
+    setColumns(prev => prev.map(c =>
+      c.id === col.id ? { ...c, tasks: reordered.map((t, i) => ({ ...t, position: i })) } : c
+    ));
+
+    authFetch(
+      `${ROUTES_API.taskMove(task.id)}?newId=${col.id}&position=${target}`,
+      { method: "PATCH", body: "{}" }
+    ).catch(() => { setColumns(columnsSnapshot.current); fetchBoard(); });
+  }, [columns, authFetch, fetchBoard]);
+
   /* ── Drag & drop colonnes ────────────────────────────────── */
 
   /**
@@ -740,13 +769,57 @@ export default function Dashboard() {
                           <span className={`badge ${priorityClass(task.priority)}`}>
                             {priorityLabel(task.priority)}
                           </span>
-                          {!isReadOnly && (
-                            <div className="task-actions">
-                              <Tooltip text="Supprimer" position="top">
-                                <button className="icon-btn danger" onClick={e => { e.stopPropagation(); handleDeleteTask(task.id); }}>✕</button>
-                              </Tooltip>
-                            </div>
-                          )}
+
+                          <div className="task-header-right">
+                            {/* Badge position — cliquable pour éditer (non-lecteur seulement) */}
+                            {!isReadOnly ? (
+                              editingPosTaskId === task.id ? (
+                                <input
+                                  className="task-pos-input"
+                                  type="number"
+                                  min={1}
+                                  max={col.tasks.length}
+                                  value={posDraft}
+                                  autoFocus
+                                  onClick={e => { e.stopPropagation(); (e.target as HTMLInputElement).select(); }}
+                                  onFocus={e => e.target.select()}
+                                  onChange={e => setPosDraft(e.target.value)}
+                                  onBlur={() => commitPosition(task, col, posDraft)}
+                                  onKeyDown={e => {
+                                    e.stopPropagation();
+                                    if (e.key === "Enter")  { (e.target as HTMLInputElement).blur(); }
+                                    if (e.key === "Escape") { setEditingPosTaskId(null); }
+                                  }}
+                                />
+                              ) : (
+                                <Tooltip text="Modifier la position" position="top">
+                                  <button
+                                    className="task-pos-badge"
+                                    onClick={e => {
+                                      e.stopPropagation();
+                                      setPosDraft(String(task.position + 1));
+                                      setEditingPosTaskId(task.id);
+                                    }}
+                                    aria-label={`Position ${task.position + 1}`}
+                                  >
+                                    #{task.position + 1}
+                                  </button>
+                                </Tooltip>
+                              )
+                            ) : (
+                              <span className="task-pos-badge task-pos-badge--readonly">
+                                {task.position + 1}
+                              </span>
+                            )}
+
+                            {!isReadOnly && (
+                              <div className="task-actions">
+                                <Tooltip text="Supprimer" position="top">
+                                  <button className="icon-btn danger" onClick={e => { e.stopPropagation(); handleDeleteTask(task.id); }}>✕</button>
+                                </Tooltip>
+                              </div>
+                            )}
+                          </div>
                         </div>
 
                         <p className="task-title">{task.title}</p>

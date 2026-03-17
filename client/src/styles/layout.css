@@ -709,7 +709,8 @@
      display: inline-flex;
      align-items: center;
      gap: 6px;
-     padding: 6px 10px;
+     width: 110px;           /* largeur fixe — le texte change mais le bouton ne bouge pas */
+     padding: 6px 8px;
      background: var(--surface2);
      border: 1px solid var(--border2);
      border-radius: var(--radius);
@@ -719,8 +720,16 @@
      font-weight: 500;
      cursor: pointer;
      white-space: nowrap;
+     overflow: hidden;
      transition: background 0.15s, color 0.15s, border-color 0.15s;
      user-select: none;
+     flex-shrink: 0;
+   }
+   
+   .search-select-trigger > span {
+     flex: 1;
+     overflow: hidden;
+     text-overflow: ellipsis;
    }
    .search-select-trigger:hover {
      background: var(--surface3);
@@ -862,8 +871,10 @@
    .members-btn {
      display: inline-flex;
      align-items: center;
+     justify-content: center;
      gap: 6px;
-     padding: 6px 12px;
+     width: 92px;          /* taille fixe — évite tout décalage à l'ouverture */
+     padding: 6px 0;
      background: var(--surface2);
      border: 1px solid var(--border2);
      border-radius: var(--radius);
@@ -872,8 +883,9 @@
      font-size: 12px;
      font-weight: 500;
      cursor: pointer;
-     transition: all 0.18s ease;
+     transition: background 0.18s ease, color 0.18s ease, border-color 0.18s ease;
      white-space: nowrap;
+     flex-shrink: 0;
    }
    
    .members-btn:hover {
