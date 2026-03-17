@@ -74,16 +74,26 @@ export default function Dashboard() {
   const colDropTargetRef = useRef<ColumnWithTasks | null>(null);
 
   /* ── Recherche ───────────────────────────────────────────── */
-  const [searchQuery,    setSearchQuery]    = useState("");
-  const [searchPriority, setSearchPriority] = useState<"" | "basse" | "moyenne" | "haute">("");
-  const [searchAssignee, setSearchAssignee] = useState<number | "">("");
+  const [searchQuery,      setSearchQuery]      = useState("");
+  const [searchPriorities, setSearchPriorities] = useState<Set<string>>(new Set());
+  const [searchAssignees,  setSearchAssignees]  = useState<Set<number>>(new Set());
 
   useEffect(() => {
     const handler = (e: Event) => {
-      const d = (e as CustomEvent<{ query: string; priority: string; assigneeId: number | "" }>).detail;
+      const d = (e as CustomEvent<{
+        query: string;
+        priorities?: string[];
+        assigneeIds?: number[];
+        priority?: string;
+        assigneeId?: number | "";
+      }>).detail;
       setSearchQuery(d.query ?? "");
-      setSearchPriority((d.priority as "" | "basse" | "moyenne" | "haute") ?? "");
-      setSearchAssignee(d.assigneeId ?? "");
+      setSearchPriorities(new Set(d.priorities?.length ? d.priorities : (d.priority ? [d.priority] : [])));
+      setSearchAssignees(new Set(
+        d.assigneeIds?.length
+          ? d.assigneeIds
+          : (d.assigneeId && d.assigneeId !== "" ? [d.assigneeId as number] : [])
+      ));
     };
     window.addEventListener("kanban:search", handler);
     return () => window.removeEventListener("kanban:search", handler);
@@ -93,12 +103,11 @@ export default function Dashboard() {
   const filterTasks = useCallback((tasks: Task[]) => {
     return tasks.filter(t => {
       if (searchQuery.trim() && !t.title.toLowerCase().includes(searchQuery.toLowerCase()) && !(t.details ?? "").toLowerCase().includes(searchQuery.toLowerCase())) return false;
-      if (searchPriority && t.priority !== searchPriority) return false;
-      if (searchAssignee !== "" && searchAssignee !== -1 && t.assignedId !== searchAssignee) return false;
+      if (searchPriorities.size > 0 && !searchPriorities.has(t.priority)) return false;
+      if (searchAssignees.size > 0 && (t.assignedId == null || !searchAssignees.has(t.assignedId))) return false;
       return true;
     });
-  }, [searchQuery, searchPriority, searchAssignee]);
-
+  }, [searchQuery, searchPriorities, searchAssignees]);
   const columnsSnapshot   = useRef<ColumnWithTasks[]>([]);
   const didDrop           = useRef(false);
   const lastLiveTaskKey   = useRef<string>("");
@@ -644,7 +653,7 @@ export default function Dashboard() {
                     >{col.name}</span>
                   )}
                   <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                    <span className="col-count">{filterTasks(col.tasks).length}{(searchQuery || searchPriority || searchAssignee !== "") && filterTasks(col.tasks).length !== col.tasks.length ? `/${col.tasks.length}` : ""}</span>
+                    <span className="col-count">{filterTasks(col.tasks).length}{(searchQuery.trim() || searchPriorities.size > 0 || searchAssignees.size > 0) && filterTasks(col.tasks).length !== col.tasks.length ? `/${col.tasks.length}` : ""}</span>
                     {!isReadOnly && (
                       <Tooltip text="Supprimer la colonne">
                         <button

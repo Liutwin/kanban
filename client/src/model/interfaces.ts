@@ -77,6 +77,7 @@ export interface Task {
   creatorId:     number;
   assignedId?:   number;
   position:      number;
+  validated?:    boolean;
 }
 
 export type Priority = "basse" | "moyenne" | "haute";

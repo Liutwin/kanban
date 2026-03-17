@@ -73,8 +73,10 @@ export default function TaskDetailModal({ task, columnName, members = [], onClos
   const [dueDate,    setDueDate]    = useState(task.dueDate ? task.dueDate.slice(0, 16) : "");
   const [priority,   setPriority]   = useState<Priority>(task.priority);
   const [assigneeId, setAssigneeId] = useState<number | null>(task.assignedId ?? null);
-  const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const [saveStatus, setSaveStatus] = useState<"idle" | "pending" | "saving" | "saved" | "error">("idle");
   const [error,      setError]      = useState("");
+  const [validated,  setValidated]  = useState<boolean>(task.validated ?? false);
+  const [validateHover, setValidateHover] = useState(false);
   const debounceRef        = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isClosing          = useRef(false);
   const commentTextareaRef = useRef<HTMLTextAreaElement>(null);
@@ -284,6 +286,7 @@ export default function TaskDetailModal({ task, columnName, members = [], onClos
         priority:      prio,
         boardColumnId: task.boardColumnId,
         creatorId:     task.creatorId,
+        validated,
       };
       const res = await authFetch(ROUTES_API.task(task.id), { method: "PUT", body: JSON.stringify(body) });
       if (!res.ok) throw new Error("Erreur lors de la sauvegarde.");
@@ -303,7 +306,7 @@ export default function TaskDetailModal({ task, columnName, members = [], onClos
     t = title, det = details, dd = dueDate, prio = priority
   ) => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
-    setSaveStatus("saving");
+    setSaveStatus("pending");
     debounceRef.current = setTimeout(() => doSave(t, det, dd, prio), 800);
   };
 
@@ -377,8 +380,8 @@ export default function TaskDetailModal({ task, columnName, members = [], onClos
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 22px 0", gap: 12, flexShrink: 0 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 7, fontSize: 12, fontFamily: "'DM Mono', monospace", color: "#7a7288" }}>
             <span style={{ color: "#b0a6ff", fontWeight: 500 }}>{columnName}</span>
-            <span style={{ opacity: 0.4 }}>›</span>
-            <span>#{task.id}</span>
+            <span style={{ opacity: 0.4 }}>·</span>
+            <span style={{ opacity: 0.55 }}>#{task.id}</span>
           </div>
           <Tooltip text="Fermer" position="bottom">
             <button
@@ -694,12 +697,67 @@ export default function TaskDetailModal({ task, columnName, members = [], onClos
                 }}
                 readOnly={!canEdit}
                 style={{ ...inputBase, fontSize: 12, fontFamily: "'DM Mono', monospace", color: overdue ? "#f28b82" : "#b8b0c8" }}
-                onFocus={e => e.currentTarget.style.background = "rgba(255,255,255,0.05)"}
+                onFocus={e => {
+                  e.currentTarget.style.background = "rgba(255,255,255,0.05)";
+                  if (canEdit && !dueDate) {
+                    const now = new Date();
+                    const pad = (n: number) => String(n).padStart(2, "0");
+                    const local = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}`;
+                    setDueDate(local);
+                  }
+                }}
                 onBlur={e  => e.currentTarget.style.background = "transparent"}
               />
               {dueDate && overdue && <span style={{ fontSize: 10, fontWeight: 600, padding: "2px 7px", borderRadius: 999, background: "rgba(242,139,130,0.12)", border: "1px solid rgba(242,139,130,0.25)", color: "#f28b82", letterSpacing: "0.05em", textTransform: "uppercase", marginTop: 4, display: "inline-block" }}>En retard</span>}
               {dueDate && canEdit && <button onClick={() => { setDueDate(""); scheduleAutoSave(title, details, ""); }} style={{ display: "block", marginTop: 3, fontSize: 11, color: "#7a7288", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", padding: "2px 8px" }}>× Effacer</button>}
             </div>
+
+            {/* Valider la tâche */}
+            {canEdit && (
+              <div>
+                <Label>✅ Validation</Label>
+                <button
+                  onClick={() => {
+                    const next = !validated;
+                    setValidated(next);
+                    // Annule tout debounce en cours et sauvegarde immédiatement
+                    if (debounceRef.current) { clearTimeout(debounceRef.current); debounceRef.current = null; }
+                    doSave(title, details, dueDate, priority);
+                  }}
+                  onMouseEnter={() => setValidateHover(true)}
+                  onMouseLeave={() => setValidateHover(false)}
+                  style={{
+                    display: "flex", alignItems: "center", justifyContent: "space-between",
+                    width: "100%", padding: "9px 12px",
+                    background: validated
+                      ? "rgba(129,201,149,0.12)"
+                      : validateHover ? "rgba(255,255,255,0.05)" : "rgba(255,255,255,0.03)",
+                    border: `1px solid ${validated ? "rgba(129,201,149,0.35)" : "rgba(255,255,255,0.1)"}`,
+                    borderRadius: 10, cursor: "pointer", fontFamily: "inherit",
+                    transition: "all 0.18s",
+                  }}
+                >
+                  <span style={{ fontSize: 12, fontWeight: 600, color: validated ? "#81c995" : "#b8b0c8" }}>
+                    {validated ? "Tâche validée" : "Valider la tâche"}
+                  </span>
+                  {/* Toggle pill */}
+                  <div style={{
+                    position: "relative", width: 36, height: 20, borderRadius: 999, flexShrink: 0,
+                    background: validated ? "#81c995" : "rgba(255,255,255,0.15)",
+                    transition: "background 0.22s",
+                    boxShadow: validated ? "0 0 8px rgba(129,201,149,0.4)" : "none",
+                  }}>
+                    <div style={{
+                      position: "absolute", top: 3, left: validated ? 18 : 3,
+                      width: 14, height: 14, borderRadius: "50%",
+                      background: validated ? "#1c1b1f" : "#e8e0f0",
+                      transition: "left 0.22s, background 0.22s",
+                      boxShadow: "0 1px 3px rgba(0,0,0,0.35)",
+                    }} />
+                  </div>
+                </button>
+              </div>
+            )}
 
             {/* Créateur (lecture seule) */}
             <div>
@@ -765,6 +823,7 @@ export default function TaskDetailModal({ task, columnName, members = [], onClos
               {canEdit && (
                 <>
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 7, padding: "8px 0", fontSize: 12, fontFamily: "'DM Mono', monospace", color: saveStatus === "error" ? "#f28b82" : saveStatus === "saving" ? "#7a7288" : saveStatus === "saved" ? "#81c995" : "#7a7288", transition: "color 0.3s" }}>
+                    {saveStatus === "pending" && <span style={{ opacity: 0.35 }}>En attente…</span>}
                     {saveStatus === "saving" && <><span style={{ display: "inline-block", width: 10, height: 10, border: "1.5px solid currentColor", borderTopColor: "transparent", borderRadius: "50%", animation: "spin 0.7s linear infinite" }} /> Sauvegarde…</>}
                     {saveStatus === "saved"  && <>✓ Sauvegardé</>}
                     {saveStatus === "error"  && <>⚠ Erreur</>}
@@ -773,11 +832,11 @@ export default function TaskDetailModal({ task, columnName, members = [], onClos
                   <Tooltip text="Supprimer la tâche" position="top">
                     <button
                       onClick={() => onDelete(task.id)}
-                      onMouseEnter={e => { e.currentTarget.style.background = "rgba(242,139,130,0.15)"; e.currentTarget.style.borderColor = "rgba(242,139,130,0.35)"; }}
-                      onMouseLeave={e => { e.currentTarget.style.background = "rgba(242,139,130,0.08)"; e.currentTarget.style.borderColor = "rgba(242,139,130,0.2)"; }}
-                      style={{ width: "100%", padding: "9px 0", borderRadius: 10, background: "rgba(242,139,130,0.08)", border: "1px solid rgba(242,139,130,0.2)", color: "#f28b82", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", transition: "all 0.15s" }}
+                      onMouseEnter={e => { e.currentTarget.style.background = "rgba(242,139,130,0.2)"; e.currentTarget.style.borderColor = "rgba(242,139,130,0.5)"; e.currentTarget.style.transform = "scale(1.02)"; }}
+                      onMouseLeave={e => { e.currentTarget.style.background = "rgba(242,139,130,0.08)"; e.currentTarget.style.borderColor = "rgba(242,139,130,0.25)"; e.currentTarget.style.transform = "scale(1)"; }}
+                      style={{ width: "100%", padding: "11px 16px", borderRadius: 12, background: "rgba(242,139,130,0.08)", border: "1px solid rgba(242,139,130,0.25)", color: "#f28b82", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", transition: "all 0.18s", letterSpacing: "0.02em", display: "flex", alignItems: "center", justifyContent: "center", gap: 7 }}
                     >
-                      ✕ Supprimer
+                      <span style={{ fontSize: 15 }}>🗑</span> Supprimer la tâche
                     </button>
                   </Tooltip>
                 </>

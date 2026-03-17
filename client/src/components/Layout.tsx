@@ -47,7 +47,7 @@ interface LayoutProps {
  *
  * @param props - {@link LayoutProps}
  */
-interface AvatarInfo { userId: number; firstName: string; lastName: string; email: string; role: "admin" | "editeur" | "lecteur"; }
+interface AvatarInfo { userId: number; firstName: string; lastName: string; email: string; role: "admin" | "editeur" | "lecteur"; avatar?: string; }
 
 export default function Layout({ children, title, boardId, boardRole, boardCreatorId }: LayoutProps) {
   const { user, logout, authFetch } = useAuth();
@@ -76,18 +76,80 @@ export default function Layout({ children, title, boardId, boardRole, boardCreat
     `${user?.firstName?.charAt(0) ?? ""}${user?.lastName?.charAt(0) ?? ""}`.toUpperCase() || "?";
 
   /* ── Recherche ───────────────────────────────────────────── */
-  const [searchValue, setSearchValue] = useState("");
+  const [searchValue,      setSearchValue]      = useState("");
+  const [searchPriorities, setSearchPriorities] = useState<Set<"basse"|"moyenne"|"haute">>(new Set());
+  const [searchAssignees,  setSearchAssignees]  = useState<Set<number>>(new Set());
+  const [assigneeDropOpen, setAssigneeDropOpen] = useState(false);
+  const assigneeDropRef = useRef<HTMLDivElement>(null);
+
+  /** Indique si au moins un filtre est actif. */
+  const hasActiveFilter = searchValue.trim() !== "" || searchPriorities.size > 0 || searchAssignees.size > 0;
 
   /** Émet un événement global que Dashboard.tsx peut intercepter pour filtrer. */
+  const dispatchSearch = useCallback(
+    (query: string, priorities: Set<string>, assignees: Set<number>) => {
+      window.dispatchEvent(new CustomEvent("kanban:search", {
+        detail: {
+          query,
+          priority:    [...priorities][0] ?? "",
+          assigneeId:  [...assignees][0]  ?? "",
+          priorities:  [...priorities],
+          assigneeIds: [...assignees],
+        },
+      }));
+    },
+    []
+  );
+
   const handleSearch = useCallback((value: string) => {
     setSearchValue(value);
-    window.dispatchEvent(new CustomEvent("kanban:search", { detail: { query: value } }));
+    dispatchSearch(value, searchPriorities, searchAssignees);
+  }, [searchPriorities, searchAssignees, dispatchSearch]);
+
+  const togglePriority = useCallback((p: "basse"|"moyenne"|"haute") => {
+    setSearchPriorities(prev => {
+      const next = new Set(prev);
+      next.has(p) ? next.delete(p) : next.add(p);
+      dispatchSearch(searchValue, next, searchAssignees);
+      return next;
+    });
+  }, [searchValue, searchAssignees, dispatchSearch]);
+
+  const toggleAssignee = useCallback((id: number) => {
+    setSearchAssignees(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      dispatchSearch(searchValue, searchPriorities, next);
+      return next;
+    });
+  }, [searchValue, searchPriorities, dispatchSearch]);
+
+  const handleReset = useCallback(() => {
+    setSearchValue("");
+    setSearchPriorities(new Set());
+    setSearchAssignees(new Set());
+    dispatchSearch("", new Set(), new Set());
+  }, [dispatchSearch]);
+
+  // Ferme le dropdown assigné si clic en dehors
+  useEffect(() => {
+    const onClickOutside = (e: MouseEvent) => {
+      if (assigneeDropRef.current && !assigneeDropRef.current.contains(e.target as Node)) {
+        setAssigneeDropOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", onClickOutside);
+    return () => document.removeEventListener("mousedown", onClickOutside);
   }, []);
 
   // Réinitialise la recherche à chaque changement de page
   useEffect(() => {
     setSearchValue("");
-    window.dispatchEvent(new CustomEvent("kanban:search", { detail: { query: "" } }));
+    setSearchPriorities(new Set());
+    setSearchAssignees(new Set());
+    window.dispatchEvent(new CustomEvent("kanban:search", {
+      detail: { query: "", priority: "", assigneeId: "", priorities: [], assigneeIds: [] },
+    }));
   }, [location.pathname]);
 
   /* ── Membres du tableau ──────────────────────────────────── */
@@ -237,28 +299,123 @@ export default function Layout({ children, title, boardId, boardRole, boardCreat
           {boardId ? (
             <div className="top-bar-right top-bar-board">
 
-              {/* Champ de recherche */}
-              <div className="search-wrapper">
-                <svg className="search-icon" width="14" height="14" viewBox="0 0 16 16" fill="none">
-                  <circle cx="6.5" cy="6.5" r="4.5" stroke="currentColor" strokeWidth="1.5"/>
-                  <line x1="10" y1="10" x2="14.5" y2="14.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-                </svg>
-                <input
-                  type="text"
-                  className="search-input"
-                  placeholder="Rechercher une tâche…"
-                  value={searchValue}
-                  onChange={e => handleSearch(e.target.value)}
-                  aria-label="Rechercher une tâche"
-                />
-                {searchValue && (
-                  <button className="search-clear" onClick={() => handleSearch("")} aria-label="Effacer la recherche">
-                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                      <line x1="1" y1="1" x2="11" y2="11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-                      <line x1="11" y1="1" x2="1" y2="11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-                    </svg>
-                  </button>
+              {/* Barre de recherche + filtres */}
+              <div className="search-bar">
+
+                {/* Champ texte */}
+                <div className="search-wrapper">
+                  <svg className="search-icon" width="14" height="14" viewBox="0 0 16 16" fill="none">
+                    <circle cx="6.5" cy="6.5" r="4.5" stroke="currentColor" strokeWidth="1.5"/>
+                    <line x1="10" y1="10" x2="14.5" y2="14.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                  </svg>
+                  <input
+                    type="text"
+                    className="search-input"
+                    placeholder="Rechercher une tâche…"
+                    value={searchValue}
+                    onChange={e => handleSearch(e.target.value)}
+                    aria-label="Rechercher une tâche"
+                  />
+                  {searchValue && (
+                    <button className="search-clear" onClick={() => handleSearch("")} aria-label="Effacer le texte">
+                      <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                        <line x1="1" y1="1" x2="11" y2="11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                        <line x1="11" y1="1" x2="1" y2="11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                      </svg>
+                    </button>
+                  )}
+                </div>
+
+                {/* Filtre Priorité — boutons multi-sélection */}
+                <div className={`search-filter-btn-group${searchPriorities.size > 0 ? " search-filter-btn-group--active" : ""}`}>
+                  {(["basse", "moyenne", "haute"] as const).map(p => (
+                    <button
+                      key={p}
+                      className={`search-filter-btn search-filter-btn--${p}${searchPriorities.has(p) ? " search-filter-btn--selected" : ""}`}
+                      onClick={() => togglePriority(p)}
+                      aria-pressed={searchPriorities.has(p)}
+                      title={`Priorité ${p}`}
+                    >
+                      {p.charAt(0).toUpperCase() + p.slice(1)}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Filtre Assigné — dropdown checkboxes */}
+                {avatarMembers.length > 0 && (
+                  <div className="search-select-wrapper" ref={assigneeDropRef}>
+                    <button
+                      className={`search-select-trigger${searchAssignees.size > 0 ? " search-select-trigger--active" : ""}`}
+                      onClick={() => setAssigneeDropOpen(o => !o)}
+                      aria-haspopup="listbox"
+                      aria-expanded={assigneeDropOpen}
+                    >
+                      <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
+                        <circle cx="8" cy="5" r="3" stroke="currentColor" strokeWidth="1.5"/>
+                        <path d="M2 14c0-3.314 2.686-5 6-5s6 1.686 6 5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                      </svg>
+                      <span>
+                        {searchAssignees.size === 0
+                          ? "Membres"
+                          : searchAssignees.size === 1
+                            ? avatarMembers.find(m => searchAssignees.has(m.userId))?.firstName ?? "1 membre"
+                            : `${searchAssignees.size} membres`}
+                      </span>
+                      <svg className={`search-select-chevron${assigneeDropOpen ? " search-select-chevron--open" : ""}`} width="10" height="10" viewBox="0 0 10 10" fill="none">
+                        <path d="M2 3.5l3 3 3-3" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                    </button>
+
+                    {assigneeDropOpen && (
+                      <ul className="search-select-dropdown" role="listbox" aria-multiselectable="true">
+                        {avatarMembers.map(m => {
+                          const checked = searchAssignees.has(m.userId);
+                          const avatarStyle = getAvatarStyle(m.userId);
+                          return (
+                            <li
+                              key={m.userId}
+                              role="option"
+                              aria-selected={checked}
+                              className={`search-select-option${checked ? " search-select-option--checked" : ""}`}
+                              onClick={() => toggleAssignee(m.userId)}
+                            >
+                              <span className="search-select-option-check">
+                                {checked && (
+                                  <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                                    <polyline points="1.5,5 4,7.5 8.5,2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                                  </svg>
+                                )}
+                              </span>
+                              {m.avatar
+                                ? <img src={m.avatar} alt="" style={{ width: 20, height: 20, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />
+                                : <span style={{ width: 20, height: 20, borderRadius: "50%", background: avatarStyle.background, color: "#1c1b1f", fontSize: 8, fontWeight: 700, display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                                    {m.firstName.charAt(0)}{m.lastName.charAt(0)}
+                                  </span>
+                              }
+                              <span className="search-select-option-name">{m.firstName} {m.lastName}</span>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    )}
+                  </div>
                 )}
+
+                {/* Bouton réinitialisation — toujours présent, invisible si inactif */}
+                <button
+                  className="search-reset-btn"
+                  style={{ visibility: hasActiveFilter ? "visible" : "hidden" }}
+                  onClick={handleReset}
+                  tabIndex={hasActiveFilter ? 0 : -1}
+                  title="Réinitialiser les filtres"
+                >
+                  <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
+                    <path d="M2 8a6 6 0 1 0 1.5-3.9" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
+                    <polyline points="2 3.5 2 8 6.5 8" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                  Réinitialiser
+                </button>
+
               </div>
 
               {/* Avatars empilés + bouton membres */}
