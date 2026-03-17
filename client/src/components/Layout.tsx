@@ -79,15 +79,16 @@ export default function Layout({ children, title, boardId, boardRole, boardCreat
   const [searchValue,      setSearchValue]      = useState("");
   const [searchPriorities, setSearchPriorities] = useState<Set<"basse"|"moyenne"|"haute">>(new Set());
   const [searchAssignees,  setSearchAssignees]  = useState<Set<number>>(new Set());
+  const [hideCompleted,    setHideCompleted]    = useState(false);
   const [assigneeDropOpen, setAssigneeDropOpen] = useState(false);
   const assigneeDropRef = useRef<HTMLDivElement>(null);
 
   /** Indique si au moins un filtre est actif. */
-  const hasActiveFilter = searchValue.trim() !== "" || searchPriorities.size > 0 || searchAssignees.size > 0;
+  const hasActiveFilter = searchValue.trim() !== "" || searchPriorities.size > 0 || searchAssignees.size > 0 || hideCompleted;
 
   /** Émet un événement global que Dashboard.tsx peut intercepter pour filtrer. */
   const dispatchSearch = useCallback(
-    (query: string, priorities: Set<string>, assignees: Set<number>) => {
+    (query: string, priorities: Set<string>, assignees: Set<number>, hideDone: boolean) => {
       window.dispatchEvent(new CustomEvent("kanban:search", {
         detail: {
           query,
@@ -95,6 +96,7 @@ export default function Layout({ children, title, boardId, boardRole, boardCreat
           assigneeId:  [...assignees][0]  ?? "",
           priorities:  [...priorities],
           assigneeIds: [...assignees],
+          hideCompleted: hideDone,
         },
       }));
     },
@@ -103,32 +105,40 @@ export default function Layout({ children, title, boardId, boardRole, boardCreat
 
   const handleSearch = useCallback((value: string) => {
     setSearchValue(value);
-    dispatchSearch(value, searchPriorities, searchAssignees);
-  }, [searchPriorities, searchAssignees, dispatchSearch]);
+    dispatchSearch(value, searchPriorities, searchAssignees, hideCompleted);
+  }, [searchPriorities, searchAssignees, hideCompleted, dispatchSearch]);
 
   const togglePriority = useCallback((p: "basse"|"moyenne"|"haute") => {
     setSearchPriorities(prev => {
       const next = new Set(prev);
       next.has(p) ? next.delete(p) : next.add(p);
-      dispatchSearch(searchValue, next, searchAssignees);
+      dispatchSearch(searchValue, next, searchAssignees, hideCompleted);
       return next;
     });
-  }, [searchValue, searchAssignees, dispatchSearch]);
+  }, [searchValue, searchAssignees, hideCompleted, dispatchSearch]);
 
   const toggleAssignee = useCallback((id: number) => {
     setSearchAssignees(prev => {
       const next = new Set(prev);
       next.has(id) ? next.delete(id) : next.add(id);
-      dispatchSearch(searchValue, searchPriorities, next);
+      dispatchSearch(searchValue, searchPriorities, next, hideCompleted);
       return next;
     });
-  }, [searchValue, searchPriorities, dispatchSearch]);
+  }, [searchValue, searchPriorities, hideCompleted, dispatchSearch]);
+
+  const toggleHideCompleted = useCallback(() => {
+    setHideCompleted(prev => {
+      dispatchSearch(searchValue, searchPriorities, searchAssignees, !prev);
+      return !prev;
+    });
+  }, [searchValue, searchPriorities, searchAssignees, dispatchSearch]);
 
   const handleReset = useCallback(() => {
     setSearchValue("");
     setSearchPriorities(new Set());
     setSearchAssignees(new Set());
-    dispatchSearch("", new Set(), new Set());
+    setHideCompleted(false);
+    dispatchSearch("", new Set(), new Set(), false);
   }, [dispatchSearch]);
 
   // Ferme le dropdown assigné si clic en dehors
@@ -147,8 +157,9 @@ export default function Layout({ children, title, boardId, boardRole, boardCreat
     setSearchValue("");
     setSearchPriorities(new Set());
     setSearchAssignees(new Set());
+    setHideCompleted(false);
     window.dispatchEvent(new CustomEvent("kanban:search", {
-      detail: { query: "", priority: "", assigneeId: "", priorities: [], assigneeIds: [] },
+      detail: { query: "", priority: "", assigneeId: "", priorities: [], assigneeIds: [], hideCompleted: false },
     }));
   }, [location.pathname]);
 
@@ -340,6 +351,22 @@ export default function Layout({ children, title, boardId, boardRole, boardCreat
                     </button>
                   ))}
                 </div>
+
+                {/* Filtre "Masquer les validées" */}
+                <button
+                  className={`search-filter-btn search-filter-btn--done${hideCompleted ? " search-filter-btn--selected" : ""}`}
+                  onClick={toggleHideCompleted}
+                  aria-pressed={hideCompleted}
+                  title={hideCompleted ? "Afficher les tâches validées" : "Masquer les tâches validées"}
+                >
+                  <svg width="11" height="11" viewBox="0 0 12 12" fill="none" style={{marginRight:4,flexShrink:0}}>
+                    {hideCompleted
+                      ? <><circle cx="6" cy="6" r="5" stroke="currentColor" strokeWidth="1.5" fill="currentColor" fillOpacity="0.15"/><polyline points="3,6 5.2,8.2 9,4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></>
+                      : <circle cx="6" cy="6" r="5" stroke="currentColor" strokeWidth="1.5"/>
+                    }
+                  </svg>
+                  {hideCompleted ? "Validées masquées" : "Masquer validées"}
+                </button>
 
                 {/* Filtre Assigné — dropdown checkboxes */}
                 {avatarMembers.length > 0 && (

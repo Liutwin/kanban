@@ -94,6 +94,7 @@ export default function MyTasks() {
   const [sortDir,        setSortDir]        = useState<SortDir>("asc");
   const [groupByBoard,   setGroupByBoard]   = useState(true);
   const [searchQuery,    setSearchQuery]    = useState("");
+  const [hideValidated,  setHideValidated]  = useState(false);
 
   // ── Chargement ────────────────────────────────────────────
 
@@ -183,6 +184,8 @@ export default function MyTasks() {
 
     if (filterPriority) list = list.filter(t => t.priority === filterPriority);
 
+    if (hideValidated) list = list.filter(t => !t.validated);
+
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
       list = list.filter(t =>
@@ -208,7 +211,7 @@ export default function MyTasks() {
     });
 
     return list;
-  }, [tasks, filterPriority, searchQuery, sortKey, sortDir]);
+  }, [tasks, filterPriority, hideValidated, searchQuery, sortKey, sortDir]);
 
   /** Tâches groupées par tableau (Map préservant l'ordre d'insertion). */
   const grouped = useMemo(() => {
@@ -311,6 +314,32 @@ export default function MyTasks() {
             >
               Grouper par tableau
             </button>
+            <div style={{ width: 1, height: 20, background: "var(--border2)" }} />
+            <button
+              onClick={() => setHideValidated(v => !v)}
+              title={hideValidated ? "Afficher aussi les tâches terminées" : "Masquer les tâches terminées"}
+              style={{
+                display: "flex", alignItems: "center", gap: 6,
+                padding: "6px 12px", borderRadius: 999, fontSize: 12,
+                fontWeight: hideValidated ? 600 : 400, cursor: "pointer",
+                fontFamily: "inherit", transition: "all 0.15s",
+                background: hideValidated ? "rgba(129,201,149,0.12)" : "var(--surface2)",
+                border: `1px solid ${hideValidated ? "rgba(129,201,149,0.35)" : "var(--border2)"}`,
+                color: hideValidated ? "#81c995" : "var(--text-3)",
+              }}
+            >
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none" style={{ flexShrink: 0 }}>
+                {hideValidated ? (
+                  <path d="M1 6l3 3 7-7" stroke="#81c995" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+                ) : (
+                  <>
+                    <circle cx="6" cy="6" r="4.5" stroke="currentColor" strokeWidth="1.5"/>
+                    <path d="M3.5 6l2 2 3-3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                  </>
+                )}
+              </svg>
+              {hideValidated ? "Terminées masquées" : "Masquer terminées"}
+            </button>
           </div>
         </div>
         </div>
@@ -337,10 +366,10 @@ export default function MyTasks() {
           <div style={{ textAlign: "center", padding: "60px 0", color: "var(--text-3)" }}>
             <div style={{ fontSize: 36, marginBottom: 12 }}>✓</div>
             <p style={{ fontSize: 14, fontWeight: 600, color: "var(--text-2)", marginBottom: 4 }}>
-              {filterPriority ? "Aucune tâche pour ce filtre" : "Aucune tâche assignée"}
+              {filterPriority ? "Aucune tâche pour ce filtre" : hideValidated ? "Toutes les tâches sont terminées" : "Aucune tâche assignée"}
             </p>
             <p style={{ fontSize: 13 }}>
-              {filterPriority ? "Essayez un autre filtre." : "Vous n'avez pas de tâche assignée pour le moment."}
+              {filterPriority ? "Essayez un autre filtre." : hideValidated ? "Désactivez le filtre pour les afficher." : "Vous n'avez pas de tâche assignée pour le moment."}
             </p>
           </div>
         ) : groupByBoard ? (
@@ -466,8 +495,14 @@ function TaskRow({ task, showBoard, onOpen }: {
 
       {/* Titre + fil d'Ariane */}
       <div style={{ minWidth: 0 }}>
-        <p style={{ fontSize: 13.5, fontWeight: 600, color: "var(--text)", letterSpacing: "-0.01em", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", marginBottom: 2 }}>
-          {task.title}
+        <p style={{ fontSize: 13.5, fontWeight: 600, color: task.validated ? "#81c995" : "var(--text)", letterSpacing: "-0.01em", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", marginBottom: 2, display: "flex", alignItems: "center", gap: 6 }}>
+          {task.validated && (
+            <svg width="13" height="13" viewBox="0 0 13 13" fill="none" style={{ flexShrink: 0, marginTop: 1 }}>
+              <circle cx="6.5" cy="6.5" r="6" fill="rgba(129,201,149,0.15)" stroke="rgba(129,201,149,0.4)" strokeWidth="1"/>
+              <path d="M3.5 6.5l2 2 4-4" stroke="#81c995" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          )}
+          <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{task.title}</span>
         </p>
         <p style={{ fontSize: 11, color: "var(--text-3)", fontFamily: "'DM Mono', monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
           {showBoard && <><span style={{ color: "var(--accent)", fontWeight: 500 }}>{task.boardName}</span> › </>}

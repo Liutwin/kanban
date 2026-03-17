@@ -77,6 +77,7 @@ export default function Dashboard() {
   const [searchQuery,      setSearchQuery]      = useState("");
   const [searchPriorities, setSearchPriorities] = useState<Set<string>>(new Set());
   const [searchAssignees,  setSearchAssignees]  = useState<Set<number>>(new Set());
+  const [hideCompleted,    setHideCompleted]    = useState(false);
 
   useEffect(() => {
     const handler = (e: Event) => {
@@ -86,6 +87,7 @@ export default function Dashboard() {
         assigneeIds?: number[];
         priority?: string;
         assigneeId?: number | "";
+        hideCompleted?: boolean;
       }>).detail;
       setSearchQuery(d.query ?? "");
       setSearchPriorities(new Set(d.priorities?.length ? d.priorities : (d.priority ? [d.priority] : [])));
@@ -94,20 +96,22 @@ export default function Dashboard() {
           ? d.assigneeIds
           : (d.assigneeId && d.assigneeId !== "" ? [d.assigneeId as number] : [])
       ));
+      setHideCompleted(d.hideCompleted ?? false);
     };
     window.addEventListener("kanban:search", handler);
     return () => window.removeEventListener("kanban:search", handler);
   }, []);
 
   /** Filtre les tâches d'une colonne selon la recherche en cours. */
-  const filterTasks = useCallback((tasks: Task[]) => {
+  const filterTasks = useCallback((tasks: Task[], colId: number) => {
     return tasks.filter(t => {
+      if (hideCompleted && t.validated) return false;
       if (searchQuery.trim() && !t.title.toLowerCase().includes(searchQuery.toLowerCase()) && !(t.details ?? "").toLowerCase().includes(searchQuery.toLowerCase())) return false;
       if (searchPriorities.size > 0 && !searchPriorities.has(t.priority)) return false;
       if (searchAssignees.size > 0 && (t.assignedId == null || !searchAssignees.has(t.assignedId))) return false;
       return true;
     });
-  }, [searchQuery, searchPriorities, searchAssignees]);
+  }, [searchQuery, searchPriorities, searchAssignees, hideCompleted]);
   const columnsSnapshot   = useRef<ColumnWithTasks[]>([]);
   const didDrop           = useRef(false);
   const lastLiveTaskKey   = useRef<string>("");
@@ -682,7 +686,7 @@ export default function Dashboard() {
                     >{col.name}</span>
                   )}
                   <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                    <span className="col-count">{filterTasks(col.tasks).length}{(searchQuery.trim() || searchPriorities.size > 0 || searchAssignees.size > 0) && filterTasks(col.tasks).length !== col.tasks.length ? `/${col.tasks.length}` : ""}</span>
+                    <span className="col-count">{filterTasks(col.tasks, col.id).length}{(searchQuery.trim() || searchPriorities.size > 0 || searchAssignees.size > 0 || hideCompleted) && filterTasks(col.tasks, col.id).length !== col.tasks.length ? `/${col.tasks.length}` : ""}</span>
                     {!isReadOnly && (
                       <Tooltip text="Supprimer la colonne">
                         <button
@@ -709,7 +713,7 @@ export default function Dashboard() {
                     if (dragTaskRef.current) { didDrop.current = true; setDropTarget(null); setDragMirror(null); handleDrop(col.id, dragTaskRef.current); }
                   }}
                 >
-                  {filterTasks(col.tasks).map(task => (
+                  {filterTasks(col.tasks, col.id).map(task => (
                     <React.Fragment key={task.id}>
                       {dropTarget?.colId === col.id && dropTarget?.beforeTaskId === task.id && dragTask?.id !== task.id && (
                         <div

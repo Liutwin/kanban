@@ -699,6 +699,13 @@
    .search-filter-btn--basse.search-filter-btn--selected   { background: rgba(100,210,140,0.18); color: #64d28c; }
    .search-filter-btn--moyenne.search-filter-btn--selected { background: rgba(255,186,73,0.18);  color: #ffba49; }
    .search-filter-btn--haute.search-filter-btn--selected   { background: rgba(255,99,99,0.18);   color: #ff6363; }
+
+   .search-filter-btn--done {
+     display: inline-flex;
+     align-items: center;
+     gap: 4px;
+   }
+   .search-filter-btn--done.search-filter-btn--selected { background: rgba(120,180,255,0.18); color: #78b4ff; }
    
    /* Dropdown assignés — filtre multi-sélection */
    .search-select-wrapper {
