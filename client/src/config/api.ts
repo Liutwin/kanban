@@ -40,6 +40,18 @@ export const ROUTES_API = {
   // ── Board members ─────────────────────────────────────────────────────────
   boardMembers:       (id: number)                    => `${BASE}/boards/${id}/members`,
   boardMember:        (boardId: number, userId: number) => `${BASE}/boards/${boardId}/members/${userId}`,
+  /** Invitations en attente d'un tableau (admin du tableau). */
+  boardPendingInvitations: (boardId: number) => `${BASE}/boards/${boardId}/members/pending`,
+
+  // ── Invitations ───────────────────────────────────────────────────────────
+  /** Retourne les invitations en attente de l'utilisateur connecté. */
+  myPendingInvitations:  `${BASE}/boards/invitations/me`,
+  /** Accepter sa propre invitation à un tableau. */
+  acceptInvitation:   (boardId: number) => `${BASE}/boards/${boardId}/members/me/accept`,
+  /** Refuser sa propre invitation à un tableau. */
+  declineInvitation:  (boardId: number) => `${BASE}/boards/${boardId}/members/me/decline`,
+  /** Valider manuellement l'invitation d'un membre (admin). */
+  validateInvitation: (boardId: number, userId: number) => `${BASE}/boards/${boardId}/members/${userId}/validate`,
 
   // ── Columns ───────────────────────────────────────────────────────────────
   columns:            (boardId: number)              => `${BASE}/boards/${boardId}/columns`,

@@ -264,3 +264,94 @@
   color: var(--text);
   letter-spacing: -0.01em;
 }
+/* ── Sections de la page ──────────────────────────────────── */
+.boards-section {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* ── Badge compteur d'invitations (inline dans le titre) ──── */
+.invitations-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(176, 166, 255, 0.18);
+  color: var(--accent);
+  border: 1px solid rgba(176, 166, 255, 0.3);
+  border-radius: 999px;
+  font-size: 11px;
+  font-family: 'DM Mono', monospace;
+  font-weight: 600;
+  padding: 1px 8px;
+  margin-left: 10px;
+  vertical-align: middle;
+}
+
+/* ── Liste des invitations — même largeur que la grille ───── */
+.invitations-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  /* Limite à ~2 colonnes de board pour ne pas s'étirer sur toute la page */
+  max-width: 560px;
+}
+
+.invitation-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--elev-1);
+  transition: border-color 0.15s;
+}
+
+.invitation-card:hover {
+  border-color: rgba(176, 166, 255, 0.3);
+}
+
+.invitation-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.invitation-board-icon {
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  background: var(--accent-dim);
+  color: var(--accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+  flex-shrink: 0;
+}
+
+.invitation-board-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.invitation-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.btn-sm {
+  font-size: 12px;
+  padding: 5px 14px;
+  height: auto;
+}

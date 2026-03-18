@@ -36,7 +36,7 @@ public interface BoardService {
      * @param requesterId l'identifiant de l'utilisateur faisant la demande
      * @return le {@link BoardDTO} correspondant
      * @throws RuntimeException    si le tableau n'est pas trouvé
-     * @throws ForbiddenException  si le requérant n'est ni créateur ni membre
+     * @throws ForbiddenException  si le requérant n'est ni créateur ni membre actif
      */
     BoardDTO getBoardById(Long id, Long requesterId);
 
@@ -92,22 +92,31 @@ public interface BoardService {
      * @param requesterId l'identifiant de l'utilisateur faisant la demande
      * @return liste de {@link BoardMemberDTO}
      * @throws RuntimeException    si le tableau n'existe pas
-     * @throws ForbiddenException  si le requérant n'est pas membre
+     * @throws ForbiddenException  si le requérant n'est pas membre actif
      */
     List<BoardMemberDTO> getMembersByBoard(Long boardId, Long requesterId);
 
     /**
-     * Ajoute un utilisateur à un tableau avec le rôle spécifié,
+     * Crée une invitation en attente pour un utilisateur dans un tableau,
      * après vérification des droits.
      *
      * <p>Seul un membre avec le rôle {@code ADMIN} ou le créateur du tableau
-     * est autorisé à ajouter d'autres membres.</p>
+     * est autorisé à inviter d'autres membres.</p>
+     *
+     * <p>La participation est créée avec {@code notified = false} : l'invité
+     * n'a pas encore accès au tableau. Il doit accepter l'invitation via
+     * {@link #acceptInvitation} (ou un admin peut valider via
+     * {@link #validateInvitation}).</p>
+     *
+     * <p>Un e-mail de notification est envoyé de façon asynchrone et non
+     * bloquante ; son échec éventuel ne fait pas échouer l'opération.</p>
      *
      * @param boardId     l'identifiant du tableau
      * @param dto         les données de la participation (userId + role)
      * @param requesterId l'identifiant de l'utilisateur faisant la demande
-     * @return le {@link BoardMemberDTO} créé
-     * @throws RuntimeException    si la participation existe déjà, ou si l'utilisateur/tableau est introuvable
+     * @return le {@link BoardMemberDTO} créé, avec {@code notified = false}
+     * @throws RuntimeException    si une invitation ou participation existe déjà,
+     *                             ou si l'utilisateur/tableau est introuvable
      * @throws ForbiddenException  si le requérant n'est pas admin du tableau
      */
     BoardMemberDTO addMember(Long boardId, BoardMemberDTO dto, Long requesterId);
@@ -142,4 +151,70 @@ public interface BoardService {
      * @throws ForbiddenException  si le requérant n'est pas autorisé
      */
     void removeMember(Long boardId, Long userId, Long requesterId);
+
+    // ---- Gestion des invitations — côté admin --------------------------------
+
+    /**
+     * Récupère les invitations en attente d'un tableau (non encore acceptées
+     * par les invités), après vérification des droits.
+     *
+     * <p>Réservé aux admins du tableau. Destiné à la page d'administration
+     * du tableau pour un suivi ou une validation manuelle.</p>
+     *
+     * @param boardId     l'identifiant du tableau
+     * @param requesterId l'identifiant de l'utilisateur faisant la demande
+     * @return liste de {@link BoardMemberDTO} avec {@code notified = false}
+     * @throws RuntimeException    si le tableau n'existe pas
+     * @throws ForbiddenException  si le requérant n'est pas admin du tableau
+     */
+    List<BoardMemberDTO> getPendingInvitations(Long boardId, Long requesterId);
+
+    /**
+     * Valide manuellement une invitation en attente depuis la page admin,
+     * en passant {@code notified} à {@code true} sans attendre l'action
+     * de l'invité.
+     *
+     * @param boardId     l'identifiant du tableau
+     * @param userId      l'identifiant de l'utilisateur invité à valider
+     * @param requesterId l'identifiant de l'utilisateur faisant la demande
+     * @return le {@link BoardMemberDTO} mis à jour, avec {@code notified = true}
+     * @throws RuntimeException    si l'invitation n'existe pas ou est déjà acceptée
+     * @throws ForbiddenException  si le requérant n'est pas admin du tableau
+     */
+    BoardMemberDTO validateInvitation(Long boardId, Long userId, Long requesterId);
+
+    // ---- Gestion des invitations — côté utilisateur (page Boards) -----------
+
+    /**
+     * Retourne toutes les invitations en attente de l'utilisateur connecté,
+     * destinées à être affichées sur sa page Boards.
+     *
+     * <p>Aucune vérification de rôle n'est requise : l'utilisateur consulte
+     * uniquement ses propres invitations ({@code userId == requesterId}).</p>
+     *
+     * @param requesterId l'identifiant de l'utilisateur connecté
+     * @return liste de {@link BoardMemberDTO} avec {@code notified = false}
+     */
+    List<BoardMemberDTO> getMyPendingInvitations(Long requesterId);
+
+    /**
+     * L'utilisateur connecté accepte sa propre invitation à un tableau :
+     * passe {@code notified} à {@code true} et lui donne ainsi accès au tableau.
+     *
+     * @param boardId     l'identifiant du tableau
+     * @param requesterId l'identifiant de l'utilisateur connecté
+     * @return le {@link BoardMemberDTO} mis à jour, avec {@code notified = true}
+     * @throws RuntimeException si l'invitation n'existe pas ou est déjà acceptée
+     */
+    BoardMemberDTO acceptInvitation(Long boardId, Long requesterId);
+
+    /**
+     * L'utilisateur connecté refuse sa propre invitation à un tableau :
+     * supprime la ligne de participation.
+     *
+     * @param boardId     l'identifiant du tableau
+     * @param requesterId l'identifiant de l'utilisateur connecté
+     * @throws RuntimeException si l'invitation n'existe pas
+     */
+    void declineInvitation(Long boardId, Long requesterId);
 }

@@ -67,6 +67,20 @@ public class BoardMember {
     private Role role = Role.LECTEUR;
 
     /**
+     * Indique si l'invitation a été acceptée par l'utilisateur invité.
+     * {@code false} = invitation en attente de réponse,
+     * {@code true}  = membre actif ayant accès au tableau.
+     *
+     * <p>Mappé sur la colonne {@code ptp_notifiee}. Par défaut à {@code false}
+     * lors de la création d'une invitation ; passe à {@code true} lorsque
+     * l'invité accepte via {@code PATCH /boards/{id}/members/me/accept}
+     * ou qu'un admin valide manuellement via
+     * {@code PATCH /boards/{id}/members/{userId}/validate}.</p>
+     */
+    @Column(name = "ptp_notifiee", nullable = false)
+    private boolean notified = false;
+
+    /**
      * Enumération des rôles possibles d'un utilisateur dans un tableau Kanban.
      */
     public enum Role {

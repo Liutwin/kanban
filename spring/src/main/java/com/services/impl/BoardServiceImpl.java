@@ -27,6 +27,11 @@ import java.util.stream.Collectors;
  * et vérifie que l'utilisateur est bien membre ou créateur du tableau
  * avant d'exécuter l'opération. En cas de violation, une
  * {@link ForbiddenException} est levée (HTTP 403).</p>
+ *
+ * <p>La vérification de membership ({@link #checkMembership}) ne tient compte
+ * que des participations <em>actives</em> ({@code notified = true}) : un
+ * utilisateur dont l'invitation est en attente ne peut pas accéder au tableau
+ * tant qu'il n'a pas accepté.</p>
  */
 @Service
 @RequiredArgsConstructor
@@ -44,16 +49,17 @@ public class BoardServiceImpl implements BoardService {
     // -------------------------------------------------------------------------
 
     /**
-     * Vérifie qu'un utilisateur est membre ou créateur d'un tableau.
+     * Vérifie qu'un utilisateur est membre <em>actif</em> (invitation acceptée,
+     * {@code notified = true}) ou créateur d'un tableau.
      * Lève une {@link ForbiddenException} dans le cas contraire.
      *
      * @param board       le tableau à contrôler
      * @param requesterId l'identifiant de l'utilisateur à vérifier
-     * @throws ForbiddenException si l'utilisateur n'a aucun accès au tableau
+     * @throws ForbiddenException si l'utilisateur n'a aucun accès actif au tableau
      */
     private void checkMembership(Board board, Long requesterId) {
         boolean isCreator = board.getCreator().getId().equals(requesterId);
-        boolean isMember  = boardMemberRepository.existsByUserIdAndBoardId(requesterId, board.getId());
+        boolean isMember  = boardMemberRepository.existsByUserIdAndBoardIdAndNotifiedTrue(requesterId, board.getId());
         if (!isCreator && !isMember) {
             throw new ForbiddenException("Accès interdit au tableau : " + board.getId());
         }
@@ -61,12 +67,12 @@ public class BoardServiceImpl implements BoardService {
 
     /**
      * Vérifie qu'un utilisateur est administrateur (rôle {@code ADMIN})
-     * ou créateur d'un tableau.
+     * <em>actif</em> ou créateur d'un tableau.
      * Lève une {@link ForbiddenException} dans le cas contraire.
      *
      * @param board       le tableau à contrôler
      * @param requesterId l'identifiant de l'utilisateur à vérifier
-     * @throws ForbiddenException si l'utilisateur n'est pas admin du tableau
+     * @throws ForbiddenException si l'utilisateur n'est pas admin actif du tableau
      */
     private void checkAdminAccess(Board board, Long requesterId) {
         if (board.getCreator().getId().equals(requesterId)) {
@@ -77,6 +83,10 @@ public class BoardServiceImpl implements BoardService {
         BoardMember member = boardMemberRepository.findById(pid)
                 .orElseThrow(() -> new ForbiddenException(
                         "Accès interdit au tableau : " + board.getId()));
+        if (!member.isNotified()) {
+            throw new ForbiddenException(
+                    "Invitation non encore acceptée pour le tableau : " + board.getId());
+        }
         if (member.getRole() != BoardMember.Role.ADMIN) {
             throw new ForbiddenException("Droits insuffisants sur le tableau : " + board.getId());
         }
@@ -175,10 +185,12 @@ public class BoardServiceImpl implements BoardService {
             throw new RuntimeException("Utilisateur introuvable : " + dto.getUserId());
         }
         if (boardMemberRepository.existsByUserIdAndBoardId(dto.getUserId(), boardId)) {
-            throw new RuntimeException("Participation déjà existante");
+            throw new RuntimeException("Invitation ou participation déjà existante");
         }
         // On force le boardId depuis l'URL (source de vérité)
         dto.setBoardId(boardId);
+        dto.setNotified(false); // invitation en attente d'acceptation par l'invité
+
         BoardMemberDTO result = boardMemberMapper.toDTO(
                 boardMemberRepository.save(boardMemberMapper.toEntity(dto)));
 
@@ -230,6 +242,75 @@ public class BoardServiceImpl implements BoardService {
         BoardMember.ParticipationId pid = new BoardMember.ParticipationId(userId, boardId);
         if (!boardMemberRepository.existsById(pid)) {
             throw new RuntimeException("Participation introuvable");
+        }
+        boardMemberRepository.deleteById(pid);
+    }
+
+    // -------------------------------------------------------------------------
+    // Gestion des invitations — côté admin
+    // -------------------------------------------------------------------------
+
+    /** {@inheritDoc} */
+    @Override
+    public List<BoardMemberDTO> getPendingInvitations(Long boardId, Long requesterId) {
+        Board board = boardRepository.findById(boardId)
+                .orElseThrow(() -> new RuntimeException("Tableau introuvable : " + boardId));
+        checkAdminAccess(board, requesterId);
+        return boardMemberRepository.findByBoardIdAndNotifiedFalse(boardId)
+                .stream()
+                .map(boardMemberMapper::toDTO)
+                .collect(Collectors.toList());
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public BoardMemberDTO validateInvitation(Long boardId, Long userId, Long requesterId) {
+        Board board = boardRepository.findById(boardId)
+                .orElseThrow(() -> new RuntimeException("Tableau introuvable : " + boardId));
+        checkAdminAccess(board, requesterId);
+        BoardMember.ParticipationId pid = new BoardMember.ParticipationId(userId, boardId);
+        BoardMember member = boardMemberRepository.findById(pid)
+                .orElseThrow(() -> new RuntimeException(
+                        "Invitation introuvable pour l'utilisateur : " + userId));
+        if (member.isNotified()) {
+            throw new RuntimeException("Cette invitation est déjà acceptée");
+        }
+        member.setNotified(true);
+        return boardMemberMapper.toDTO(boardMemberRepository.save(member));
+    }
+
+    // -------------------------------------------------------------------------
+    // Gestion des invitations — côté utilisateur (page Boards)
+    // -------------------------------------------------------------------------
+
+    /** {@inheritDoc} */
+    @Override
+    public List<BoardMemberDTO> getMyPendingInvitations(Long requesterId) {
+        return boardMemberRepository.findByUserIdAndNotifiedFalse(requesterId)
+                .stream()
+                .map(boardMemberMapper::toDTO)
+                .collect(Collectors.toList());
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public BoardMemberDTO acceptInvitation(Long boardId, Long requesterId) {
+        BoardMember.ParticipationId pid = new BoardMember.ParticipationId(requesterId, boardId);
+        BoardMember member = boardMemberRepository.findById(pid)
+                .orElseThrow(() -> new RuntimeException("Invitation introuvable"));
+        if (member.isNotified()) {
+            throw new RuntimeException("Invitation déjà acceptée");
+        }
+        member.setNotified(true);
+        return boardMemberMapper.toDTO(boardMemberRepository.save(member));
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public void declineInvitation(Long boardId, Long requesterId) {
+        BoardMember.ParticipationId pid = new BoardMember.ParticipationId(requesterId, boardId);
+        if (!boardMemberRepository.existsById(pid)) {
+            throw new RuntimeException("Invitation introuvable");
         }
         boardMemberRepository.deleteById(pid);
     }

@@ -31,10 +31,43 @@ public interface BoardMemberRepository extends JpaRepository<BoardMember, BoardM
     List<BoardMember> findByBoardId(Long boardId);
 
     /**
-     * Vérifie si un utilisateur participe déjà à un tableau donné.
+     * Récupère les invitations en attente d'un tableau (non encore acceptées).
+     * Utilisé par les admins du tableau pour consulter ou valider manuellement
+     * les invitations via {@code GET /boards/{id}/members/pending}.
+     *
+     * @param boardId l'identifiant du tableau
+     * @return liste des participations avec {@code notified = false}
+     */
+    List<BoardMember> findByBoardIdAndNotifiedFalse(Long boardId);
+
+    /**
+     * Récupère les invitations en attente d'un utilisateur donné.
+     * Utilisé pour alimenter la section "Invitations en attente" de la page Boards
+     * via {@code GET /boards/invitations/me}.
+     *
+     * @param userId l'identifiant de l'utilisateur
+     * @return liste des participations avec {@code notified = false}
+     */
+    List<BoardMember> findByUserIdAndNotifiedFalse(Long userId);
+
+    /**
+     * Vérifie si un utilisateur est membre <em>actif</em> d'un tableau,
+     * c'est-à-dire qu'il a accepté son invitation ({@code notified = true}).
+     * Utilisé par {@code checkMembership} pour autoriser l'accès au tableau.
+     *
+     * @param userId  l'identifiant de l'utilisateur
+     * @param boardId l'identifiant du tableau
+     * @return {@code true} si la participation est validée
+     */
+    boolean existsByUserIdAndBoardIdAndNotifiedTrue(Long userId, Long boardId);
+
+    /**
+     * Vérifie si une participation existe pour cet utilisateur et ce tableau,
+     * qu'elle soit validée ou non. Utilisé lors de la création d'une invitation
+     * pour éviter les doublons.
      *
      * @param userId    l'identifiant de l'utilisateur
-     * @param boardId l'identifiant du tableau
+     * @param boardId   l'identifiant du tableau
      * @return {@code true} si la participation existe déjà
      */
     boolean existsByUserIdAndBoardId(Long userId, Long boardId);

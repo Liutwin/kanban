@@ -28,4 +28,11 @@ public class BoardMemberDTO {
      * Rôle de l'utilisateur dans le tableau.
      */
     private BoardMember.Role role;
+
+    /**
+     * Statut de l'invitation.
+     * {@code false} = invitation en attente de réponse de l'invité,
+     * {@code true}  = membre actif ayant accepté l'invitation.
+     */
+    private boolean notified;
 }

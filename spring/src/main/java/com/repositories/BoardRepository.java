@@ -18,7 +18,12 @@ public interface BoardRepository extends JpaRepository<Board, Long> {
 
     /**
      * Récupère tous les tableaux accessibles par un utilisateur :
-     * ceux qu'il a créés OU ceux dont il est membre via participation_ptp.
+     * ceux qu'il a créés OU ceux dont il est <em>membre actif</em>
+     * ({@code ptp_notifiee = true}) via {@code participation_ptp}.
+     *
+     * <p>Les invitations en attente ({@code notified = false}) sont
+     * explicitement exclues : un utilisateur invité ne doit pas voir
+     * le tableau avant d'avoir accepté son invitation.</p>
      *
      * @param userId l'identifiant de l'utilisateur
      * @return liste des tableaux correspondants
@@ -26,7 +31,8 @@ public interface BoardRepository extends JpaRepository<Board, Long> {
     @Query("""
         SELECT DISTINCT b FROM Board b
         LEFT JOIN BoardMember bm ON bm.board.id = b.id
-        WHERE b.creator.id = :userId OR bm.user.id = :userId
+        WHERE b.creator.id = :userId
+           OR (bm.user.id = :userId AND bm.notified = true)
     """)
     List<Board> findAllAccessibleByUser(@Param("userId") Long userId);
 }

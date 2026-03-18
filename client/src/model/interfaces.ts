@@ -51,11 +51,24 @@ export interface Board {
   creatorId: number;
 }
 
-/** Membre d'un tableau — `GET /api/v1/boards/{id}/members`. */
+/**
+ * Membre d'un tableau — `GET /api/v1/boards/{id}/members`.
+ * Le champ `notified` reflète le statut de l'invitation :
+ * `false` = invitation en attente, `true` = membre actif.
+ */
 export interface Member {
-  userId:  number;
-  boardId: number;
-  role:    "admin" | "editeur" | "lecteur";
+  userId:   number;
+  boardId:  number;
+  role:     "admin" | "editeur" | "lecteur";
+  notified: boolean;
+}
+
+/**
+ * Invitation en attente, telle que retournée par `GET /api/v1/boards/invitations/me`.
+ * Étend {@link Member} avec le nom du tableau pour l'affichage sur la page Boards.
+ */
+export interface PendingInvitation extends Member {
+  boardName: string;
 }
 
 /** Colonne d'un tableau — `GET /api/v1/boards/{boardId}/columns`. */

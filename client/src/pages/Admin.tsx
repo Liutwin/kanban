@@ -7,7 +7,7 @@ import { getAvatarStyle } from "../utils/avatarColor";
 import { extractErrorMessage } from "../utils/apiHelpers";
 import UserAvatar, { prefetchAvatars } from "../components/UserAvatar";
 import { toSlug } from "../utils/slug";
-import type { User } from "../model/interfaces";
+import type { User, Member, Board } from "../model/interfaces";
 import "../styles/admin.css";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -37,34 +37,39 @@ interface AdminUser extends User {
   avatarURL?: string;
 }
 
+/**
+ * Invitation en attente enrichie pour l'affichage dans le tableau admin.
+ * Agrège les données de {@link Member} avec le nom du tableau et
+ * les informations de l'utilisateur invité.
+ */
+interface PendingInvitationAdmin extends Member {
+  /** Nom du tableau concerné. */
+  boardName: string;
+  /** Données de l'utilisateur invité, chargées séparément. */
+  user?: AdminUser;
+}
+
 /** Délai de debounce (ms) pour le champ de recherche. */
 const SEARCH_DEBOUNCE_MS = 250;
+
+const ROLE_LABELS: Record<Member["role"], string> = {
+  admin:   "Admin",
+  editeur: "Éditeur",
+  lecteur: "Lecteur",
+};
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Sous-composant : Carte de statistique
 // ─────────────────────────────────────────────────────────────────────────────
 
-/**
- * Props du composant {@link StatCard}.
- */
 interface StatCardProps {
-  /** Icône SVG inline affichée dans la carte. */
   icon: React.ReactNode;
-  /** Valeur numérique affichée en grand. */
   value: number | string;
-  /** Libellé descriptif sous la valeur. */
   label: string;
-  /** Couleur CSS d'accentuation de la carte. */
   accent: string;
-  /** Affiche un squelette animé si `true`. */
   loading?: boolean;
 }
 
-/**
- * Carte de statistique affichée dans la section récapitulative.
- *
- * @param props - {@link StatCardProps}
- */
 function StatCard({ icon, value, label, accent, loading }: StatCardProps) {
   return (
     <div className="admin-stat-card" style={{ "--stat-accent": accent } as React.CSSProperties}>
@@ -84,14 +89,9 @@ function StatCard({ icon, value, label, accent, loading }: StatCardProps) {
 // Sous-composant : Toggle admin inline
 // ─────────────────────────────────────────────────────────────────────────────
 
-/**
- * Props du composant {@link AdminToggle}.
- */
 interface AdminToggleProps {
   isAdmin: boolean;
-  /** Désactive le toggle et affiche un spinner pendant la requête PATCH. */
   pending: boolean;
-  /** Désactive définitivement le toggle (ex : l'utilisateur ne peut pas se retirer ses propres droits). */
   disabled?: boolean;
   onChange: (newValue: boolean) => void;
   label: string;
@@ -120,21 +120,12 @@ function AdminToggle({ isAdmin, pending, disabled, onChange, label }: AdminToggl
 // Sous-composant : Ligne utilisateur
 // ─────────────────────────────────────────────────────────────────────────────
 
-/**
- * Props du composant {@link UserRow}.
- */
 interface UserRowProps {
-  /** Données de l'utilisateur à afficher. */
   user: AdminUser;
-  /** `true` si c'est l'utilisateur actuellement connecté. */
   isSelf: boolean;
-  /** `true` pendant que le toggle admin de cet utilisateur est en vol. */
   adminPending: boolean;
-  /** Rappel déclenché au changement du toggle admin. */
   onToggleAdmin: (user: AdminUser, newValue: boolean) => void;
-  /** Rappel déclenché quand on clique sur "Voir le profil". */
   onViewProfile: (user: AdminUser) => void;
-  /** Rappel déclenché quand on clique sur "Supprimer". */
   onDelete: (user: AdminUser) => void;
 }
 
@@ -147,8 +138,6 @@ interface UserRowProps {
  * Le toggle est entièrement contrôlé par `user.isAdmin` — aucun état local —
  * ce qui garantit qu'il reflète toujours fidèlement la valeur serveur,
  * y compris après une mise à jour optimiste et un éventuel rollback.
- *
- * @param props - {@link UserRowProps}
  */
 function UserRow({ user, isSelf, adminPending, onToggleAdmin, onViewProfile, onDelete }: UserRowProps) {
   return (
@@ -241,27 +230,17 @@ function UserRow({ user, isSelf, adminPending, onToggleAdmin, onViewProfile, onD
 // Sous-composant : Modal de confirmation de suppression
 // ─────────────────────────────────────────────────────────────────────────────
 
-/**
- * Props du composant {@link DeleteConfirmModal}.
- */
 interface DeleteConfirmModalProps {
-  /** Utilisateur dont la suppression est demandée. */
   user: AdminUser;
-  /** `true` si la requête DELETE est en cours. */
   submitting: boolean;
-  /** Message d'erreur éventuel à afficher dans la modale. */
   error: string;
-  /** Rappel déclenché à la confirmation. */
   onConfirm: () => void;
-  /** Rappel déclenché à l'annulation ou au clic en dehors. */
   onCancel: () => void;
 }
 
 /**
  * Modale de confirmation avant suppression définitive d'un utilisateur.
  * Affiche une preview du compte ciblé et rappelle les effets de bord.
- *
- * @param props - {@link DeleteConfirmModalProps}
  */
 function DeleteConfirmModal({ user, submitting, error, onConfirm, onCancel }: DeleteConfirmModalProps) {
   return (
@@ -336,9 +315,12 @@ function DeleteConfirmModal({ user, submitting, error, onConfirm, onCancel }: De
  * (nom, prénom, e-mail, mot de passe) des autres utilisateurs — seul
  * chaque utilisateur peut le faire depuis sa propre page de profil.
  *
- * Les deux actions exposées sont :
+ * Les actions exposées sont :
  * - **Basculer le droit admin** via un toggle inline (optimiste + rollback).
  * - **Supprimer un compte** avec modale de confirmation.
+ * - **Valider ou annuler les invitations en attente** sur tous les tableaux :
+ *   agrège les invitations `notified = false` de chaque tableau accessible
+ *   et permet à l'admin de les débloquer sans attendre l'action de l'invité.
  *
  * **Anti-boucle infinie** : `authFetch` est stocké dans un `useRef` pour
  * que `fetchUsers` et `fetchStats` aient des tableaux de dépendances vides
@@ -384,6 +366,20 @@ export default function Admin() {
   const [deleteSubmitting, setDeleteSubmitting] = useState(false);
   const [deleteError,      setDeleteError]      = useState("");
 
+  // ── Invitations en attente ────────────────────────────────────────────────
+  /**
+   * Toutes les invitations en attente agrégées sur l'ensemble des tableaux.
+   * Chargées en récupérant d'abord tous les tableaux, puis pour chacun
+   * les participations avec `notified = false`.
+   */
+  const [pendingInvitations,        setPendingInvitations]        = useState<PendingInvitationAdmin[]>([]);
+  const [loadingInvitations,        setLoadingInvitations]        = useState(true);
+  /** ID `${boardId}-${userId}` de l'invitation en cours de validation. */
+  const [validatingInvitationKey,   setValidatingInvitationKey]   = useState<string | null>(null);
+  /** ID `${boardId}-${userId}` de l'invitation en cours d'annulation. */
+  const [cancellingInvitationKey,   setCancellingInvitationKey]   = useState<string | null>(null);
+  const [invitationError,           setInvitationError]           = useState("");
+
   // ─────────────────────────────────────────────────────────────────────────
   // Chargement
   // ─────────────────────────────────────────────────────────────────────────
@@ -406,20 +402,19 @@ export default function Admin() {
     }
   }, []); // [] stable — authFetch via ref
 
-  /** Charge les statistiques globales (boards, tasks, users, admins).
-   *  Utilise GET /users/profiles pour récupérer le total de tâches (somme
-   *  des tasksCreated), car il n'existe pas de endpoint GET /tasks global.
+  /**
+   * Charge les statistiques globales (boards, tasks, users, admins).
+   * Utilise GET /users/profiles pour récupérer le total de tâches (somme
+   * des tasksCreated), car il n'existe pas de endpoint GET /tasks global.
    */
   const fetchStats = useCallback(async () => {
     setLoadingStats(true);
     try {
-      // Appel unique : /users/profiles contient tout ce qu'il faut
       const [profilesRes, boardsRes] = await Promise.allSettled([
         authFetchRef.current(ROUTES_API.userProfiles),
         authFetchRef.current(ROUTES_API.boards),
       ]);
 
-      // Profils → users, adminCount, totalTasks
       type ProfileItem = { admin: boolean; tasksCreated: number };
       const profiles: ProfileItem[] =
         profilesRes.status === "fulfilled" && profilesRes.value.ok
@@ -446,10 +441,69 @@ export default function Admin() {
     }
   }, []); // [] stable — authFetch via ref
 
+  /**
+   * Charge toutes les invitations en attente sur l'ensemble des tableaux.
+   *
+   * Stratégie : récupère d'abord la liste complète des tableaux via
+   * `GET /boards`, puis pour chacun interroge `GET /boards/{id}/members/pending`.
+   * Les requêtes par tableau sont parallélisées. Les données utilisateur
+   * de chaque invité sont ensuite enrichies en un second passage parallèle.
+   *
+   * Les erreurs par tableau sont silencieuses pour ne pas bloquer
+   * l'affichage des tableaux qui fonctionnent.
+   */
+  const fetchPendingInvitations = useCallback(async () => {
+    setLoadingInvitations(true);
+    setInvitationError("");
+    try {
+      const boardsRes = await authFetchRef.current(ROUTES_API.boards);
+      if (!boardsRes.ok) throw new Error(await extractErrorMessage(boardsRes));
+      const boardsJson = await boardsRes.json();
+      const boards: Board[] = Array.isArray(boardsJson) ? boardsJson : (boardsJson?.data ?? []);
+
+      // Invitations en attente par tableau — en parallèle
+      const perBoard = await Promise.allSettled(
+        boards.map(async board => {
+          const res = await authFetchRef.current(ROUTES_API.boardPendingInvitations(board.id));
+          if (!res.ok) return [];
+          const json = await res.json();
+          const members: Member[] = Array.isArray(json) ? json : (json?.data ?? []);
+          return members.map(m => ({ ...m, boardName: board.name }));
+        })
+      );
+
+      const flat: PendingInvitationAdmin[] = perBoard
+        .flatMap(r => r.status === "fulfilled" ? r.value : []);
+
+      // Enrichissement avec les données utilisateur — en parallèle
+      const enriched = await Promise.all(
+        flat.map(async inv => {
+          try {
+            const r    = await authFetchRef.current(ROUTES_API.user(inv.userId));
+            const json = await r.json();
+            const u: AdminUser = r.ok
+              ? (Array.isArray(json) ? json : (json?.data ?? json))
+              : undefined;
+            return { ...inv, user: u };
+          } catch {
+            return inv;
+          }
+        })
+      );
+
+      setPendingInvitations(enriched);
+    } catch (e: unknown) {
+      setInvitationError(e instanceof Error ? e.message : "Erreur lors du chargement des invitations.");
+    } finally {
+      setLoadingInvitations(false);
+    }
+  }, []); // [] stable — authFetch via ref
+
   useEffect(() => {
     fetchUsers();
     fetchStats();
-  }, [fetchUsers, fetchStats]);
+    fetchPendingInvitations();
+  }, [fetchUsers, fetchStats, fetchPendingInvitations]);
 
   // ─────────────────────────────────────────────────────────────────────────
   // Debounce recherche
@@ -462,7 +516,12 @@ export default function Admin() {
   }, [search]);
 
   /** Utilisateurs filtrés selon la recherche (prénom, nom, e-mail — insensible à la casse). */
+  // IDs des utilisateurs ayant une invitation en attente — exclus de la liste membres
+  // pour éviter le doublon (l'utilisateur apparaît déjà comme ligne d'invitation).
+  const pendingUserIds = new Set(pendingInvitations.map(i => i.userId));
+
   const filteredUsers = users.filter(u => {
+    if (pendingUserIds.has(u.id)) return false;
     if (!debouncedSearch) return true;
     const q = debouncedSearch.toLowerCase();
     return (
@@ -473,7 +532,7 @@ export default function Admin() {
   });
 
   // ─────────────────────────────────────────────────────────────────────────
-  // Actions
+  // Actions — utilisateurs
   // ─────────────────────────────────────────────────────────────────────────
 
   /**
@@ -482,12 +541,8 @@ export default function Admin() {
    * Stratégie **optimiste** : la liste locale est mise à jour immédiatement
    * pour une réactivité maximale. En cas d'erreur réseau, la liste est
    * rechargée depuis le serveur (rollback implicite).
-   *
-   * @param target   - Utilisateur ciblé.
-   * @param newValue - `true` pour accorder les droits admin, `false` pour les retirer.
    */
   const handleToggleAdmin = useCallback(async (target: AdminUser, newValue: boolean) => {
-    // Mise à jour optimiste
     setUsers(prev => prev.map(u => u.id === target.id ? { ...u, isAdmin: newValue } : u));
     setAdminPendingIds(prev => new Set(prev).add(target.id));
 
@@ -499,18 +554,16 @@ export default function Admin() {
           email:     target.email,
           firstName: target.firstName,
           lastName:  target.lastName,
-          admin:     newValue,          // ← champ Spring : "admin", pas "isAdmin"
+          admin:     newValue,
         }),
       });
       if (!res.ok) throw new Error(await extractErrorMessage(res));
 
-      // Resynchronise le compteur d'admins dans les stats
       setStats(prev => prev
         ? { ...prev, adminCount: prev.adminCount + (newValue ? 1 : -1) }
         : prev
       );
     } catch {
-      // Rollback : recharge l'état réel depuis le serveur
       await fetchUsers();
     } finally {
       setAdminPendingIds(prev => { const s = new Set(prev); s.delete(target.id); return s; });
@@ -544,6 +597,58 @@ export default function Admin() {
       setDeleteError(e instanceof Error ? e.message : "Impossible de supprimer.");
     } finally {
       setDeleteSubmitting(false);
+    }
+  };
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Actions — invitations
+  // ─────────────────────────────────────────────────────────────────────────
+
+  /**
+   * Valide une invitation en attente via
+   * `PATCH /boards/{boardId}/members/{userId}/validate`.
+   * Retire l'invitation de la liste locale après succès.
+   */
+  const handleValidateInvitation = async (boardId: number, userId: number) => {
+    const key = `${boardId}-${userId}`;
+    setValidatingInvitationKey(key);
+    setInvitationError("");
+    try {
+      const res = await authFetchRef.current(
+        ROUTES_API.validateInvitation(boardId, userId),
+        { method: "PATCH", body: "{}" }
+      );
+      if (!res.ok) throw new Error(await extractErrorMessage(res));
+      setPendingInvitations(prev => prev.filter(i => !(i.boardId === boardId && i.userId === userId)));
+    } catch (e: unknown) {
+      setInvitationError(e instanceof Error ? e.message : "Erreur lors de la validation.");
+    } finally {
+      setValidatingInvitationKey(null);
+    }
+  };
+
+  /**
+   * Annule une invitation en attente via
+   * `DELETE /boards/{boardId}/members/{userId}`.
+   * Mise à jour optimiste : retire immédiatement de la liste, rollback si erreur.
+   */
+  const handleCancelInvitation = async (boardId: number, userId: number) => {
+    const key = `${boardId}-${userId}`;
+    setCancellingInvitationKey(key);
+    setInvitationError("");
+    const previous = pendingInvitations;
+    setPendingInvitations(prev => prev.filter(i => !(i.boardId === boardId && i.userId === userId)));
+    try {
+      const res = await authFetchRef.current(
+        ROUTES_API.boardMember(boardId, userId),
+        { method: "DELETE" }
+      );
+      if (!res.ok) throw new Error(await extractErrorMessage(res));
+    } catch (e: unknown) {
+      setPendingInvitations(previous);
+      setInvitationError(e instanceof Error ? e.message : "Erreur lors de l'annulation.");
+    } finally {
+      setCancellingInvitationKey(null);
     }
   };
 
@@ -588,6 +693,10 @@ export default function Admin() {
           />
         </div>
 
+        {invitationError && (
+          <div className="admin-form-error" role="alert">{invitationError}</div>
+        )}
+
         {/* ── Barre de recherche ───────────────────────────────────────── */}
         <div className="admin-toolbar">
           <div className="admin-search-wrap">
@@ -620,7 +729,7 @@ export default function Admin() {
           </span>
         </div>
 
-        {/* ── Tableau ─────────────────────────────────────────────────── */}
+        {/* ── Tableau utilisateurs ─────────────────────────────────────── */}
         <div className="admin-table-wrap">
           {usersError ? (
             <div className="admin-state admin-state--error" role="alert">
@@ -678,6 +787,73 @@ export default function Admin() {
                     onDelete={target => { setDeleteError(""); setDeleteTarget(target); }}
                   />
                 ))}
+                {/* ── Lignes d'invitations en attente ──────────────── */}
+                {!loadingInvitations && pendingInvitations.map(inv => {
+                  const key          = `${inv.boardId}-${inv.userId}`;
+                  const isValidating = validatingInvitationKey === key;
+                  const isCancelling = cancellingInvitationKey === key;
+                  const busy         = isValidating || isCancelling;
+                  return (
+                    <tr key={key} className="admin-user-row admin-user-row--pending">
+                      <td className="admin-user-td admin-user-td--avatar">
+                        {inv.user && (
+                          <UserAvatar
+                            userId={inv.userId}
+                            firstName={inv.user.firstName}
+                            lastName={inv.user.lastName}
+                            hasAvatar={!!inv.user.avatarURL}
+                            size={34}
+                            className="admin-user-avatar"
+                          />
+                        )}
+                      </td>
+                      <td className="admin-user-td">
+                        <div className="admin-user-name-block">
+                          <span className="admin-user-fullname">
+                            {inv.user ? `${inv.user.firstName} ${inv.user.lastName}` : `#${inv.userId}`}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="admin-user-td admin-user-td--email">
+                        <span className="admin-user-email">{inv.user?.email ?? "—"}</span>
+                      </td>
+                      <td className="admin-user-td admin-user-td--toggle">
+                        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                          <span className="admin-badge-pending">En attente</span>
+                          <span style={{ fontSize: 11, color: "var(--text-3)", fontFamily: "'DM Mono', monospace" }}>
+                            {inv.boardName} · {ROLE_LABELS[inv.role]}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="admin-user-td admin-user-td--actions">
+                        <button
+                          className="admin-inv-btn-validate"
+                          onClick={() => handleValidateInvitation(inv.boardId, inv.userId)}
+                          disabled={busy}
+                          title="Valider l'invitation sans attendre l'invité"
+                        >
+                          {isValidating ? "…" : "✓ Valider"}
+                        </button>
+                      </td>
+                      <td className="admin-user-td admin-user-td--actions">
+                        <button
+                          className="admin-action-btn admin-action-btn--delete"
+                          onClick={() => handleCancelInvitation(inv.boardId, inv.userId)}
+                          disabled={busy}
+                          title="Annuler l'invitation"
+                          aria-label="Annuler l'invitation"
+                        >
+                          <svg width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                            <polyline points="3,4 13,4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                            <path d="M5 4V3h6v1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                            <path d="M4 4l1 9h6l1-9" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/>
+                          </svg>
+                          Annuler
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           )}

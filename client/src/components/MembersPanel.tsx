@@ -112,7 +112,7 @@ export default function MembersPanel({ boardId, currentUserId, currentRole, boar
       // Fallback : si l'utilisateur courant n'est pas dans la liste
       // (ex : créateur sans entrée dans participation_ptp), on l'ajoute en admin.
       if (!memberList.some(m => m.userId === currentUserId)) {
-        memberList = [{ userId: currentUserId, boardId, role: "admin" }, ...memberList];
+        memberList = [{ userId: currentUserId, boardId, role: "admin", notified: true }, ...memberList];
       }
 
       const withUsers = await Promise.all(
@@ -128,12 +128,19 @@ export default function MembersPanel({ boardId, currentUserId, currentRole, boar
         })
       );
 
-      // Soi-même en premier, puis admins, puis alphabétique
+      // Soi-même en premier, puis membres actifs (notified=true), puis en attente,
+      // puis tri alphabétique dans chaque groupe.
       withUsers.sort((a, b) => {
         if (a.userId === currentUserId) return -1;
         if (b.userId === currentUserId) return 1;
-        if (a.role === "admin" && b.role !== "admin") return -1;
-        if (b.role === "admin" && a.role !== "admin") return 1;
+        // Membres actifs avant membres en attente
+        if (a.notified && !b.notified) return -1;
+        if (!a.notified && b.notified) return 1;
+        // Parmi les actifs : admins en premier
+        if (a.notified && b.notified) {
+          if (a.role === "admin" && b.role !== "admin") return -1;
+          if (b.role === "admin" && a.role !== "admin") return 1;
+        }
         return `${a.user?.firstName ?? ""} ${a.user?.lastName ?? ""}`.localeCompare(
           `${b.user?.firstName ?? ""} ${b.user?.lastName ?? ""}`, "fr"
         );
@@ -176,7 +183,6 @@ export default function MembersPanel({ boardId, currentUserId, currentRole, boar
     const res = await authFetch(ROUTES_API.boardMember(boardId, currentUserId), { method: "DELETE" });
     if (res.ok) {
       onClose();
-      // Redirige vers la liste des tableaux
       window.location.href = "/boards";
     } else {
       setInviteError("Erreur lors du départ du tableau.");
@@ -233,15 +239,20 @@ export default function MembersPanel({ boardId, currentUserId, currentRole, boar
     }
   };
 
-  // ── Ajouter un membre ──────────────────────────────────────
+  // ── Inviter un membre ──────────────────────────────────────
+  /**
+   * Envoie une invitation (`POST /boards/{id}/members`) avec `notified = false`.
+   * Le membre apparaît immédiatement dans la liste avec le badge "En attente" ;
+   * il ne pourra accéder au tableau qu'après avoir accepté l'invitation
+   * depuis sa page Boards.
+   */
   const handleInvite = async () => {
     if (!selectedUser) { setInviteError("Sélectionnez un utilisateur dans la liste."); return; }
     if (members.some(m => m.userId === selectedUser.id)) {
-      setInviteError("Cet utilisateur est déjà membre."); return;
+      setInviteError("Cet utilisateur a déjà une invitation ou est déjà membre."); return;
     }
     setInviting(true);
     setInviteError("");
-    // Capture avant tout setState asynchrone
     const user      = selectedUser;
     const roleAdded = inviteRole;
     try {
@@ -253,17 +264,18 @@ export default function MembersPanel({ boardId, currentUserId, currentRole, boar
         const text = await res.text().catch(() => "");
         throw new Error(`Erreur ${res.status}${text ? " : " + text.slice(0, 200) : ""}`);
       }
-      // Mise à jour locale directe — pas de refetch (évite le démontage du panneau)
+      // Ajout optimiste dans la liste avec notified = false (invitation en attente)
       const newMember: MemberWithUser = {
-        userId:  user.id,
+        userId:   user.id,
         boardId,
-        role:    roleAdded,
-        user:    user as User,
+        role:     roleAdded,
+        notified: false,
+        user:     user as User,
       };
       setMembers(prev => [...prev, newMember]);
       setSearchQuery("");
       setSelectedUser(null);
-      setInviteSuccess(`${user.firstName} ${user.lastName} ajouté·e en tant que ${ROLE_LABELS[roleAdded]}.`);
+      setInviteSuccess(`Invitation envoyée à ${user.firstName} ${user.lastName}.`);
       setTimeout(() => setInviteSuccess(""), 4000);
     } catch (err) {
       setInviteError(err instanceof Error ? err.message : "Erreur.");
@@ -303,6 +315,7 @@ export default function MembersPanel({ boardId, currentUserId, currentRole, boar
         @keyframes spin      { to { transform:rotate(360deg); } }
         .mp-row { display:flex; align-items:center; gap:10px; padding:9px 16px; transition:background 0.15s; }
         .mp-row:hover { background:rgba(255,255,255,0.03); }
+        .mp-row--pending { opacity: 0.7; }
         .mp-avatar-btn {
           width:32px; height:32px; border-radius:50%;
           font-size:11px; font-weight:600; font-family:'DM Mono',monospace;
@@ -319,6 +332,14 @@ export default function MembersPanel({ boardId, currentUserId, currentRole, boar
           transition:border-color 0.15s;
         }
         .mp-role-select:hover,.mp-role-select:focus { border-color:var(--accent); }
+        .mp-badge-pending {
+          font-size: 10px; font-family:'DM Mono',monospace; font-weight:500;
+          padding: 2px 8px; border-radius: 999px; flex-shrink:0;
+          background: rgba(176,166,255,0.12);
+          color: var(--accent);
+          border: 1px solid rgba(176,166,255,0.25);
+          letter-spacing: 0.03em;
+        }
         .ac-item { display:flex; align-items:center; gap:8px; padding:7px 12px; cursor:pointer; transition:background 0.12s; }
         .ac-item:hover { background:rgba(255,255,255,0.06); }
       `}</style>
@@ -327,7 +348,12 @@ export default function MembersPanel({ boardId, currentUserId, currentRole, boar
       <div style={{ padding: "13px 16px 10px", borderBottom: "1px solid var(--border)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <span style={{ fontSize: 13, fontWeight: 600, color: "var(--text)" }}>
           Membres{" "}
-          <span style={{ fontSize: 11, color: "var(--text-3)", fontFamily: "'DM Mono',monospace" }}>{members.length}</span>
+          <span style={{ fontSize: 11, color: "var(--text-3)", fontFamily: "'DM Mono',monospace" }}>{members.filter(m => m.notified).length}</span>
+          {members.some(m => !m.notified) && (
+            <span style={{ fontSize: 11, color: "var(--accent)", fontFamily: "'DM Mono',monospace", marginLeft: 6 }}>
+              · {members.filter(m => !m.notified).length} en attente
+            </span>
+          )}
         </span>
         <button onClick={onClose} style={{ background: "none", border: "none", color: "var(--text-3)", cursor: "pointer", fontSize: 20, lineHeight: 1, padding: "0 2px", transition: "color 0.15s" }}
           onMouseEnter={e => (e.currentTarget.style.color = "var(--text)")}
@@ -361,7 +387,9 @@ export default function MembersPanel({ boardId, currentUserId, currentRole, boar
               />
               <div style={{ textAlign: "center" }}>
                 <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: "var(--text)" }}>{name}</p>
-                <p style={{ margin: "2px 0 0", fontSize: 11, color: "var(--text-3)" }}>{ROLE_LABELS[m.role]}</p>
+                <p style={{ margin: "2px 0 0", fontSize: 11, color: "var(--text-3)" }}>
+                  {m.notified ? ROLE_LABELS[m.role] : "Invitation en attente"}
+                </p>
               </div>
             </div>
             {/* Email */}
@@ -396,10 +424,11 @@ export default function MembersPanel({ boardId, currentUserId, currentRole, boar
         ) : members.map(m => {
           const isSelf    = m.userId === currentUserId;
           const isCreator = boardCreatorId !== undefined && m.userId === boardCreatorId;
+          const isPending = !m.notified;
           const c      = getAvatarStyle(m.userId);
           const name   = m.user ? `${m.user.firstName ?? ""} ${m.user.lastName ?? ""}`.trim() : `#${m.userId}`;
           return (
-            <div key={m.userId} className="mp-row">
+            <div key={m.userId} className={`mp-row${isPending ? " mp-row--pending" : ""}`}>
               <button
                 className="mp-avatar-btn"
                 style={{ background: "transparent", border: "none", padding: 0 }}
@@ -426,7 +455,25 @@ export default function MembersPanel({ boardId, currentUserId, currentRole, boar
                 )}
               </div>
 
-              {isAdmin && !isSelf ? (
+              {/* Colonne droite : badge "En attente", sélecteur de rôle, ou badge fixe */}
+              {isPending ? (
+                // Invitation non encore acceptée — pas de sélecteur de rôle
+                <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+                  <span className="mp-badge-pending">En attente</span>
+                  {isAdmin && (
+                    // L'admin peut annuler l'invitation
+                    <button
+                      title="Annuler l'invitation"
+                      onClick={() => setPendingRemove(m)}
+                      style={{ background: "none", border: "none", color: "var(--text-3)", cursor: "pointer", fontSize: 14, padding: "2px 4px", borderRadius: 4, lineHeight: 1, transition: "color 0.15s" }}
+                      onMouseEnter={e => (e.currentTarget.style.color = "var(--danger)")}
+                      onMouseLeave={e => (e.currentTarget.style.color = "var(--text-3)")}
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
+              ) : isAdmin && !isSelf ? (
                 isCreator ? (
                   // Créateur : badge fixe + couronne, non modifiable
                   <span style={{
@@ -437,7 +484,7 @@ export default function MembersPanel({ boardId, currentUserId, currentRole, boar
                     <span title="Créateur du tableau" style={{ fontSize: 10, opacity: 0.75 }}>👑</span>
                   </span>
                 ) : (
-                  // Autres membres (y compris les autres admins) : select normal
+                  // Autres membres actifs : select normal
                   <select className="mp-role-select" value={m.role}
                     onChange={e => handleRoleChange(m.userId, e.target.value as Member["role"] | "retirer")}>
                     <option value="admin">Admin</option>
@@ -468,11 +515,14 @@ export default function MembersPanel({ boardId, currentUserId, currentRole, boar
         </div>
       )}
 
-      {/* Confirmation de suppression */}
+      {/* Confirmation de suppression / annulation d'invitation */}
       {pendingRemove && (
         <div style={{ margin: "0 12px 10px", padding: "12px 14px", background: "rgba(242,139,130,0.08)", border: "1px solid rgba(242,139,130,0.25)", borderRadius: 10 }}>
           <p style={{ margin: "0 0 10px", fontSize: 12, color: "var(--text)", lineHeight: 1.5 }}>
-            Retirer <strong>{pendingRemove.user?.firstName} {pendingRemove.user?.lastName}</strong> du tableau ?
+            {pendingRemove.notified
+              ? <>Retirer <strong>{pendingRemove.user?.firstName} {pendingRemove.user?.lastName}</strong> du tableau ?</>
+              : <>Annuler l'invitation de <strong>{pendingRemove.user?.firstName} {pendingRemove.user?.lastName}</strong> ?</>
+            }
           </p>
           <div style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}>
             <button
@@ -485,17 +535,17 @@ export default function MembersPanel({ boardId, currentUserId, currentRole, boar
               onClick={confirmRemove}
               style={{ background: "rgba(242,139,130,0.15)", border: "1px solid rgba(242,139,130,0.35)", borderRadius: 7, color: "var(--danger)", fontSize: 12, fontWeight: 600, padding: "5px 14px", cursor: "pointer" }}
             >
-              Retirer
+              {pendingRemove.notified ? "Retirer" : "Annuler l'invitation"}
             </button>
           </div>
         </div>
       )}
 
-      {/* Ajouter un membre */}
+      {/* Inviter un membre */}
       {isAdmin && (
         <div style={{ borderTop: "1px solid var(--border)", padding: "10px 12px 12px" }}>
           <p style={{ margin: "0 0 7px", fontSize: 11, fontWeight: 600, color: "var(--text-3)", textTransform: "uppercase", letterSpacing: "0.08em", fontFamily: "'DM Mono',monospace" }}>
-            Ajouter un membre
+            Inviter un membre
           </p>
 
           <div style={{ position: "relative", marginBottom: 7 }}>
@@ -547,7 +597,7 @@ export default function MembersPanel({ boardId, currentUserId, currentRole, boar
               onClick={handleInvite}
               disabled={!selectedUser || inviting}
             >
-              {inviting ? "En cours…" : "Ajouter"}
+              {inviting ? "En cours…" : "Inviter"}
             </button>
           </div>
           {inviteError && (
@@ -555,6 +605,7 @@ export default function MembersPanel({ boardId, currentUserId, currentRole, boar
           )}
         </div>
       )}
+
       {/* Quitter le tableau — visible pour tous sauf le créateur */}
       {boardCreatorId !== undefined && currentUserId !== boardCreatorId && (
         <div style={{ borderTop: "1px solid var(--border)", padding: "10px 12px 12px" }}>
