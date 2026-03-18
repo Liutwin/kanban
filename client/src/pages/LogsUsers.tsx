@@ -150,11 +150,11 @@ export default function Logs() {
   // 3. Chargement du journal
   // ─────────────────────────────────────────────────────────────────────────
 
-  const fetchLogs = useCallback(async (id: number, from?: string, to?: string) => {
+  const fetchLogs = useCallback(async (id: number, from?: string, to?: string, type?: string) => {
     setLoadingLogs(true);
     setLogsError("");
     try {
-      const url  = ROUTES_API.userLogs(id, from || undefined, to || undefined);
+      const url  = ROUTES_API.userLogs(id, type !== "all" ? type : undefined, from || undefined, to || undefined);
       const res  = await authFetchRef.current(url);
       if (!res.ok) throw new Error(await extractErrorMessage(res));
       const json = await res.json();
@@ -170,27 +170,25 @@ export default function Logs() {
   useEffect(() => {
     if (targetId === null) return;
     fetchProfile(targetId);
-    fetchLogs(targetId, dateFrom, dateTo);
+    fetchLogs(targetId, dateFrom, dateTo, typeFilter);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [targetId]);
 
   useEffect(() => {
     if (targetId === null) return;
-    fetchLogs(targetId, dateFrom, dateTo);
+    fetchLogs(targetId, dateFrom, dateTo, typeFilter);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dateFrom, dateTo]);
+  }, [dateFrom, dateTo, typeFilter]);
 
   // ─────────────────────────────────────────────────────────────────────────
   // Filtrage local
   // ─────────────────────────────────────────────────────────────────────────
 
   const filteredLogs = logs.filter(l => {
-    const matchType   = typeFilter === "all" || l.type === typeFilter;
-    const q           = search.toLowerCase();
-    const matchSearch = !q
+    const q = search.toLowerCase();
+    return !q
       || l.description?.toLowerCase().includes(q)
       || l.boardName?.toLowerCase().includes(q);
-    return matchType && matchSearch;
   });
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -420,7 +418,7 @@ export default function Logs() {
             <p>{logsError}</p>
             <button
               className="admin-btn admin-btn--ghost"
-              onClick={() => targetId && fetchLogs(targetId, dateFrom, dateTo)}
+              onClick={() => targetId && fetchLogs(targetId, dateFrom, dateTo, typeFilter)}
             >
               Réessayer
             </button>

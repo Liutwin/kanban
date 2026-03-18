@@ -22,10 +22,11 @@ export const ROUTES_API = {
   userAvatar:         (id: number) => `${BASE}/users/${id}/avatar`,
   userProfile:        (id: number) => `${BASE}/users/profiles/${id}`,
   userProfiles:       `${BASE}/users/profiles`,
-  userLogs:           (id: number, from?: string, to?: string) => {
+  userLogs:           (id: number, type?: string, from?: string, to?: string) => {
     const p = new URLSearchParams();
-    if (from) p.append("from", from);
-    if (to)   p.append("to",   to);
+    if (type) p.append("type", type.toUpperCase());
+    if (from) p.append("from", `${from}T00:00:00`);
+    if (to)   p.append("to",   `${to}T23:59:59`);
     const qs = p.toString();
     return `${BASE}/users/${id}/logs${qs ? "?" + qs : ""}`;
   },
@@ -57,9 +58,9 @@ export const ROUTES_API = {
   // ── Logs boards
   boardLogs: (id: number, type?: string, from?: string, to?: string) => {
     const p = new URLSearchParams();
-    if (type) p.append("type", type);
-    if (from) p.append("from", from);
-    if (to)   p.append("to",   to);
+    if (type) p.append("type", type.toUpperCase());
+    if (from) p.append("from", `${from}T00:00:00`);
+    if (to)   p.append("to",   `${to}T23:59:59`);
     const qs = p.toString();
     return `${BASE}/boards/${id}/logs${qs ? "?" + qs : ""}`;
   },
