@@ -14,7 +14,6 @@ import com.repositories.TaskRepository;
 import com.services.BoardExportService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
-import com.lowagie.text.pdf.draw.LineSeparator;
 
 import java.awt.Color;
 import java.io.ByteArrayOutputStream;
@@ -180,13 +179,25 @@ public class BoardExportServiceImpl implements BoardExportService {
         if (n == 0) return;
 
         // Grille à N colonnes égales
+        // Ligne 0 (répétée) : en-têtes des colonnes
+        // Ligne 1           : tâches de chaque colonne
         PdfPTable grid = new PdfPTable(n);
         grid.setWidthPercentage(100);
         grid.setSpacingAfter(14);
+        grid.setSplitLate(false);
+        grid.setSplitRows(true);
+        grid.setHeaderRows(1); // répète la ligne d'en-tête sur chaque page
 
+        // Ligne d'en-tête (répétée)
         for (BoardColumn col : columns) {
             List<Task> tasks = taskRepository.findByBoardColumnIdOrderByPosition(col.getId());
-            grid.addCell(buildColumnCell(col, tasks));
+            grid.addCell(buildColumnHeader(col, tasks.size()));
+        }
+
+        // Ligne de contenu (tâches)
+        for (BoardColumn col : columns) {
+            List<Task> tasks = taskRepository.findByBoardColumnIdOrderByPosition(col.getId());
+            grid.addCell(buildColumnBody(tasks));
         }
 
         doc.add(grid);
@@ -208,9 +219,29 @@ public class BoardExportServiceImpl implements BoardExportService {
     // -------------------------------------------------------------------------
 
     /**
-     * Cellule représentant une colonne Kanban complète.
+     * Cellule d'en-tête d'une colonne Kanban (ligne répétée sur chaque page).
      */
-    private PdfPCell buildColumnCell(BoardColumn col, List<Task> tasks) {
+    private PdfPCell buildColumnHeader(BoardColumn col, int taskCount) {
+
+        PdfPCell cell = new PdfPCell();
+        cell.setBackgroundColor(new Color(0x1E, 0x3A, 0x5F));
+        cell.setBorderColor(COLOR_COL_BORDER);
+        cell.setBorderWidth(0.5f);
+        cell.setPaddingTop(7);
+        cell.setPaddingBottom(7);
+        cell.setPaddingLeft(8);
+        cell.setPaddingRight(8);
+
+        Font headerFont = new Font(Font.HELVETICA, 11, Font.BOLD, COLOR_WHITE);
+        cell.addElement(new Paragraph(col.getName() + "  (" + taskCount + ")", headerFont));
+
+        return cell;
+    }
+
+    /**
+     * Cellule de contenu d'une colonne Kanban (tâches).
+     */
+    private PdfPCell buildColumnBody(List<Task> tasks) {
 
         PdfPCell cell = new PdfPCell();
         cell.setBackgroundColor(COLOR_COL_BG);
@@ -218,18 +249,6 @@ public class BoardExportServiceImpl implements BoardExportService {
         cell.setBorderWidth(0.5f);
         cell.setPadding(6);
 
-        // En-tête de colonne
-        Paragraph header = new Paragraph(
-                col.getName() + "  (" + tasks.size() + ")", FONT_COL_HDR);
-        header.setSpacingAfter(6);
-        cell.addElement(header);
-
-        // Séparateur
-        LineSeparator sep = new LineSeparator(0.5f, 100, COLOR_COL_BORDER,
-                Element.ALIGN_CENTER, -2);
-        cell.addElement(new Chunk(sep));
-
-        // Tâches
         for (Task task : tasks) {
             cell.addElement(buildTaskTable(task));
         }
