@@ -12,6 +12,8 @@ import Tooltip from "./Tooltip";
 import MembersPanel from './MembersPanel';
 import { getAvatarStyle } from '../utils/avatarColor';
 import UserAvatar, { prefetchAvatars, fetchAvatarOnce } from './UserAvatar';
+import MemberPopoverCard from './MemberPopoverCard';
+import { toSlug }          from '../utils/slug';
 
 /**
  * Props du composant Layout.
@@ -159,6 +161,11 @@ export default function Layout({ children, title, boardId, boardRole, boardCreat
     return () => document.removeEventListener("mousedown", onClickOutside);
   }, []);
 
+  // Ferme le drawer mobile à chaque changement de page
+  useEffect(() => {
+    setSidebarOpen(false);
+  }, [location.pathname]);
+
   // Réinitialise la recherche à chaque changement de page
   useEffect(() => {
     setSearchValue("");
@@ -175,6 +182,7 @@ export default function Layout({ children, title, boardId, boardRole, boardCreat
   // La logique complète (rôles, ajout, popover) vit dans MembersPanel.
   const [avatarMembers, setAvatarMembers] = useState<AvatarInfo[]>([]);
   const [panelOpen,     setPanelOpen]     = useState(false);
+  const [sidebarOpen,   setSidebarOpen]   = useState(false);
   const [topbarPopover, setTopbarPopover] = useState<AvatarInfo | null>(null);
   const triggerRef    = useRef<HTMLDivElement>(null);
   const membersBtnRef = useRef<HTMLButtonElement>(null);
@@ -270,7 +278,12 @@ export default function Layout({ children, title, boardId, boardRole, boardCreat
   return (
     <div className="layout">
       {/* Barre latérale */}
-      <aside className="sidebar">
+      {/* Backdrop mobile */}
+      {sidebarOpen && (
+        <div className="sidebar-backdrop" onClick={() => setSidebarOpen(false)} />
+      )}
+
+      <aside className={`sidebar${sidebarOpen ? " sidebar--open" : ""}`}>
         <div className="sidebar-brand">
           <span className="brand-icon">
             <img src={SidebarIcon} alt="" width="22" height="22" />
@@ -334,6 +347,19 @@ export default function Layout({ children, title, boardId, boardRole, boardCreat
       {/* Contenu principal */}
       <main className={`main-content${boardId ? " main-content--board" : ""}`}>
         <header className="top-bar">
+          {/* Hamburger mobile */}
+          <button
+            className="hamburger-btn"
+            onClick={() => setSidebarOpen(v => !v)}
+            aria-label="Ouvrir le menu"
+          >
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+              <line x1="2" y1="4"  x2="14" y2="4"  stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+              <line x1="2" y1="8"  x2="14" y2="8"  stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+              <line x1="2" y1="12" x2="14" y2="12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+            </svg>
+          </button>
+
           {/* Titre */}
           <h1 className="page-title">{title ?? ""}</h1>
 
@@ -542,47 +568,20 @@ export default function Layout({ children, title, boardId, boardRole, boardCreat
                 {/* Popover topbar avatar */}
                 {topbarPopover && (() => {
                   const m = topbarPopover;
-                  const c = getAvatarStyle(m.userId);
                   const ROLE_LABELS: Record<string, string> = { admin: "Admin", editeur: "Éditeur", lecteur: "Lecteur" };
+                  const slug = `${toSlug(m.firstName)}-${toSlug(m.lastName)}`;
                   return (
-                    <div style={{
-                      position: "absolute", top: "calc(100% + 8px)", left: 0,
-                      width: 210, background: "var(--surface2)",
-                      border: "1px solid var(--border2)", borderRadius: "var(--radius-lg)",
-                      boxShadow: "var(--elev-4)", zIndex: 300, overflow: "hidden",
-                    }}>
-                      <div style={{ padding: "18px 16px 12px", display: "flex", flexDirection: "column", alignItems: "center", gap: 10, borderBottom: "1px solid var(--border)" }}>
-                        <UserAvatar
-                          userId={m.userId}
-                          firstName={m.firstName}
-                          lastName={m.lastName}
-                          hasAvatar={!!m.avatar}
-                          size={52}
-                          style={{ border: `2px solid ${getAvatarStyle(m.userId).to}55` }}
-                        />
-                        <div style={{ textAlign: "center" }}>
-                          <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: "var(--text)" }}>{m.firstName} {m.lastName}</p>
-                          <p style={{ margin: "2px 0 0", fontSize: 11, color: "var(--text-3)" }}>{ROLE_LABELS[m.role] ?? m.role}</p>
-                        </div>
-                      </div>
-                      {m.email && (
-                        <div style={{ padding: "9px 14px", borderBottom: "1px solid var(--border)" }}>
-                          <p style={{ margin: 0, fontSize: 11, color: "var(--text-3)", fontFamily: "'DM Mono',monospace", wordBreak: "break-all" }}>{m.email}</p>
-                        </div>
-                      )}
-                      <button
-                        onClick={() => { setTopbarPopover(null); navigate("/profile"); }}
-                        style={{ width: "100%", padding: "9px 14px", background: "transparent", border: "none", cursor: "pointer", textAlign: "left", fontSize: 12, color: "var(--accent)", fontFamily: "inherit", display: "flex", alignItems: "center", gap: 6 }}
-                        onMouseEnter={e => (e.currentTarget.style.background = "rgba(176,166,255,0.08)")}
-                        onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
-                      >
-                        <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
-                          <circle cx="8" cy="5" r="3" stroke="currentColor" strokeWidth="1.5"/>
-                          <path d="M2 14c0-3 2.7-5 6-5s6 2 6 5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-                        </svg>
-                        Voir le profil
-                      </button>
-                    </div>
+                    <MemberPopoverCard
+                      userId={m.userId}
+                      firstName={m.firstName}
+                      lastName={m.lastName}
+                      email={m.email}
+                      roleLabel={ROLE_LABELS[m.role] ?? m.role}
+                      hasAvatar={!!m.avatar}
+                      positionStyle={{ top: "calc(100% + 8px)", left: 0 }}
+                      onClose={() => setTopbarPopover(null)}
+                      onViewProfile={() => navigate(`/logs/users/${slug}`)}
+                    />
                   );
                 })()}
 

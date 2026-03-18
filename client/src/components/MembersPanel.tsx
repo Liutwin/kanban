@@ -2,9 +2,11 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import { ROUTES_API } from "../config/api";
+import { toSlug }      from "../utils/slug";
 import type { Member, User } from "../model/interfaces";
 import { getAvatarStyle } from "../utils/avatarColor";
 import UserAvatar, { prefetchAvatars } from "./UserAvatar";
+import MemberPopoverCard from './MemberPopoverCard';
 
 // ─────────────────────────────────────────────────────────────
 // Types & constantes
@@ -54,7 +56,6 @@ function unwrap<T>(json: unknown): T {
 export default function MembersPanel({ boardId, currentUserId, currentRole, boardCreatorId, onClose, triggerRef }: MembersPanelProps) {
   const { authFetch } = useAuth();
   const navigate      = useNavigate();
-
   const [members,       setMembers]       = useState<MemberWithUser[]>([]);
   const [loading,       setLoading]       = useState(true);
   const [inviteError,   setInviteError]   = useState("");
@@ -364,54 +365,28 @@ export default function MembersPanel({ boardId, currentUserId, currentRole, boar
       {/* Popover profil — rendue ICI, hors du scroll, positionnée via top calculé */}
       {popover && (() => {
         const { member: m, top } = popover;
-        const c    = getAvatarStyle(m.userId);
-        const u    = m.user;
-        const name = u ? `${u.firstName ?? ""} ${u.lastName ?? ""}`.trim() : `#${m.userId}`;
+        const u = m.user;
         return (
-          <div style={{
-            position: "absolute", right: "calc(100% + 8px)", top,
-            width: 210, background: "var(--surface3)",
-            border: "1px solid var(--border2)", borderRadius: "var(--radius-lg)",
-            boxShadow: "var(--elev-4)", zIndex: 300, overflow: "hidden",
-            animation: "slideLeft 0.15s cubic-bezier(0.16,1,0.3,1)",
-          }}>
-            {/* Avatar grand + nom */}
-            <div style={{ padding: "18px 16px 12px", display: "flex", flexDirection: "column", alignItems: "center", gap: 10, borderBottom: "1px solid var(--border)" }}>
-              <UserAvatar
-                userId={m.userId}
-                firstName={u?.firstName ?? ""}
-                lastName={u?.lastName ?? ""}
-                hasAvatar={!!u?.avatarURL}
-                size={52}
-                style={{ border: `2px solid ${c.color}55` }}
-              />
-              <div style={{ textAlign: "center" }}>
-                <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: "var(--text)" }}>{name}</p>
-                <p style={{ margin: "2px 0 0", fontSize: 11, color: "var(--text-3)" }}>
-                  {m.notified ? ROLE_LABELS[m.role] : "Invitation en attente"}
-                </p>
-              </div>
-            </div>
-            {/* Email */}
-            {u?.email && (
-              <div style={{ padding: "9px 14px", borderBottom: "1px solid var(--border)" }}>
-                <p style={{ margin: 0, fontSize: 11, color: "var(--text-3)", fontFamily: "'DM Mono',monospace", wordBreak: "break-all" }}>{u.email}</p>
-              </div>
-            )}
-            {/* Voir le profil */}
-            <button
-              onClick={() => { setPopover(null); navigate("/profile"); }}
-              style={{ width: "100%", padding: "9px 14px", background: "transparent", border: "none", cursor: "pointer", textAlign: "left", fontSize: 12, color: "var(--accent)", fontFamily: "inherit", display: "flex", alignItems: "center", gap: 6 }}
-              onMouseEnter={e => (e.currentTarget.style.background = "rgba(176,166,255,0.08)")}
-              onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
-            >
-              <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
-                <circle cx="8" cy="5" r="3" stroke="currentColor" strokeWidth="1.5"/>
-                <path d="M2 14c0-3 2.7-5 6-5s6 2 6 5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-              </svg>
-              Voir le profil
-            </button>
-          </div>
+          <MemberPopoverCard
+            userId={m.userId}
+            firstName={u?.firstName ?? ""}
+            lastName={u?.lastName ?? ""}
+            email={u?.email}
+            roleLabel={m.notified ? ROLE_LABELS[m.role] : "Invitation en attente"}
+            hasAvatar={!!u?.avatarURL}
+            positionStyle={{
+              right: "calc(100% + 8px)", top,
+              animation: "slideLeft 0.15s cubic-bezier(0.16,1,0.3,1)",
+            }}
+            onClose={() => setPopover(null)}
+            onViewProfile={() => {
+              const firstName = u?.firstName ?? "";
+              const lastName  = u?.lastName  ?? "";
+              const slug = `${toSlug(firstName)}-${toSlug(lastName)}`;
+              setPopover(null);
+              navigate(`/logs/users/${slug}`);
+            }}
+          />
         );
       })()}
 

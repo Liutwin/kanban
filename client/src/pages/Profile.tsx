@@ -303,14 +303,14 @@ export default function Profile() {
 
   /** Charge l'avatar via le cache partagé (0 requête réseau si déjà en cache). */
   useEffect(() => {
-    if (!user?.id || !user.avatarURL) return;
+    if (!user?.id) return;
     let cancelled = false;
     fetchAvatarOnce(user.id, authFetch).then(url => {
       if (!cancelled && url) setAvatarBlobUrl(url);
     });
     return () => { cancelled = true; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.id, user?.avatarURL]);
+  }, [user?.id]);
 
   /** Upload un nouvel avatar (même pattern que les pièces jointes TaskDetailModal). */
   const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
