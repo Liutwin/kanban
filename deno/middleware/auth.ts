@@ -7,6 +7,7 @@ import { APIErrorCode, APIException, type AuthPayload } from "../model/interface
 // On étend la définition du contexte d'une requête en typant la variable `state` contenant son état
 export interface AuthContext extends Context {
   state: AuthState;
+  params: Record<string, string>;
 }
 
 // On définit l'état d'une requête, qui peut contenir un payload JWT en cas de connexion réussie

@@ -5,6 +5,7 @@ import { oakCors }     from "@tajpouria/cors";
 import { errorMiddleware } from "./middleware/error.ts";
 import authRouter          from "./routes/auth.ts";
 import proxyRouter         from "./routes/proxy.ts";
+import wsRouter from "./routes/websockets.ts";
 
 // Configuration réseau
 const PROTOCOL = "http";
@@ -21,6 +22,7 @@ app.use(errorMiddleware);
 // Routes
 app.use(authRouter.routes(),  authRouter.allowedMethods());
 app.use(proxyRouter.routes(), proxyRouter.allowedMethods());
+app.use(wsRouter.routes(),    wsRouter.allowedMethods());
 
 app.addEventListener("listen", () =>
   console.log(`🚀 Serveur Deno démarré sur ${ADDRESS}`)

@@ -1,7 +1,11 @@
 import { Router }       from "@oak/oak";
+import { Context } from "node:vm";
+
 import { authMiddleware, type AuthContext } from "../middleware/auth.ts";
 import { hashPassword } from "../lib/jwt.ts";
 import { db } from "../config/db.ts";
+import { broadcast } from "../services/board-ws.ts";
+import type { BoardAction } from "../model/websockets.ts";
 
 /** URL de base du serveur Tomcat (backend Spring Boot). */
 const TOMCAT_URL = "http://localhost:8081";
@@ -24,7 +28,7 @@ const router = new Router({ prefix: "/api/v1" });
  * @param overrideBody - Corps JSON sérialisé à envoyer à la place du body original.
  */
 async function proxyToTomcat(
-  ctx: AuthContext,
+  ctx: Context,
   path: string,
   overrideBody?: string
 ) {
@@ -116,9 +120,7 @@ router.post("/users", async (ctx) => {
 router.patch("/users/:id/password", authMiddleware, async (ctx: AuthContext) => {
   const body = await ctx.request.body.json() as { oldPassword: string; newPassword: string };
 
-  // Extraire l'id depuis le pathname car AuthContext n'expose pas ctx.params
-  const match = ctx.request.url.pathname.match(/\/users\/(\d+)\/password/);
-  const userId = match?.[1] ?? String(ctx.state.user!.id);
+  const userId = ctx.params.id;
 
   // Récupérer le hash stocké en base pour extraire le sel
   const [rows] = await db.query(
@@ -161,6 +163,63 @@ router.patch("/users/:id/password", authMiddleware, async (ctx: AuthContext) => 
 router.all("/(.*)", authMiddleware, async (ctx: AuthContext) => {
   const path = ctx.request.url.pathname + ctx.request.url.search;
   await proxyToTomcat(ctx, path);
+
+
+
+  // Broadcast WebSocket après toute mutation réussie
+  const method = ctx.request.method;
+  const status = ctx.response.status as number;
+
+  if (["POST", "PUT", "PATCH", "DELETE"].includes(method) && status < 300) {
+    const boardId = extractBoardId(path);
+    const action  = detectAction(path, method);
+
+    if (boardId && action) {
+      broadcast(boardId, {
+        type: "board_update",
+        boardId,
+        action,
+        originUserId: ctx.state.user?.id,
+      });
+    }
+  }
 });
+
+/**
+ * Extrait le boardId depuis un chemin d'API Spring.
+ * Couvre les patterns :
+ *   /api/v1/boards/42/...
+ *   /api/v1/tasks/... (le boardId n'est pas dans l'URL — on ne broadcaste pas)
+ *   /api/v1/comments/... (idem)
+ */
+function extractBoardId(path: string): number | null {
+  const m = path.match(/\/api\/v1\/boards\/(\d+)/);
+  return m ? parseInt(m[1], 10) : null;
+}
+
+/**
+ * Déduit le type d'action à partir du chemin et de la méthode HTTP.
+ */
+function detectAction(path: string, method: string): BoardAction | null {
+  const isTasks   = /\/tasks/.test(path);
+  const isCols    = /\/columns/.test(path);
+  const isMembers = /\/members/.test(path);
+  const isMove    = /\/move/.test(path);
+
+  if (isTasks) {
+    if (isMove)            return "task_moved";
+    if (method === "POST") return "task_created";
+    if (method === "DELETE") return "task_deleted";
+    return "task_updated";
+  }
+  if (isCols) {
+    if (isMove)            return "column_moved";
+    if (method === "POST") return "column_created";
+    if (method === "DELETE") return "column_deleted";
+    return "column_updated";
+  }
+  if (isMembers)           return "member_updated";
+  return null;
+}
 
 export default router;
