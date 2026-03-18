@@ -71,16 +71,17 @@ export default function Boards() {
    * Récupère la liste des tableaux de l'utilisateur connecté depuis l'API
    * et met à jour l'état local. Ne fait rien si `user.id` n'est pas disponible.
    */
-  const fetchBoards = async () => {
+  const fetchBoards = async (signal?: AbortSignal) => {
     if (!user?.id) return;
     setLoading(true);
     setError("");
     try {
-      const res = await authFetch(ROUTES_API.boardsByUser(user.id));
+      const res = await authFetch(ROUTES_API.boardsByUser(user.id), { signal });
       if (!res.ok) throw new Error(await extractErrorMessage(res));
       const data: BoardWithRole[] = await res.json();
       setBoards(data);
     } catch (e: unknown) {
+      if (e instanceof DOMException && e.name === "AbortError") return;
       setError(e instanceof Error ? e.message : "Erreur lors du chargement.");
     } finally {
       setLoading(false);
@@ -92,22 +93,25 @@ export default function Boards() {
    * via `GET /api/v1/boards/invitations/me`.
    * Les erreurs sont isolées pour ne pas bloquer l'affichage des tableaux.
    */
-  const fetchInvitations = async () => {
+  const fetchInvitations = async (signal?: AbortSignal) => {
     setInvitationError("");
     try {
-      const res = await authFetch(ROUTES_API.myPendingInvitations);
+      const res = await authFetch(ROUTES_API.myPendingInvitations, { signal });
       if (!res.ok) throw new Error(await extractErrorMessage(res));
       const data: PendingInvitation[] = await res.json();
       setInvitations(data);
     } catch (e: unknown) {
+      if (e instanceof DOMException && e.name === "AbortError") return;
       setInvitationError(e instanceof Error ? e.message : "Erreur lors du chargement des invitations.");
     }
   };
 
   useEffect(() => {
     if (!user?.id) { setLoading(false); return; }
-    fetchBoards();
-    fetchInvitations();
+    const controller = new AbortController();
+    fetchBoards(controller.signal);
+    fetchInvitations(controller.signal);
+    return () => controller.abort();
   }, [user?.id]);
 
   /** Ferme la modale de création et réinitialise son état interne. */

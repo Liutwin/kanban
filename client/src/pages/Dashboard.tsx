@@ -143,23 +143,23 @@ export default function Dashboard() {
 
   /* ── Chargement ──────────────────────────────────────────── */
 
-  const fetchBoard = async () => {
+  const fetchBoard = async (signal?: AbortSignal) => {
     setLoading(true);
     setError("");
     try {
-      const resBoard = await authFetch(ROUTES_API.board(boardId));
+      const resBoard = await authFetch(ROUTES_API.board(boardId), { signal });
       if (!resBoard.ok) throw new Error(await extractErrorMessage(resBoard));
       const board: Board = await resBoard.json();
       setBoardName(board.name);
       setBoardCreatorId(board.creatorId);
 
-      const resCols = await authFetch(ROUTES_API.columns(boardId));
+      const resCols = await authFetch(ROUTES_API.columns(boardId), { signal });
       if (!resCols.ok) throw new Error(await extractErrorMessage(resCols));
       const cols: Column[] = await resCols.json();
 
       const colsWithTasks: ColumnWithTasks[] = await Promise.all(
         cols.map(async col => {
-          const resTasks = await authFetch(ROUTES_API.tasksByColumn(col.id));
+          const resTasks = await authFetch(ROUTES_API.tasksByColumn(col.id), { signal });
           const tasks: Task[] = resTasks.ok ? await resTasks.json() : [];
           return { ...col, tasks };
         })
@@ -175,7 +175,7 @@ export default function Dashboard() {
       const userIdsToFetch = new Set<number>();
       userIdsToFetch.add(board.creatorId);
 
-      const resMembers = await authFetch(ROUTES_API.boardMembers(boardId));
+      const resMembers = await authFetch(ROUTES_API.boardMembers(boardId), { signal });
       if (resMembers.ok) {
         const memberList: Member[] = await resMembers.json();
         const roles = new Map<number, Member["role"]>();
@@ -185,7 +185,7 @@ export default function Dashboard() {
 
       const userResults = await Promise.allSettled(
         [...userIdsToFetch].map(uid =>
-          authFetch(ROUTES_API.user(uid)).then(r => r.ok ? r.json() as Promise<User> : null)
+          authFetch(ROUTES_API.user(uid), { signal }).then(r => r.ok ? r.json() as Promise<User> : null)
         )
       );
       const resolvedMembers = userResults
@@ -197,13 +197,20 @@ export default function Dashboard() {
       // Les <UserAvatar> montés ensuite trouveront le cache déjà chaud.
       prefetchAvatars(resolvedMembers, authFetch);
     } catch (e: unknown) {
+      // Requête annulée par le nettoyage du useEffect (StrictMode ou
+      // changement de boardId) : on ignore silencieusement.
+      if (e instanceof DOMException && e.name === "AbortError") return;
       setError(e instanceof Error ? e.message : "Erreur de chargement.");
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => { fetchBoard(); }, [boardId]);
+  useEffect(() => {
+    const controller = new AbortController();
+    fetchBoard(controller.signal);
+    return () => controller.abort();
+  }, [boardId]);
 
   useEffect(() => {
     const onDragOver = (e: DragEvent) => {
@@ -632,21 +639,9 @@ export default function Dashboard() {
   return (
     <Layout title={boardName || "Tableau"} boardId={boardId} boardRole={currentRole} boardCreatorId={board_creatorId ?? undefined}>
       <div className="dashboard-page">
-        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 4 }}>
-          <button className="back-btn" style={{ marginBottom: 0 }} onClick={() => navigate("/boards")}>
-            ← Retour aux tableaux
-          </button>
-          <button
-            className="btn btn-ghost"
-            onClick={() => navigate(`/logs/boards/${boardId}`)}
-            style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13 }}
-          >
-            <svg width="14" height="14" viewBox="0 0 20 20" fill="none">
-              <path d="M4 5h12M4 10h8M4 15h5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-            </svg>
-            Journal d'activité
-          </button>
-        </div>
+        <button className="back-btn" onClick={() => navigate("/boards")}>
+          ← Retour aux tableaux
+        </button>
 
         {/* Nom du tableau éditable (admin uniquement, double-clic) + bouton export PDF */}
         {boardName && (
@@ -675,14 +670,14 @@ export default function Dashboard() {
               <h1 className="board-name-title">{boardName}</h1>
             )}
 
-            {/* Bouton export PDF — visible pour admin et éditeur */}
-            {(
+            {/* Boutons export PDF + journal d'activité */}
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <Tooltip text="Télécharger le tableau en PDF">
                 <button
                   className="btn btn-ghost"
                   onClick={handleExport}
                   disabled={exporting}
-                  style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 6 }}
+                  style={{ display: "flex", alignItems: "center", gap: 6 }}
                 >
                   {exporting ? (
                     <span className="spinner" style={{ borderTopColor: "currentColor", width: 14, height: 14 }} />
@@ -697,7 +692,17 @@ export default function Dashboard() {
                   {exporting ? "Export…" : "Exporter PDF"}
                 </button>
               </Tooltip>
-            )}
+              <button
+                className="btn btn-ghost"
+                onClick={() => navigate(`/logs/boards/${boardId}`)}
+                style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13 }}
+              >
+                <svg width="14" height="14" viewBox="0 0 20 20" fill="none">
+                  <path d="M4 5h12M4 10h8M4 15h5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                </svg>
+                Journal d'activité
+              </button>
+            </div>
 
             {exportError && (
               <span style={{ fontSize: 13, color: "var(--color-danger, #e24b4a)", marginLeft: 8 }}>

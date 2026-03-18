@@ -64,10 +64,16 @@ export default function Layout({ children, title, boardId, boardRole, boardCreat
 
   useEffect(() => {
     if (!user?.id) return;
-    authFetch(`/api/v1/users/${user.id}`)
+    const controller = new AbortController();
+    authFetch(`/api/v1/users/${user.id}`, { signal: controller.signal })
       .then(res => { if (!res.ok) throw new Error(); return res.json(); })
       .then(json => setUserDTO((json?.data ?? json) as UserDTO))
-      .catch(() => setUserDTO(null));
+      .catch(e => {
+        // Requête annulée par le nettoyage du useEffect : on ignore silencieusement.
+        if (e instanceof DOMException && e.name === "AbortError") return;
+        setUserDTO(null);
+      });
+    return () => controller.abort();
   }, [user?.id]);
 
   const fullName =
@@ -173,10 +179,10 @@ export default function Layout({ children, title, boardId, boardRole, boardCreat
   const triggerRef    = useRef<HTMLDivElement>(null);
   const membersBtnRef = useRef<HTMLButtonElement>(null);
 
-  const fetchAvatarMembers = useCallback(async () => {
+  const fetchAvatarMembers = useCallback(async (signal?: AbortSignal) => {
     if (!boardId) return;
     try {
-      const res  = await authFetch(ROUTES_API.boardMembers(boardId));
+      const res  = await authFetch(ROUTES_API.boardMembers(boardId), { signal });
       if (!res.ok) return;
       const json = await res.json();
       // Spring retourne un tableau direct ici (sans enveloppe { data })
@@ -191,7 +197,7 @@ export default function Layout({ children, title, boardId, boardRole, boardCreat
       const enriched = await Promise.all(
         raw.map(async m => {
           try {
-            const r2    = await authFetch(ROUTES_API.user(m.userId));
+            const r2    = await authFetch(ROUTES_API.user(m.userId), { signal });
             const json2 = await r2.json();
             const p     = json2?.data ?? json2;
             return {
@@ -215,10 +221,19 @@ export default function Layout({ children, title, boardId, boardRole, boardCreat
       });
       setAvatarMembers(enriched);
       prefetchAvatars(enriched.map(m => ({ id: m.userId, avatarURL: m.avatar })), authFetch);
-    } catch { /* silencieux */ }
+    } catch (e) {
+      // Requête annulée par le nettoyage du useEffect : on ignore silencieusement.
+      if (e instanceof DOMException && e.name === "AbortError") return;
+      /* autres erreurs : silencieux */
+    }
   }, [boardId, user?.id]);
 
-  useEffect(() => { if (boardId) fetchAvatarMembers(); }, [boardId, fetchAvatarMembers]);
+  useEffect(() => {
+    if (!boardId) return;
+    const controller = new AbortController();
+    fetchAvatarMembers(controller.signal);
+    return () => controller.abort();
+  }, [boardId, fetchAvatarMembers]);
 
   // Précharge l'avatar de l'utilisateur connecté dès le montage du Layout,
   // sans attendre user.avatarURL (absent du JWT) — 1 requête, mise en cache.
