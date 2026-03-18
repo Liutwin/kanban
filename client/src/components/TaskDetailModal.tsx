@@ -84,16 +84,20 @@ export default function TaskDetailModal({ task, columnName, members = [], onClos
   const isClosing          = useRef(false);
   const commentTextareaRef = useRef<HTMLTextAreaElement>(null);
 
-  const handleClose = () => {
+  const handleClose = async () => {
     isClosing.current = true;
-    // Si une sauvegarde est en attente (debounce), la déclencher immédiatement
+    // Si une sauvegarde est en attente (debounce), la déclencher immédiatement et l'attendre
     if (debounceRef.current) {
       clearTimeout(debounceRef.current);
       debounceRef.current = null;
-      doSave(title, details, dueDate, priority);
+      await doSave(title, details, dueDate, priority);
     }
     onClose();
   };
+
+  // Ref toujours à jour pour éviter la closure périmée dans le handler Escape
+  const handleCloseRef = useRef(handleClose);
+  handleCloseRef.current = handleClose;
 
   /* UI state */
   const [priorityOpen,  setPriorityOpen]  = useState(false);
@@ -315,10 +319,10 @@ export default function TaskDetailModal({ task, columnName, members = [], onClos
 
   /* Échap pour fermer la modale */
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") handleClose(); };
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") handleCloseRef.current(); };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [onClose]);
+  }, []);
 
   /* État hover pour le bouton fermer */
   const [closeHover, setCloseHover] = useState(false);
@@ -334,7 +338,7 @@ export default function TaskDetailModal({ task, columnName, members = [], onClos
       const body = {
         title:         t.trim(),
         details:       det || null,
-        dueDate:       dd ? new Date(dd).toISOString() : null,
+        dueDate:       dd ? `${dd}:00` : null,
         priority:      prio,
         boardColumnId: task.boardColumnId,
         creatorId:     task.creatorId,
@@ -343,9 +347,9 @@ export default function TaskDetailModal({ task, columnName, members = [], onClos
       const res = await authFetch(ROUTES_API.task(task.id), { method: "PUT", body: JSON.stringify(body) });
       if (!res.ok) throw new Error("Erreur lors de la sauvegarde.");
       const saved: Task = await res.json();
+      onEdit(saved);
       if (!isClosing.current) {
         setSaveStatus("saved");
-        onEdit(saved);
       }
     } catch (e: unknown) {
       if (isClosing.current) return;
@@ -863,7 +867,7 @@ export default function TaskDetailModal({ task, columnName, members = [], onClos
                   onChange={e => {
                     if (!canEdit) return;
                     const t = e.target.value;
-                    const d = dueDate ? dueDate.slice(0, 10) : new Date().toISOString().slice(0, 10);
+                    const d = dueDate ? dueDate.slice(0, 10) : (() => { const n = new Date(); return `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,"0")}-${String(n.getDate()).padStart(2,"0")}`; })();
                     const val = t ? `${d}T${t}` : dueDate ? dueDate.slice(0, 10) + "T00:00" : "";
                     setDueDate(val);
                     scheduleAutoSave(title, details, val);
@@ -955,7 +959,7 @@ export default function TaskDetailModal({ task, columnName, members = [], onClos
 
                 {/* Raccourci "M'assigner" / "Retirer" */}
                 {canEdit && user?.id != null && (
-                  assigneeId === user.id ? (
+                  assigneeId != null ? (
                     <button
                       onClick={() => handleAssigneeChange(null)}
                       onMouseEnter={e => { e.currentTarget.style.background = "rgba(242,139,130,0.12)"; e.currentTarget.style.borderColor = "rgba(242,139,130,0.35)"; }}
