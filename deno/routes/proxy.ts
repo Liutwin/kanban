@@ -164,14 +164,12 @@ router.all("/(.*)", authMiddleware, async (ctx: AuthContext) => {
   const path = ctx.request.url.pathname + ctx.request.url.search;
   await proxyToTomcat(ctx, path);
 
-
-
   // Broadcast WebSocket après toute mutation réussie
   const method = ctx.request.method;
   const status = ctx.response.status as number;
 
   if (["POST", "PUT", "PATCH", "DELETE"].includes(method) && status < 300) {
-    const boardId = extractBoardId(path);
+    const boardId = extractBoardId(ctx, path);
     const action  = detectAction(path, method);
 
     if (boardId && action) {
@@ -186,19 +184,34 @@ router.all("/(.*)", authMiddleware, async (ctx: AuthContext) => {
 });
 
 /**
- * Extrait le boardId depuis un chemin d'API Spring.
- * Couvre les patterns :
- *   /api/v1/boards/42/...
- *   /api/v1/tasks/... (le boardId n'est pas dans l'URL — on ne broadcaste pas)
- *   /api/v1/comments/... (idem)
+ * Extrait le boardId depuis un chemin d'API Spring ou depuis l'en-tête `X-Board-Id`.
+ *
+ * Deux stratégies, dans l'ordre :
+ * 1. Le boardId est dans l'URL (ex. : `/api/v1/boards/42/columns`) — cas des mutations
+ *    sur les tableaux et les colonnes.
+ * 2. Fallback sur l'en-tête `X-Board-Id` injecté par le client Dashboard — nécessaire
+ *    pour les routes `/tasks/...` et `/comments/...` où le boardId n'apparaît pas dans l'URL.
+ *
+ * @param ctx  - Contexte Oak, utilisé pour lire l'en-tête `X-Board-Id`.
+ * @param path - Chemin de la requête proxifiée vers Spring.
+ * @returns Le boardId extrait, ou `null` si introuvable.
  */
-function extractBoardId(path: string): number | null {
-  const m = path.match(/\/api\/v1\/boards\/(\d+)/);
-  return m ? parseInt(m[1], 10) : null;
+function extractBoardId(ctx: AuthContext, path: string): number | null {
+  const fromPath = path.match(/\/api\/v1\/boards\/(\d+)/);
+  if (fromPath) return parseInt(fromPath[1], 10);
+
+  // Fallback : boardId injecté par le client via X-Board-Id
+  // (utilisé pour les routes /tasks/..., /comments/... où il n'est pas dans l'URL)
+  const fromHeader = ctx.request.headers.get("X-Board-Id");
+  return fromHeader ? parseInt(fromHeader, 10) : null;
 }
 
 /**
  * Déduit le type d'action à partir du chemin et de la méthode HTTP.
+ *
+ * @param path   - Chemin de la requête proxifiée.
+ * @param method - Méthode HTTP de la requête.
+ * @returns Le type d'action pour le broadcast WebSocket, ou `null` si non pertinent.
  */
 function detectAction(path: string, method: string): BoardAction | null {
   const isTasks   = /\/tasks/.test(path);
@@ -207,18 +220,18 @@ function detectAction(path: string, method: string): BoardAction | null {
   const isMove    = /\/move/.test(path);
 
   if (isTasks) {
-    if (isMove)            return "task_moved";
-    if (method === "POST") return "task_created";
+    if (isMove)              return "task_moved";
+    if (method === "POST")   return "task_created";
     if (method === "DELETE") return "task_deleted";
     return "task_updated";
   }
   if (isCols) {
-    if (isMove)            return "column_moved";
-    if (method === "POST") return "column_created";
+    if (isMove)              return "column_moved";
+    if (method === "POST")   return "column_created";
     if (method === "DELETE") return "column_deleted";
     return "column_updated";
   }
-  if (isMembers)           return "member_updated";
+  if (isMembers) return "member_updated";
   return null;
 }
 

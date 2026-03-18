@@ -21,8 +21,8 @@ app.use(errorMiddleware);
 
 // Routes
 app.use(authRouter.routes(),  authRouter.allowedMethods());
-app.use(proxyRouter.routes(), proxyRouter.allowedMethods());
 app.use(wsRouter.routes(),    wsRouter.allowedMethods());
+app.use(proxyRouter.routes(), proxyRouter.allowedMethods());
 
 app.addEventListener("listen", () =>
   console.log(`🚀 Serveur Deno démarré sur ${ADDRESS}`)

@@ -10,6 +10,8 @@ import "../styles/dashboard.css";
 import TaskDetailModal from "../components/TaskDetailModal";
 import Tooltip from "../components/Tooltip";
 import UserAvatar, { prefetchAvatars } from "../components/UserAvatar";
+import { useBoardSocket } from "../hooks/useBoardSocket";
+import type { BoardUpdateMessage } from "../model/websockets";
 
 interface ColumnWithTasks extends Column {
   tasks: Task[];
@@ -18,7 +20,20 @@ interface ColumnWithTasks extends Column {
 export default function Dashboard() {
   const { id }        = useParams<{ id: string }>();
   const boardId       = parseInt(id ?? "", 10);
+  console.log("boardId =", boardId, "isNaN =", isNaN(boardId));
   const { authFetch, user } = useAuth();
+
+  // Wrapper qui injecte X-Board-Id sur toutes les requêtes du Dashboard,
+  // permettant à Deno de broadcaster même pour les routes /tasks/...
+  // où le boardId n'apparaît pas dans l'URL.
+  const boardFetch = useCallback(
+    (url: RequestInfo, init: RequestInit = {}) =>
+      authFetch(url, {
+        ...init,
+        headers: { ...(init.headers ?? {}), "X-Board-Id": String(boardId) },
+      }),
+    [authFetch, boardId]
+  );
   const navigate      = useNavigate();
 
   const [boardName, setBoardName] = useState("");
@@ -35,7 +50,7 @@ export default function Dashboard() {
   // Modale tâche
   const [taskModal, setTaskModal] = useState<{ colId: number } | null>(null);
   const [taskForm, setTaskForm]   = useState({
-    title: "", details: "", dueDate: "", priority: "moyenne" as Priority,
+    title: "", details: "", dueDate: "", dueTime: "", priority: "moyenne" as Priority,
   });
   const [saving, setSaving]       = useState(false);
   const [taskError, setTaskError] = useState("");
@@ -114,6 +129,8 @@ export default function Dashboard() {
     });
   }, [searchQuery, searchPriorities, searchAssignees, hideCompleted]);
   const columnsSnapshot   = useRef<ColumnWithTasks[]>([]);
+  const columnsRef = useRef<ColumnWithTasks[]>([]);
+  useEffect(() => { columnsRef.current = columns; }, [columns]);
   const didDrop           = useRef(false);
   const lastLiveTaskKey   = useRef<string>("");
 
@@ -147,19 +164,19 @@ export default function Dashboard() {
     setLoading(true);
     setError("");
     try {
-      const resBoard = await authFetch(ROUTES_API.board(boardId), { signal });
+      const resBoard = await boardFetch(ROUTES_API.board(boardId), { signal });
       if (!resBoard.ok) throw new Error(await extractErrorMessage(resBoard));
       const board: Board = await resBoard.json();
       setBoardName(board.name);
       setBoardCreatorId(board.creatorId);
 
-      const resCols = await authFetch(ROUTES_API.columns(boardId), { signal });
+      const resCols = await boardFetch(ROUTES_API.columns(boardId), { signal });
       if (!resCols.ok) throw new Error(await extractErrorMessage(resCols));
       const cols: Column[] = await resCols.json();
 
       const colsWithTasks: ColumnWithTasks[] = await Promise.all(
         cols.map(async col => {
-          const resTasks = await authFetch(ROUTES_API.tasksByColumn(col.id), { signal });
+          const resTasks = await boardFetch(ROUTES_API.tasksByColumn(col.id), { signal });
           const tasks: Task[] = resTasks.ok ? await resTasks.json() : [];
           return { ...col, tasks };
         })
@@ -175,7 +192,7 @@ export default function Dashboard() {
       const userIdsToFetch = new Set<number>();
       userIdsToFetch.add(board.creatorId);
 
-      const resMembers = await authFetch(ROUTES_API.boardMembers(boardId), { signal });
+      const resMembers = await boardFetch(ROUTES_API.boardMembers(boardId), { signal });
       if (resMembers.ok) {
         const memberList: Member[] = await resMembers.json();
         const roles = new Map<number, Member["role"]>();
@@ -185,7 +202,7 @@ export default function Dashboard() {
 
       const userResults = await Promise.allSettled(
         [...userIdsToFetch].map(uid =>
-          authFetch(ROUTES_API.user(uid), { signal }).then(r => r.ok ? r.json() as Promise<User> : null)
+          boardFetch(ROUTES_API.user(uid), { signal }).then(r => r.ok ? r.json() as Promise<User> : null)
         )
       );
       const resolvedMembers = userResults
@@ -232,7 +249,7 @@ export default function Dashboard() {
   /* ── CRUD tâches ─────────────────────────────────────────── */
 
   const openCreateTask = (colId: number) => {
-    setTaskForm({ title: "", details: "", dueDate: "", priority: "moyenne" });
+    setTaskForm({ title: "", details: "", dueDate: "", dueTime: "", priority: "moyenne" });
     setTaskError("");
     setTaskModal({ colId });
   };
@@ -246,12 +263,16 @@ export default function Dashboard() {
       const body = {
         title:         taskForm.title.trim(),
         details:       taskForm.details || null,
-        dueDate:       taskForm.dueDate || null,
+        dueDate:       taskForm.dueDate
+          ? taskForm.dueTime
+            ? `${taskForm.dueDate}T${taskForm.dueTime}`
+            : `${taskForm.dueDate}T23:59`
+          : null,
         priority:      taskForm.priority,
         boardColumnId: taskModal!.colId,
         creatorId:     user!.id,
       };
-      const res = await authFetch(ROUTES_API.tasks, { method: "POST", body: JSON.stringify(body) });
+      const res = await boardFetch(ROUTES_API.tasks, { method: "POST", body: JSON.stringify(body) });
       if (!res.ok) throw new Error(await extractErrorMessage(res));
       const savedTask: Task = await res.json();
       setColumns(cols => cols.map(c =>
@@ -267,7 +288,7 @@ export default function Dashboard() {
 
   const handleDeleteTask = async (taskId: number) => {
     askConfirm("Supprimer cette tâche ?", async () => {
-      const res = await authFetch(ROUTES_API.task(taskId), { method: "DELETE" });
+      const res = await boardFetch(ROUTES_API.task(taskId), { method: "DELETE" });
       if (res.ok) {
         setColumns(cols => cols.map(c => ({ ...c, tasks: c.tasks.filter(t => t.id !== taskId) })));
       } else {
@@ -284,7 +305,7 @@ export default function Dashboard() {
     if (!colName.trim()) { setColError("Le nom est requis."); return; }
     setColSaving(true);
     try {
-      const res = await authFetch(ROUTES_API.columns(boardId), {
+      const res = await boardFetch(ROUTES_API.columns(boardId), {
         method: "POST",
         body: JSON.stringify({ name: colName.trim() }),
       });
@@ -302,7 +323,7 @@ export default function Dashboard() {
 
   const handleDeleteColumn = async (colId: number) => {
     askConfirm("Supprimer cette colonne et toutes ses tâches ?", async () => {
-      const res = await authFetch(ROUTES_API.column(boardId, colId), { method: "DELETE" });
+      const res = await boardFetch(ROUTES_API.column(boardId, colId), { method: "DELETE" });
       if (res.ok) {
         setColumns(cols => cols.filter(c => c.id !== colId));
       } else {
@@ -318,7 +339,7 @@ export default function Dashboard() {
     setExporting(true);
     setExportError("");
     try {
-      const res = await authFetch(ROUTES_API.boardExport(boardId));
+      const res = await boardFetch(ROUTES_API.boardExport(boardId));
       if (!res.ok) throw new Error(await extractErrorMessage(res));
       const blob = await res.blob();
       const url  = URL.createObjectURL(blob);
@@ -348,7 +369,7 @@ export default function Dashboard() {
     const prev = boardName;
     setBoardName(trimmed);
     try {
-      const res = await authFetch(ROUTES_API.board(boardId), {
+      const res = await boardFetch(ROUTES_API.board(boardId), {
         method: "PUT",
         body: JSON.stringify({ name: trimmed }),
       });
@@ -370,7 +391,7 @@ export default function Dashboard() {
     const prev = col.name;
     setColumns(cols => cols.map(c => c.id === col.id ? { ...c, name: trimmed } : c));
     try {
-      const res = await authFetch(ROUTES_API.column(boardId, col.id), {
+      const res = await boardFetch(ROUTES_API.column(boardId, col.id), {
         method: "PUT",
         body: JSON.stringify({ name: trimmed }),
       });
@@ -468,7 +489,7 @@ export default function Dashboard() {
       return c;
     }));
 
-    authFetch(
+    boardFetch(
       `${ROUTES_API.taskMove(task.id)}?newId=${targetColId}&position=${position}`,
       { method: "PATCH", body: "{}" }
     ).catch(() => { setColumns(columnsSnapshot.current); fetchBoard(); });
@@ -493,11 +514,11 @@ export default function Dashboard() {
       c.id === col.id ? { ...c, tasks: reordered.map((t, i) => ({ ...t, position: i })) } : c
     ));
 
-    authFetch(
+    boardFetch(
       `${ROUTES_API.taskMove(task.id)}?newId=${col.id}&position=${target}`,
       { method: "PATCH", body: "{}" }
     ).catch(() => { setColumns(columnsSnapshot.current); fetchBoard(); });
-  }, [columns, authFetch, fetchBoard]);
+  }, [columns, boardFetch, fetchBoard]);
 
   /* ── Drag & drop colonnes ────────────────────────────────── */
 
@@ -542,7 +563,7 @@ export default function Dashboard() {
     setDragCol(null);
     setDragColOver(null);
     // reorderColLive a déjà mis à jour l'affichage ; on persiste uniquement.
-    authFetch(`${ROUTES_API.columnMove(boardId, colId)}?newNum=${newNum}`, {
+    boardFetch(`${ROUTES_API.columnMove(boardId, colId)}?newNum=${newNum}`, {
       method: "PATCH",
       body:   "{}",
     }).catch(() => { setColumns(columnsSnapshot.current); fetchBoard(); });
@@ -633,6 +654,76 @@ export default function Dashboard() {
     : memberRoles.get(user?.id ?? -1) ?? "lecteur";
 
   const isReadOnly = currentRole === "lecteur";
+
+  /**
+   * Recharge uniquement les tâches de chaque colonne.
+   * Utilisé par le handler WS pour les actions sur les tâches,
+   * afin d'éviter un rechargement complet du tableau.
+   *
+   * Lit les colonnes depuis `columnsSnapshot` (ref stable) plutôt que
+   * depuis le state `columns`, afin de ne pas figurer comme dépendance
+   * de `handleBoardUpdate` — ce qui provoquerait une reconnexion WS
+   * à chaque mise à jour des tâches.
+   */
+  const fetchTasks = useCallback(async () => {
+    const current = columnsRef.current;
+    const updated = await Promise.all(
+      current.map(async col => {
+        const res = await boardFetch(ROUTES_API.tasksByColumn(col.id));
+        const tasks: Task[] = res.ok ? await res.json() : col.tasks;
+        return { ...col, tasks };
+      })
+    );
+    setColumns(updated);
+  }, [boardFetch]);
+
+  /**
+   * Recharge uniquement la liste des colonnes (sans re-fetcher les tâches).
+   * Utilisé par le handler WS pour les actions sur les colonnes.
+   */
+  const fetchColumns = useCallback(async () => {
+    const res = await boardFetch(ROUTES_API.columns(boardId));
+    if (!res.ok) return;
+    const cols: Column[] = await res.json();
+    setColumns(prev =>
+      cols
+        .map(col => ({ ...col, tasks: prev.find(c => c.id === col.id)?.tasks ?? [] }))
+        .sort((a, b) => a.numero - b.numero)
+    );
+  }, [boardId, boardFetch]);
+
+  /**
+   * Handler WebSocket : met à jour uniquement la partie du tableau
+   * impactée par l'action reçue, sans rechargement complet.
+   *
+   * - Tâches (création, modification, déplacement, suppression) → fetchTasks
+   * - Colonnes (création, modification, déplacement, suppression) → fetchColumns
+   * - Membres → fetchBoard (changement de rôles, rare)
+   */
+  const handleBoardUpdate = useCallback((msg: BoardUpdateMessage) => {
+    switch (msg.action) {
+      case "task_created":
+      case "task_updated":
+      case "task_deleted":
+      case "task_moved":
+        fetchTasks();
+        break;
+      case "column_created":
+      case "column_deleted":
+      case "column_moved":
+      case "column_updated":
+        fetchColumns();
+        break;
+      case "member_updated":
+        fetchBoard();
+        break;
+    }
+  }, [fetchTasks, fetchColumns, fetchBoard]);
+
+  useBoardSocket(boardId, {
+    onUpdate: handleBoardUpdate,
+    currentUserId: user?.id,
+  });
 
   /* ── Rendu ───────────────────────────────────────────────── */
 
@@ -1049,9 +1140,29 @@ export default function Dashboard() {
                 </div>
                 <div className="form-group">
                   <label className="form-label">Date limite</label>
-                  <input className="form-input" type="datetime-local"
-                    value={taskForm.dueDate}
-                    onChange={e => setTaskForm(f => ({ ...f, dueDate: e.target.value }))} />
+                  <div style={{ display: "flex", gap: 6 }}>
+                    <input
+                      className="form-input"
+                      type="date"
+                      value={taskForm.dueDate}
+                      onChange={e => setTaskForm(f => ({ ...f, dueDate: e.target.value }))}
+                      style={{ flex: 1 }}
+                    />
+                    <input
+                      className="form-input"
+                      type="time"
+                      value={taskForm.dueTime}
+                      onChange={e => setTaskForm(f => ({ ...f, dueTime: e.target.value }))}
+                      disabled={!taskForm.dueDate}
+                      title="Heure optionnelle"
+                      style={{ width: 90, opacity: taskForm.dueDate ? 1 : 0.4 }}
+                    />
+                  </div>
+                  {taskForm.dueDate && !taskForm.dueTime && (
+                    <span style={{ fontSize: 11, color: "#7a7288", marginTop: 3, display: "block" }}>
+                      Heure non renseignée — échéance fixée à 23 h 59
+                    </span>
+                  )}
                 </div>
               </div>
 
