@@ -36,4 +36,13 @@ public interface FileRepository extends MongoRepository<File, String> {
      * @param tskId l'identifiant de la tâche (référence MariaDB)
      */
     void deleteByTskId(Long tskId);
+
+    /**
+     * Supprime toutes les pièces jointes associées à un commentaire.
+     * Appelé lors de la suppression d'un commentaire pour maintenir
+     * la cohérence inter-collections MongoDB.
+     *
+     * @param comId l'identifiant du commentaire (ObjectId MongoDB)
+     */
+    void deleteByComId(ObjectId comId);
 }

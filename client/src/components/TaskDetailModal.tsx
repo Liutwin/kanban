@@ -101,12 +101,16 @@ export default function TaskDetailModal({ task, columnName, members = [], onClos
 
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
 
+  // Confirmation de suppression : { kind: "comment"|"file", id: string, label: string }
+  const [pendingConfirm, setPendingConfirm] = useState<{ kind: "comment" | "file"; id: string; label: string } | null>(null);
+
   /* Pièces jointes */
   const [files,        setFiles]        = useState<FileAttachment[]>([]);
   const [filesLoading, setFilesLoading] = useState(false);
   const [uploading,    setUploading]    = useState(false);
   const [blobUrls,     setBlobUrls]     = useState<Record<string, string>>({});
   const fileInputRef                    = useRef<HTMLInputElement>(null);
+  // Upload lié à un commentaire : stocke le comId cible avant d'ouvrir le sélecteur
 
   // Libère les blob URLs à la fermeture pour éviter les fuites mémoire
   useEffect(() => {
@@ -159,13 +163,13 @@ export default function TaskDetailModal({ task, columnName, members = [], onClos
       if (!res.ok) return;
       const created: FileAttachment = await res.json();
       setFiles(prev => [...prev, created]);
-      // Pré-charge le blob URL si c'est une image
       if (created.type?.startsWith("image/")) loadBlobUrl(created);
     } finally {
       setUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
     }
   };
+
 
   const handleDeleteFile = async (id: string) => {
     const res = await authFetch(ROUTES_API.file(String(id)), { method: "DELETE" });
@@ -175,12 +179,18 @@ export default function TaskDetailModal({ task, columnName, members = [], onClos
     }
   };
 
+  const askDeleteFile = (id: string, name: string) =>
+    setPendingConfirm({ kind: "file", id, label: name });
+
   /* Commentaires */
   const [comments,      setComments]      = useState<Comment[]>([]);
   const [commentText,   setCommentText]   = useState("");
   const [editingCom,    setEditingCom]    = useState<{ id: number; text: string } | null>(null);
   const [comLoading,    setComLoading]    = useState(false);
   const [comSending,    setComSending]    = useState(false);
+  // Fichier en attente pour le nouveau commentaire (joint avant envoi)
+  const [pendingFiles,  setPendingFiles]  = useState<globalThis.File[]>([]);
+  const newComFileInputRef                = useRef<HTMLInputElement>(null);
 
   // Charger les commentaires à l'ouverture
   useEffect(() => {
@@ -204,6 +214,25 @@ export default function TaskDetailModal({ task, columnName, members = [], onClos
       const created: Comment = await res.json();
       setComments(prev => [...prev, created]);
       setCommentText("");
+
+      // Upload de tous les fichiers en attente, liés au commentaire créé
+      for (const pf of pendingFiles) {
+        const form = new FormData();
+        form.append("file",  pf);
+        form.append("tskId", String(task.id));
+        form.append("usrId", String(user!.id));
+        form.append("comId", String(created.id));
+        const fileRes = await authFetch(ROUTES_API.files, { method: "POST", body: form });
+        if (fileRes.ok) {
+          const createdFile: FileAttachment = await fileRes.json();
+          setFiles(prev => [...prev, createdFile]);
+          if (createdFile.type?.startsWith("image/")) loadBlobUrl(createdFile);
+        }
+      }
+      if (pendingFiles.length > 0) {
+        setPendingFiles([]);
+        if (newComFileInputRef.current) newComFileInputRef.current.value = "";
+      }
     } finally {
       setComSending(false);
     }
@@ -225,6 +254,9 @@ export default function TaskDetailModal({ task, columnName, members = [], onClos
     const res = await authFetch(ROUTES_API.comment(id), { method: "DELETE" });
     if (res.ok) setComments(prev => prev.filter(c => c.id !== id));
   };
+
+  const askDeleteComment = (id: number, preview: string) =>
+    setPendingConfirm({ kind: "comment", id: String(id), label: preview.length > 60 ? preview.slice(0, 60) + "…" : preview });
 
   /* Résolution créateur */
   const creatorFromMembers = members.find(m => m.id === task.creatorId) ?? null;
@@ -362,6 +394,49 @@ export default function TaskDetailModal({ task, columnName, members = [], onClos
 
   return (
     <>
+      {/* ── Modale de confirmation suppression ── */}
+      {pendingConfirm && (
+        <div
+          onClick={() => setPendingConfirm(null)}
+          style={{ position: "fixed", inset: 0, zIndex: 300, background: "rgba(0,0,0,0.55)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center" }}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{ background: "#2b2930", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 16, padding: "24px 28px", width: "min(380px,90vw)", boxShadow: "0 16px 48px rgba(0,0,0,0.6)", display: "flex", flexDirection: "column", gap: 14 }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <span style={{ fontSize: 20 }}>🗑</span>
+              <span style={{ fontSize: 15, fontWeight: 700, color: "#e8e0f0" }}>
+                {pendingConfirm.kind === "comment" ? "Supprimer le commentaire" : "Supprimer la pièce jointe"}
+              </span>
+            </div>
+            <p style={{ fontSize: 13, color: "#b8b0c8", lineHeight: 1.6, margin: 0 }}>
+              {pendingConfirm.kind === "comment"
+                ? <><strong style={{ color: "#e8e0f0" }}>«&nbsp;{pendingConfirm.label}&nbsp;»</strong> sera définitivement supprimé, ainsi que ses pièces jointes.</>
+                : <><strong style={{ color: "#e8e0f0" }}>«&nbsp;{pendingConfirm.label}&nbsp;»</strong> sera définitivement supprimé du serveur.</>
+              }
+            </p>
+            <p style={{ fontSize: 11, color: "#7a7288", margin: 0, fontFamily: "'DM Mono', monospace" }}>Cette action est irréversible.</p>
+            <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 4 }}>
+              <button
+                onClick={() => setPendingConfirm(null)}
+                style={{ padding: "7px 16px", borderRadius: 9, border: "1px solid rgba(255,255,255,0.12)", background: "transparent", color: "#b8b0c8", fontSize: 13, cursor: "pointer", fontFamily: "inherit", fontWeight: 500 }}
+              >Annuler</button>
+              <button
+                onClick={() => {
+                  if (pendingConfirm.kind === "comment") handleDeleteComment(Number(pendingConfirm.id));
+                  else handleDeleteFile(pendingConfirm.id);
+                  setPendingConfirm(null);
+                }}
+                style={{ padding: "7px 16px", borderRadius: 9, border: "1px solid rgba(242,139,130,0.4)", background: "rgba(242,139,130,0.12)", color: "#f28b82", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", transition: "all 0.15s" }}
+                onMouseEnter={e => { e.currentTarget.style.background = "rgba(242,139,130,0.22)"; }}
+                onMouseLeave={e => { e.currentTarget.style.background = "rgba(242,139,130,0.12)"; }}
+              >Supprimer</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Lightbox image plein écran */}
       {lightboxUrl && (
         <div
@@ -500,18 +575,49 @@ export default function TaskDetailModal({ task, columnName, members = [], onClos
                             </div>
                           </div>
                         ) : (
-                          <div style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
-                            <p style={{ fontSize: 13, color: "#b8b0c8", lineHeight: 1.55, margin: 0, flex: 1, wordBreak: "break-word", whiteSpace: "pre-wrap" }}>{com.content}</p>
-                            {isOwn && canEdit && (
-                              <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
-                                <Tooltip text="Modifier" position="top">
-                                  <button onClick={() => setEditingCom({ id: com.id, text: com.content })} style={{ background: "none", border: "none", color: "#7a7288", cursor: "pointer", fontSize: 12, padding: "2px 5px", borderRadius: 5 }}>✎</button>
-                                </Tooltip>
-                                <Tooltip text="Supprimer" position="top">
-                                  <button onClick={() => handleDeleteComment(com.id)} style={{ background: "none", border: "none", color: "#7a7288", cursor: "pointer", fontSize: 12, padding: "2px 5px", borderRadius: 5 }}>✕</button>
-                                </Tooltip>
-                              </div>
-                            )}
+                          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                            <div style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
+                              <p style={{ fontSize: 13, color: "#b8b0c8", lineHeight: 1.55, margin: 0, flex: 1, wordBreak: "break-word", whiteSpace: "pre-wrap" }}>{com.content}</p>
+                              {isOwn && canEdit && (
+                                <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
+                                  <Tooltip text="Modifier" position="top">
+                                    <button onClick={() => setEditingCom({ id: com.id, text: com.content })} style={{ background: "none", border: "none", color: "#7a7288", cursor: "pointer", fontSize: 12, padding: "2px 5px", borderRadius: 5 }}>✎</button>
+                                  </Tooltip>
+                                  <Tooltip text="Supprimer" position="top">
+                                    <button onClick={() => askDeleteComment(com.id, com.content)} style={{ background: "none", border: "none", color: "#7a7288", cursor: "pointer", fontSize: 12, padding: "2px 5px", borderRadius: 5 }}>✕</button>
+                                  </Tooltip>
+                                </div>
+                              )}
+                            </div>
+
+                            {/* PJ liées à ce commentaire */}
+                            {files.filter(f => f.comId != null && String(f.comId) === String(com.id)).map(f => {
+                              const isImg = f.type?.startsWith("image/");
+                              const blob  = blobUrls[String(f.id)];
+                              const icon  = isImg ? "🖼️" : f.type === "application/pdf" ? "📄" : f.type?.startsWith("text/") ? "📝" : "📎";
+                              return (
+                                <div key={String(f.id)} style={{ display: "flex", flexDirection: "column", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 8, overflow: "hidden" }}>
+                                  {isImg && blob && (
+                                    <img src={blob} alt={f.name} onClick={() => setLightboxUrl(blob)}
+                                      style={{ width: "100%", maxHeight: 140, objectFit: "contain", background: "rgba(0,0,0,0.2)", cursor: "zoom-in", display: "block" }} />
+                                  )}
+                                  <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "4px 8px" }}>
+                                    <span style={{ fontSize: 13, flexShrink: 0 }}>{icon}</span>
+                                    <span style={{ fontSize: 11, color: "#b8b0c8", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{f.name}</span>
+                                    <Tooltip text="Télécharger" position="left">
+                                      <button onClick={() => handleDownload(f)} style={{ background: "none", border: "none", color: "#7a7288", cursor: "pointer", fontSize: 13, padding: "2px 4px", borderRadius: 4 }}>⬇</button>
+                                    </Tooltip>
+                                    {canEdit && (
+                                      <Tooltip text="Supprimer" position="left">
+                                        <button onClick={() => askDeleteFile(String(f.id), f.name)} style={{ background: "none", border: "none", color: "#7a7288", cursor: "pointer", fontSize: 11, padding: "2px 4px", borderRadius: 4 }}>✕</button>
+                                      </Tooltip>
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            })}
+
+
                           </div>
                         )}
                       </div>
@@ -521,55 +627,83 @@ export default function TaskDetailModal({ task, columnName, members = [], onClos
               </div>
 
               {/* Saisie nouveau commentaire — masquée pour les lecteurs */}
-              {canEdit && <div style={{ display: "flex", gap: 8, alignItems: "flex-end" }}>
+              {canEdit && <div style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
                 <UserAvatar
                   userId={user?.id ?? 0}
                   firstName={user?.firstName ?? ""}
                   lastName={user?.lastName ?? ""}
                   hasAvatar={!!user && !!members.find(m => m.id === user.id)?.avatarURL}
                   size={28}
-                  style={{ flexShrink: 0 }}
+                  style={{ flexShrink: 0, marginTop: 6 }}
                 />
-                <div style={{ flex: 1, position: "relative" }}>
-                  <textarea
-                    ref={commentTextareaRef}
-                    value={commentText}
-                    onChange={e => setCommentText(e.target.value)}
-                    onKeyDown={e => {
-                      if (e.key === "Enter" && !e.shiftKey) {
-                        e.preventDefault();
-                        handleAddComment();
-                      }
-                    }}
-                    placeholder="Ajouter un commentaire… (saut de ligne : Shift+Entrée)"
-                    rows={1}
-                    style={{ ...inputBase, fontSize: 13, lineHeight: 1.55, resize: "none", overflow: "hidden", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 10, padding: "8px 70px 8px 10px", display: "block", transition: "border-color 0.15s" }}
-                    onFocus={e => { e.currentTarget.style.background = "rgba(255,255,255,0.06)"; e.currentTarget.style.borderColor = "rgba(176,166,255,0.3)"; }}
-                    onBlur={e  => { e.currentTarget.style.background = "rgba(255,255,255,0.04)"; e.currentTarget.style.borderColor = "rgba(255,255,255,0.08)"; }}
+                <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 6 }}>
+                  {/* Input caché pour la PJ du nouveau commentaire */}
+                  <input
+                    ref={newComFileInputRef}
+                    type="file"
+                    style={{ display: "none" }}
+                    onChange={e => { const f = e.target.files?.[0]; if (f) setPendingFiles(prev => [...prev, f]); if (newComFileInputRef.current) newComFileInputRef.current.value = ""; }}
                   />
-                  <button
-                    onClick={handleAddComment}
-                    disabled={comSending || !commentText.trim()}
-                    style={{ position: "absolute", right: 6, top: "50%", transform: "translateY(-50%)", padding: "4px 10px", borderRadius: 7, border: "none", background: commentText.trim() ? "rgba(176,166,255,0.2)" : "transparent", color: commentText.trim() ? "#b0a6ff" : "#4a4460", fontSize: 11, fontWeight: 600, cursor: commentText.trim() ? "pointer" : "not-allowed", fontFamily: "inherit", transition: "all 0.15s" }}
-                  >
-                    {comSending ? "…" : "Envoyer"}
-                  </button>
+                  <div style={{ position: "relative" }}>
+                    <textarea
+                      ref={commentTextareaRef}
+                      value={commentText}
+                      onChange={e => setCommentText(e.target.value)}
+                      onKeyDown={e => {
+                        if (e.key === "Enter" && !e.shiftKey) {
+                          e.preventDefault();
+                          handleAddComment();
+                        }
+                      }}
+                      placeholder="Ajouter un commentaire… (saut de ligne : Shift+Entrée)"
+                      rows={1}
+                      style={{ ...inputBase, fontSize: 13, lineHeight: 1.55, resize: "none", overflow: "hidden", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 10, padding: "8px 70px 8px 10px", display: "block", transition: "border-color 0.15s" }}
+                      onFocus={e => { e.currentTarget.style.background = "rgba(255,255,255,0.06)"; e.currentTarget.style.borderColor = "rgba(176,166,255,0.3)"; }}
+                      onBlur={e  => { e.currentTarget.style.background = "rgba(255,255,255,0.04)"; e.currentTarget.style.borderColor = "rgba(255,255,255,0.08)"; }}
+                    />
+                    <button
+                      onClick={handleAddComment}
+                      disabled={comSending || !commentText.trim()}
+                      style={{ position: "absolute", right: 6, top: "50%", transform: "translateY(-50%)", padding: "4px 10px", borderRadius: 7, border: "none", background: commentText.trim() ? "rgba(176,166,255,0.2)" : "transparent", color: commentText.trim() ? "#b0a6ff" : "#4a4460", fontSize: 11, fontWeight: 600, cursor: commentText.trim() ? "pointer" : "not-allowed", fontFamily: "inherit", transition: "all 0.15s" }}
+                    >
+                      {comSending ? "…" : "Envoyer"}
+                    </button>
+                  </div>
+                  {/* Fichiers en attente + bouton joindre */}
+                  <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                    {pendingFiles.map((pf, i) => (
+                      <div key={i} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                        <span style={{ fontSize: 12 }}>📎</span>
+                        <span style={{ fontSize: 11, color: "#b0a6ff", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{pf.name}</span>
+                        <button
+                          onClick={() => setPendingFiles(prev => prev.filter((_, j) => j !== i))}
+                          style={{ fontSize: 11, color: "#f28b82", background: "none", border: "none", cursor: "pointer", padding: "2px 4px", fontFamily: "inherit", flexShrink: 0 }}
+                        >✕</button>
+                      </div>
+                    ))}
+                    <button
+                      onClick={() => newComFileInputRef.current?.click()}
+                      style={{ alignSelf: "flex-start", fontSize: 11, color: "#7a7288", background: "none", border: "none", cursor: "pointer", padding: "2px 0", fontFamily: "inherit", transition: "color 0.15s" }}
+                      onMouseEnter={e => { e.currentTarget.style.color = "#b0a6ff"; }}
+                      onMouseLeave={e => { e.currentTarget.style.color = "#7a7288"; }}
+                    >📎 Joindre un fichier</button>
+                  </div>
                 </div>
               </div>}
             </div>
 
             {/* Pièces jointes */}
             <div>
-              <Label>📎 Pièces jointes ({files.length})</Label>
+              <Label>📎 Pièces jointes ({files.filter(f => !f.comId).length})</Label>
 
               <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 10 }}>
                 {filesLoading && (
                   <span style={{ fontSize: 12, color: "#7a7288", fontStyle: "italic" }}>Chargement…</span>
                 )}
-                {!filesLoading && files.length === 0 && (
+                {!filesLoading && files.filter(f => !f.comId).length === 0 && (
                   <span style={{ fontSize: 12, color: "#7a7288", fontStyle: "italic" }}>Aucune pièce jointe.</span>
                 )}
-                {files.map(f => {
+                {files.filter(f => !f.comId).map(f => {
                   const isImage = f.type?.startsWith("image/");
                   const blobUrl = blobUrls[String(f.id)];
                   return (
@@ -624,7 +758,7 @@ export default function TaskDetailModal({ task, columnName, members = [], onClos
                         {canEdit && (
                           <Tooltip text="Supprimer" position="left">
                             <button
-                              onClick={() => handleDeleteFile(String(f.id))}
+                              onClick={() => askDeleteFile(String(f.id), f.name)}
                               style={{ background: "none", border: "none", color: "#7a7288", cursor: "pointer", fontSize: 12, padding: "2px 5px", borderRadius: 5, flexShrink: 0 }}
                             >✕</button>
                           </Tooltip>

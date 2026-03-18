@@ -21,7 +21,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
-import java.util.UUID;
 import java.util.stream.Collectors;
 
 /**
@@ -78,21 +77,29 @@ public class FileServiceImpl implements FileService {
             Path dir = Paths.get(uploadDir, "tsk" + tskId);
             Files.createDirectories(dir);
 
-            // Préfixe UUID pour éviter les collisions de noms
-            String filename    = UUID.randomUUID() + "_" + multipartFile.getOriginalFilename();
+            // Sauvegarde d'abord les métadonnées sans le chemin pour obtenir l'_id MongoDB
+            FileDTO dtoWithoutWay = new FileDTO();
+            dtoWithoutWay.setName(multipartFile.getOriginalFilename());
+            dtoWithoutWay.setType(multipartFile.getContentType());
+            dtoWithoutWay.setWay("");
+            dtoWithoutWay.setTskId(tskId);
+            dtoWithoutWay.setUsrId(usrId);
+            dtoWithoutWay.setComId(comId);
+
+            File savedEntity = fileRepository.save(fileMapper.toEntity(dtoWithoutWay));
+
+            // Nom de fichier déterministe : id MongoDB + extension originale
+            String original = multipartFile.getOriginalFilename();
+            String ext      = (original != null && original.contains("."))
+                    ? original.substring(original.lastIndexOf(".")).toLowerCase()
+                    : "";
+            String filename    = savedEntity.getId() + ext;
             Path   destination = dir.resolve(filename);
             multipartFile.transferTo(destination);
 
-            // Construit le DTO et sauvegarde les métadonnées dans MongoDB
-            FileDTO dto = new FileDTO();
-            dto.setName(multipartFile.getOriginalFilename());
-            dto.setType(multipartFile.getContentType());
-            dto.setWay(destination.toString());
-            dto.setTskId(tskId);
-            dto.setUsrId(usrId);
-            dto.setComId(comId);
-
-            return fileMapper.toDTO(fileRepository.save(fileMapper.toEntity(dto)));
+            // Met à jour le chemin dans MongoDB
+            savedEntity.setWay(destination.toString());
+            return fileMapper.toDTO(fileRepository.save(savedEntity));
 
         } catch (IOException e) {
             throw new RuntimeException("Erreur lors de l'enregistrement du fichier", e);
@@ -144,5 +151,19 @@ public class FileServiceImpl implements FileService {
             }
         });
         fileRepository.deleteByTskId(tskId);
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public void deleteByComment(String comId) {
+        ObjectId oid = new ObjectId(comId);
+        fileRepository.findByComId(oid).forEach(file -> {
+            try {
+                Files.deleteIfExists(Paths.get(file.getWay()));
+            } catch (IOException e) {
+                throw new RuntimeException("Erreur lors de la suppression du fichier physique", e);
+            }
+        });
+        fileRepository.deleteByComId(oid);
     }
 }

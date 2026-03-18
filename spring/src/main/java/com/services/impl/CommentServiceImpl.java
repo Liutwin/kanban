@@ -5,10 +5,10 @@ import com.entities.Comment;
 import com.entities.Task;
 import com.mappers.CommentMapper;
 import com.repositories.CommentRepository;
-import com.repositories.FileRepository;
 import com.repositories.TaskRepository;
 import com.repositories.UserRepository;
 import com.services.CommentService;
+import com.services.FileService;
 import com.services.MailService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -27,7 +27,7 @@ import java.util.stream.Collectors;
 public class CommentServiceImpl implements CommentService {
 
     private final CommentRepository commentRepository;
-    private final FileRepository fileRepository;
+    private final FileService    fileService;
     private final CommentMapper commentMapper;
     private final TaskRepository taskRepository;   // vérif cohérence MariaDB
     private final UserRepository userRepository;   // vérif cohérence MariaDB
@@ -94,6 +94,7 @@ public class CommentServiceImpl implements CommentService {
     public void deleteComment(String id) {
         if (!commentRepository.existsById(id))
             throw new RuntimeException("Commentaire introuvable : " + id);
+        fileService.deleteByComment(id);
         commentRepository.deleteById(id);
     }
 
@@ -101,7 +102,7 @@ public class CommentServiceImpl implements CommentService {
     @Override
     public void deleteByTache(Long tskId) {
         // Supprimer d'abord les fichiers liés, puis les commentaires
-        fileRepository.deleteByTskId(tskId);
+        fileService.deleteByTache(tskId);
         commentRepository.deleteByTskId(tskId);
     }
 }

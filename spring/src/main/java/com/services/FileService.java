@@ -76,4 +76,13 @@ public interface FileService {
      * @param tskId l'identifiant de la tâche (référence MariaDB)
      */
     void deleteByTache(Long tskId);
+
+    /**
+     * Supprime toutes les pièces jointes associées à un commentaire
+     * (métadonnées MongoDB + fichiers physiques).
+     * Appelé lors de la suppression d'un commentaire.
+     *
+     * @param comId l'identifiant du commentaire (ObjectId en String)
+     */
+    void deleteByComment(String comId);
 }

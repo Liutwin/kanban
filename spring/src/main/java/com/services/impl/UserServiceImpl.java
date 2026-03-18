@@ -21,7 +21,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
-import java.util.UUID;
 import java.util.stream.Collectors;
 
 /**
@@ -144,7 +143,11 @@ public class UserServiceImpl implements UserService {
             }
 
             // Préfixe UUID pour éviter les collisions
-            String filename = UUID.randomUUID() + "_" + file.getOriginalFilename();
+            String original = file.getOriginalFilename();
+            String ext      = (original != null && original.contains("."))
+                    ? original.substring(original.lastIndexOf(".")).toLowerCase()
+                    : "";
+            String filename    = "user_" + id + ext;
             Path destination = dir.resolve(filename);
             file.transferTo(destination);
 
