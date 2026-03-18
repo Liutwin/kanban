@@ -519,7 +519,7 @@ export default function Admin() {
 
   const handleViewProfile = useCallback((target: AdminUser) => {
     const slug = `${toSlug(target.firstName)}-${toSlug(target.lastName)}`;
-    navigate(`/logs/${slug}`);
+    navigate(`/logs/users/${slug}`);
   }, [navigate]);
 
   /**

@@ -54,6 +54,16 @@ export const ROUTES_API = {
   taskMove:           (id: number)                   => `${BASE}/tasks/${id}/move`,
   taskAssign:         (id: number)                   => `${BASE}/tasks/${id}/assign`,
 
+  // ── Logs boards
+  boardLogs: (id: number, type?: string, from?: string, to?: string) => {
+    const p = new URLSearchParams();
+    if (type) p.append("type", type);
+    if (from) p.append("from", from);
+    if (to)   p.append("to",   to);
+    const qs = p.toString();
+    return `${BASE}/boards/${id}/logs${qs ? "?" + qs : ""}`;
+  },
+
   // ── Comments ──────────────────────────────────────────────────────────────
   comments:           `${BASE}/comments`,
   commentsByTask:     (taskId: number) => `${BASE}/comments/task/${taskId}`,

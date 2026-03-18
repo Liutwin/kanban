@@ -5,10 +5,11 @@ import Login       from "./pages/Login";
 import Register    from "./pages/Register";
 import Boards      from "./pages/Boards";
 import Dashboard   from "./pages/Dashboard";
-import Logs        from "./pages/Logs";
-import MyTasks from "./pages/MyTasks";
+import LogsUsers   from "./pages/LogsUsers";
+import LogsBoards  from "./pages/LogsBoards";
+import MyTasks     from "./pages/MyTasks";
 import Admin       from "./pages/Admin";
-import Profile from "./pages/Profile";
+import Profile     from "./pages/Profile";
 
 export default function App() {
   return (
@@ -26,12 +27,20 @@ export default function App() {
         <Route path="/boards/:id" element={
           <ProtectedRoute><Dashboard /></ProtectedRoute>
         } />
-        <Route path="/logs" element={
-          <ProtectedRoute><Logs /></ProtectedRoute>
+
+        {/* Journal utilisateurs */}
+        <Route path="/logs/users" element={
+          <ProtectedRoute><LogsUsers /></ProtectedRoute>
         } />
-        <Route path="/logs/:userSlug" element={
-          <ProtectedRoute><Logs /></ProtectedRoute>
+        <Route path="/logs/users/:userSlug" element={
+          <ProtectedRoute><LogsUsers /></ProtectedRoute>
         } />
+
+        {/* Journal tableaux */}
+        <Route path="/logs/boards/:boardId" element={
+          <ProtectedRoute><LogsBoards /></ProtectedRoute>
+        } />
+
         <Route path="/profile" element={
           <ProtectedRoute><Profile /></ProtectedRoute>
         } />

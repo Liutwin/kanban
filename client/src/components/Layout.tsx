@@ -272,7 +272,7 @@ export default function Layout({ children, title, boardId, boardRole, boardCreat
             <span className="nav-icon">✓</span>
             <span>Mes tâches</span>
           </NavLink>
-          <NavLink to="/logs" className={({ isActive }) => `nav-item ${isActive ? "active" : ""}`}>
+          <NavLink to="/logs/users" className={({ isActive }) => `nav-item ${isActive ? "active" : ""}`}>
             <span className="nav-icon">≡</span>
             <span>Mes activités</span>
           </NavLink>
@@ -368,12 +368,12 @@ export default function Layout({ children, title, boardId, boardRole, boardCreat
                   ))}
                 </div>
 
-                {/* Filtre "Masquer les validées" */}
+                {/* Filtre "Masquer les terminées" */}
                 <button
                   className={`search-filter-btn search-filter-btn--done${hideCompleted ? " search-filter-btn--selected" : ""}`}
                   onClick={toggleHideCompleted}
                   aria-pressed={hideCompleted}
-                  title={hideCompleted ? "Afficher les tâches validées" : "Masquer les tâches validées"}
+                  title={hideCompleted ? "Afficher les tâches terminées" : "Masquer les tâches terminées"}
                 >
                   <svg width="11" height="11" viewBox="0 0 12 12" fill="none" style={{marginRight:4,flexShrink:0}}>
                     {hideCompleted
@@ -381,7 +381,7 @@ export default function Layout({ children, title, boardId, boardRole, boardCreat
                       : <circle cx="6" cy="6" r="5" stroke="currentColor" strokeWidth="1.5"/>
                     }
                   </svg>
-                  Masquer validées
+                  Masquer "terminées"
                 </button>
 
                 {/* Filtre Assigné — dropdown checkboxes */}

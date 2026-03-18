@@ -1,5 +1,5 @@
 /deno/.env
-spring/src/main/ressources/application-local.properties
+spring/src/main/resources/application-local.properties
 spring/.gradle/8.12.1/checksums/checksums.lock
 spring/.gradle/8.12.1/checksums/md5-checksums.bin
 spring/.gradle/8.12.1/checksums/sha1-checksums.bin

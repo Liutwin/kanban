@@ -639,9 +639,21 @@ export default function Dashboard() {
   return (
     <Layout title={boardName || "Tableau"} boardId={boardId} boardRole={currentRole} boardCreatorId={board_creatorId ?? undefined}>
       <div className="dashboard-page">
-        <button className="back-btn" onClick={() => navigate("/boards")}>
-          ← Retour aux tableaux
-        </button>
+        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 4 }}>
+          <button className="back-btn" style={{ marginBottom: 0 }} onClick={() => navigate("/boards")}>
+            ← Retour aux tableaux
+          </button>
+          <button
+            className="btn btn-ghost"
+            onClick={() => navigate(`/logs/boards/${boardId}`)}
+            style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13 }}
+          >
+            <svg width="14" height="14" viewBox="0 0 20 20" fill="none">
+              <path d="M4 5h12M4 10h8M4 15h5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+            </svg>
+            Journal d'activité
+          </button>
+        </div>
 
         {/* Nom du tableau éditable (admin uniquement, double-clic) + bouton export PDF */}
         {boardName && (
