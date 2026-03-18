@@ -34,6 +34,7 @@ export const ROUTES_API = {
   boards:             `${BASE}/boards`,
   board:              (id: number) => `${BASE}/boards/${id}`,
   boardsByUser:       (id: number) => `${BASE}/boards/user/${id}`,
+  boardExport: (id: number) => `${BASE}/boards/${id}/export`,
 
   // ── Board members ─────────────────────────────────────────────────────────
   boardMembers:       (id: number)                    => `${BASE}/boards/${id}/members`,

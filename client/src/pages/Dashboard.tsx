@@ -123,6 +123,10 @@ export default function Dashboard() {
   const [colError, setColError]   = useState("");
   const [colSaving, setColSaving] = useState(false);
 
+  // Export PDF
+  const [exporting, setExporting]     = useState(false);
+  const [exportError, setExportError] = useState("");
+
   // Édition inline du nom du tableau (admin uniquement)
   const [editingBoardName, setEditingBoardName] = useState(false);
   const [boardNameDraft, setBoardNameDraft]     = useState("");
@@ -298,6 +302,29 @@ export default function Dashboard() {
         fetchBoard();
       }
     });
+  };
+
+
+  /* u2500u2500 Export PDF u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500 */
+
+  const handleExport = async () => {
+    setExporting(true);
+    setExportError("");
+    try {
+      const res = await authFetch(ROUTES_API.boardExport(boardId));
+      if (!res.ok) throw new Error(await extractErrorMessage(res));
+      const blob = await res.blob();
+      const url  = URL.createObjectURL(blob);
+      const a    = document.createElement("a");
+      a.href     = url;
+      a.download = `kanban-${boardId}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (e: unknown) {
+      setExportError(e instanceof Error ? e.message : "Erreur lors de l'export.");
+    } finally {
+      setExporting(false);
+    }
   };
 
   /* ── Édition inline du nom du tableau ───────────────────── */
@@ -616,7 +643,7 @@ export default function Dashboard() {
           ← Retour aux tableaux
         </button>
 
-        {/* Nom du tableau éditable (admin uniquement, double-clic) */}
+        {/* Nom du tableau éditable (admin uniquement, double-clic) + bouton export PDF */}
         {boardName && (
           <div className="board-name-heading">
             {editingBoardName ? (
@@ -641,6 +668,36 @@ export default function Dashboard() {
               </Tooltip>
             ) : (
               <h1 className="board-name-title">{boardName}</h1>
+            )}
+
+            {/* Bouton export PDF — visible pour admin et éditeur */}
+            {(
+              <Tooltip text="Télécharger le tableau en PDF">
+                <button
+                  className="btn btn-ghost"
+                  onClick={handleExport}
+                  disabled={exporting}
+                  style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 6 }}
+                >
+                  {exporting ? (
+                    <span className="spinner" style={{ borderTopColor: "currentColor", width: 14, height: 14 }} />
+                  ) : (
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none"
+                      stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                      <polyline points="7 10 12 15 17 10"/>
+                      <line x1="12" y1="15" x2="12" y2="3"/>
+                    </svg>
+                  )}
+                  {exporting ? "Export…" : "Exporter PDF"}
+                </button>
+              </Tooltip>
+            )}
+
+            {exportError && (
+              <span style={{ fontSize: 13, color: "var(--color-danger, #e24b4a)", marginLeft: 8 }}>
+                ⚠ {exportError}
+              </span>
             )}
           </div>
         )}
