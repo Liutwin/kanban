@@ -20,6 +20,15 @@ export const ROUTES_API = {
   user:               (id: number) => `${BASE}/users/${id}`,
   userPassword:       (id: number) => `${BASE}/users/${id}/password`,
   userAvatar:         (id: number) => `${BASE}/users/${id}/avatar`,
+  userProfile:        (id: number) => `${BASE}/users/profiles/${id}`,
+  userProfiles:       `${BASE}/users/profiles`,
+  userLogs:           (id: number, from?: string, to?: string) => {
+    const p = new URLSearchParams();
+    if (from) p.append("from", from);
+    if (to)   p.append("to",   to);
+    const qs = p.toString();
+    return `${BASE}/users/${id}/logs${qs ? "?" + qs : ""}`;
+  },
 
   // ── Boards ────────────────────────────────────────────────────────────────
   boards:             `${BASE}/boards`,
