@@ -391,11 +391,7 @@ export default function Dashboard() {
     if (targetTaskId != null) {
       const filteredIdx = tasksWithoutDragged.findIndex(t => t.id === targetTaskId);
       if (sameColumn) {
-        const targetTask     = targetCol.tasks.find(t => t.id === targetTaskId);
-        const isDraggingDown = targetTask != null && targetTask.position > task.position;
-        targetIndex = isDraggingDown
-          ? (filteredIdx < 0 ? tasksWithoutDragged.length : filteredIdx + 1)
-          : (filteredIdx < 0 ? tasksWithoutDragged.length : filteredIdx);
+        targetIndex = filteredIdx < 0 ? tasksWithoutDragged.length : filteredIdx;
       } else {
         targetIndex = filteredIdx < 0 ? tasksWithoutDragged.length : filteredIdx;
       }
@@ -424,6 +420,7 @@ export default function Dashboard() {
 
   const handleDrop = (targetColId: number, task: Task, targetTaskId?: number) => {
     didDrop.current = true;
+    setDragTask(null);
 
     const snap       = columnsSnapshot.current;
     const sameColumn = task.boardColumnId === targetColId;
@@ -438,11 +435,7 @@ export default function Dashboard() {
     if (targetTaskId != null) {
       const filteredIdx = tasksWithoutDragged.findIndex(t => t.id === targetTaskId);
       if (sameColumn) {
-        const targetTask     = targetCol.tasks.find(t => t.id === targetTaskId);
-        const isDraggingDown = targetTask != null && targetTask.position > task.position;
-        targetIndex = isDraggingDown
-          ? (filteredIdx < 0 ? tasksWithoutDragged.length : filteredIdx + 1)
-          : (filteredIdx < 0 ? tasksWithoutDragged.length : filteredIdx);
+        targetIndex = filteredIdx < 0 ? tasksWithoutDragged.length : filteredIdx;
       } else {
         targetIndex = filteredIdx < 0 ? tasksWithoutDragged.length : filteredIdx;
       }
@@ -795,7 +788,13 @@ export default function Dashboard() {
                   onDragOver={e => {
                     e.preventDefault();
                     if (dragTaskRef.current) {
-                      setDropTarget({ colId: col.id, beforeTaskId: null });
+                      // Ne pas écraser beforeTaskId avec null quand le curseur
+                      // traverse le gap entre deux cartes : on conserve la valeur
+                      // courante si on reste dans la même colonne.
+                      setDropTarget(prev => ({
+                        colId: col.id,
+                        beforeTaskId: prev?.colId === col.id ? prev.beforeTaskId : null,
+                      }));
                       startColAutoScroll(e.currentTarget as HTMLElement, e.clientY);
                     }
                   }}
@@ -803,12 +802,25 @@ export default function Dashboard() {
                   onDrop={e => {
                     e.preventDefault();
                     stopColAutoScroll();
-                    if (dragTaskRef.current) { didDrop.current = true; setDropTarget(null); setDragMirror(null); handleDrop(col.id, dragTaskRef.current); }
+                    if (dragTaskRef.current) {
+                      // Stopper la propagation vers kanban-col pour éviter un second
+                      // handleDrop sans targetTaskId qui enverrait la tâche en fin de colonne.
+                      e.stopPropagation();
+                      didDrop.current = true;
+                      // Utiliser beforeTaskId du dernier onDragOver (mis à jour par les
+                      // cartes) plutôt que de toujours passer undefined (= fin de colonne).
+                      const targetId = dropTarget?.colId === col.id
+                        ? (dropTarget.beforeTaskId ?? undefined)
+                        : undefined;
+                      setDropTarget(null);
+                      setDragMirror(null);
+                      handleDrop(col.id, dragTaskRef.current, targetId);
+                    }
                   }}
                 >
                   {filterTasks(col.tasks, col.id).map(task => (
                     <React.Fragment key={task.id}>
-                      {dropTarget?.colId === col.id && dropTarget?.beforeTaskId === task.id && dragTask?.id !== task.id && (
+                      {dropTarget?.colId === col.id && dropTarget?.beforeTaskId === task.id && !(dragTask?.id === task.id && dragTask?.boardColumnId === col.id) && (
                         <div
                           className="task-drop-placeholder"
                           onDragOver={e => { e.preventDefault(); e.stopPropagation(); setDropTarget({ colId: col.id, beforeTaskId: task.id }); }}
@@ -816,9 +828,9 @@ export default function Dashboard() {
                         />
                       )}
                       <div
-                        className={`task-card ${dragTask?.id === task.id && dragTask?.boardColumnId === col.id ? "dragging" : ""} ${dropTarget?.beforeTaskId === task.id && dragTaskRef.current?.boardColumnId === col.id ? "drag-over-task" : ""}`}
+                        className={`task-card ${dropTarget?.beforeTaskId === task.id && dragTaskRef.current?.boardColumnId === col.id ? "drag-over-task" : ""}`}
                         draggable={!isReadOnly}
-                        style={{ cursor: "pointer" }}
+                        style={{ cursor: "pointer", ...(dragTask?.id === task.id ? { display: "none" } : {}) }}
                         onClick={() => setDetailTask(task)}
                         onDragStart={e => {
                         if (isReadOnly) return;
@@ -846,10 +858,7 @@ export default function Dashboard() {
                           const isTop   = e.clientY < rect.top + rect.height / 2;
                           const tasks   = col.tasks;
                           const idx     = tasks.findIndex(t => t.id === task.id);
-                          const prev    = tasks[idx - 1];
-                          if (isTop && prev && prev.id === dragged.id) return;
                           const next    = tasks[idx + 1];
-                          if (!isTop && next && next.id === dragged.id) return;
                           const target  = isTop ? task.id : (next ? next.id : null);
                           setDropTarget({ colId: col.id, beforeTaskId: target });
                         }}

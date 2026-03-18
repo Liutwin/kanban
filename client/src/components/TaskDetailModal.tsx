@@ -659,7 +659,7 @@ export default function TaskDetailModal({ task, columnName, members = [], onClos
                           handleAddComment();
                         }
                       }}
-                      placeholder="Ajouter un commentaire… (saut de ligne : Shift+Entrée)"
+                      placeholder="Ajouter un commentaire… (Shift+Entrée pour aller à la ligne)"
                       rows={1}
                       style={{ ...inputBase, fontSize: 13, lineHeight: 1.55, resize: "none", overflow: "hidden", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 10, padding: "8px 70px 8px 10px", display: "block", transition: "border-color 0.15s" }}
                       onFocus={e => { e.currentTarget.style.background = "rgba(255,255,255,0.06)"; e.currentTarget.style.borderColor = "rgba(176,166,255,0.3)"; }}
