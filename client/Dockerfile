@@ -31,8 +31,8 @@ COPY nginx.conf /etc/nginx/nginx.conf
 COPY --from=builder /app/dist /usr/share/nginx/html
 
 # Copie les certificats SSL (générés à l'avance, voir README)
-COPY certs/cert.pem /etc/nginx/ssl/cert.pem
-COPY certs/key.pem  /etc/nginx/ssl/key.pem
+#COPY certs/cert.pem /etc/nginx/ssl/cert.pem
+#COPY certs/key.pem  /etc/nginx/ssl/key.pem
 
 # nginx écoute sur 80 (HTTP) et 443 (HTTPS)
 EXPOSE 80 443

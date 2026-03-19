@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from "react";
 import { AuthContext } from "./AuthContext";
-import type { AuthResponse } from "../model/interfaces";
+import type { AuthResponse, User } from "../model/interfaces";
 
 /**
  * Fournisseur du contexte d'authentification.
@@ -29,9 +29,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
    * Met à jour l'état React et synchronise le localStorage.
    * - Si `r` est non nul, sérialise et stocke la réponse.
    * - Si `r` est nul (déconnexion), supprime l'entrée du localStorage.
-   *
-   * @param r - La réponse d'authentification à stocker, ou `null` pour
-   *            effacer la session.
    */
   const handleSet = (r: AuthResponse | null) => {
     setAuthResponse(r);
@@ -39,8 +36,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     else   localStorage.removeItem("auth");
   };
 
+  /**
+   * Met à jour uniquement les données utilisateur dans le contexte et le
+   * localStorage, sans toucher au token JWT.
+   * Utilisé après une modification de profil ou un changement de rôle admin.
+   */
+  const handleUpdateUser = (u: User) => {
+    setAuthResponse(prev => {
+      if (!prev) return prev;
+      const next = { ...prev, user: u };
+      localStorage.setItem("auth", JSON.stringify(next));
+      return next;
+    });
+  };
+
   return (
-    <AuthContext.Provider value={{ authResponse, setAuthResponse: handleSet }}>
+    <AuthContext.Provider value={{ authResponse, setAuthResponse: handleSet, updateUser: handleUpdateUser }}>
       {children}
     </AuthContext.Provider>
   );

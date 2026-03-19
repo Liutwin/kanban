@@ -55,7 +55,7 @@ interface LayoutProps {
 interface AvatarInfo { userId: number; firstName: string; lastName: string; email: string; role: "admin" | "editeur" | "lecteur"; avatar?: string; }
 
 export default function Layout({ children, title, boardId, boardRole, boardCreatorId, onlineUserIds = [] }: LayoutProps) {
-  const { user, logout, authFetch } = useAuth();
+  const { user, logout, authFetch, updateUser } = useAuth();
   const navigate  = useNavigate();
   const location  = useLocation();
 
@@ -79,6 +79,40 @@ export default function Layout({ children, title, boardId, boardRole, boardCreat
       });
     return () => controller.abort();
   }, [user?.id]);
+
+  /**
+   * Polling du profil utilisateur toutes les 30 secondes.
+   *
+   * Permet de refléter un changement de rôle admin (attribution ou révocation)
+   * effectué par un autre administrateur, sans que l'utilisateur ait à se
+   * reconnecter. Le lien "Administration" apparaît ou disparaît automatiquement.
+   *
+   * Note : la révocation est aussi détectée immédiatement via le 403 intercepté
+   * dans authFetch — le polling couvre principalement le cas de l'attribution.
+   */
+  useEffect(() => {
+    if (!user?.id) return;
+    const POLL_INTERVAL_MS = 30_000;
+
+    const poll = async () => {
+      try {
+        const res = await authFetch(`/api/v1/users/${user.id}`);
+        if (!res.ok) return;
+        const json = await res.json();
+        const raw  = json?.data ?? json;
+        // Normalise "admin" → "isAdmin" (Jackson strip du préfixe "is")
+        const freshIsAdmin: boolean = raw.isAdmin ?? raw.admin ?? false;
+        if (freshIsAdmin !== user.isAdmin) {
+          updateUser({ ...user, isAdmin: freshIsAdmin });
+        }
+      } catch {
+        // Silencieux : le polling est best-effort
+      }
+    };
+
+    const intervalId = setInterval(poll, POLL_INTERVAL_MS);
+    return () => clearInterval(intervalId);
+  }, [user?.id, user?.isAdmin]);
 
   const fullName =
     `${user?.firstName ?? ""}${user?.firstName ? " " : ""}${user?.lastName ?? ""}`.trim() || "Utilisateur";
@@ -544,24 +578,35 @@ export default function Layout({ children, title, boardId, boardRole, boardCreat
                             />
                           </button>
                         </Tooltip>
-                        {/* Badges déplacés dans l'outer div pour ne pas être coupés par overflow:hidden */}
+                        {/* Badge admin — 2 chevrons dorés, sans bordure */}
                         {m.role === "admin" && (
                           <span style={{
-                            position: "absolute", top: -2, right: -2,
-                            width: 12, height: 12, borderRadius: "50%",
-                            background: "#fdd663", border: "2px solid var(--surface)",
+                            position: "absolute", top: -4, right: -4,
+                            width: 14, height: 14, borderRadius: "50%",
+                            background: "var(--surface)",
                             display: "flex", alignItems: "center", justifyContent: "center",
-                            fontSize: 7, lineHeight: 1, pointerEvents: "none",
-                            zIndex: 1,
-                          }}>★</span>
+                            pointerEvents: "none", zIndex: 1,
+                          }}>
+                            <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                              <polyline points="1.5,6 5,2.5 8.5,6" stroke="#fdd663" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+                              <polyline points="1.5,8.5 5,5 8.5,8.5" stroke="#fdd663" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+                            </svg>
+                          </span>
                         )}
+
+                        {/* Badge éditeur — 1 chevron bleu, sans bordure */}
                         {m.role === "editeur" && (
                           <span style={{
-                            position: "absolute", top: -1, right: -1,
-                            width: 9, height: 9, borderRadius: "50%",
-                            background: "#b0c8ff", border: "2px solid var(--surface)",
+                            position: "absolute", top: -4, right: -4,
+                            width: 14, height: 14, borderRadius: "50%",
+                            background: "var(--surface)",
+                            display: "flex", alignItems: "center", justifyContent: "center",
                             pointerEvents: "none", zIndex: 1,
-                          }} />
+                          }}>
+                            <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                              <polyline points="1.5,7 5,3.5 8.5,7" stroke="#7eb0ff" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+                            </svg>
+                          </span>
                         )}
                         {/* Point vert de présence — visible si connecté au tableau */}
                         {isOnline && (

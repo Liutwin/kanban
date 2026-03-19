@@ -1,6 +1,7 @@
-import { useContext } from "react";
+import { useContext, useRef } from "react";
 import { AuthContext } from "../contexts/AuthContext";
-import type { AuthResponse } from "../model/interfaces";
+import type { AuthResponse, User } from "../model/interfaces";
+import { API_CONFIG } from "../config/api";
 
 /**
  * Hook d'authentification centralisant l'accès au contexte {@link AuthContext}.
@@ -9,26 +10,23 @@ import type { AuthResponse } from "../model/interfaces";
  * et une fonction `authFetch` pour effectuer des requêtes HTTP authentifiées.
  *
  * @returns Un objet contenant :
- * - `user`      – L'utilisateur connecté, ou `null` si non authentifié.
- * - `token`     – Le token JWT courant, ou `null` si non authentifié.
- * - `isLogged`  – `true` si une session active est présente.
- * - `login`     – Enregistre la réponse d'authentification dans le contexte.
- * - `logout`    – Efface la session courante.
- * - `authFetch` – Wrapper autour de `fetch` qui injecte le JWT et gère le Content-Type.
+ * - `user`        – L'utilisateur connecté, ou `null` si non authentifié.
+ * - `token`       – Le token JWT courant, ou `null` si non authentifié.
+ * - `isLogged`    – `true` si une session active est présente.
+ * - `login`       – Enregistre la réponse d'authentification dans le contexte.
+ * - `logout`      – Efface la session courante.
+ * - `updateUser`  – Met à jour les données utilisateur sans toucher au token.
+ * - `authFetch`   – Wrapper autour de `fetch` qui injecte le JWT et gère le Content-Type.
  */
 export function useAuth() {
-  const { authResponse, setAuthResponse } = useContext(AuthContext);
+  const { authResponse, setAuthResponse, updateUser } = useContext(AuthContext);
 
-  /**
-   * Ouvre une session en enregistrant la réponse d'authentification.
-   *
-   * @param r - La réponse retournée par `POST /api/v1/auth/login`.
-   */
+  // Ref pour éviter de capturer authResponse dans la closure de authFetch
+  // (même pattern qu'Admin.tsx pour éviter les boucles infinies)
+  const authResponseRef = useRef(authResponse);
+  authResponseRef.current = authResponse;
+
   const login  = (r: AuthResponse) => setAuthResponse(r);
-
-  /**
-   * Ferme la session en effaçant le contexte d'authentification.
-   */
   const logout = () => setAuthResponse(null);
 
   /**
@@ -38,43 +36,72 @@ export function useAuth() {
    * Gère deux cas de Content-Type :
    * - **JSON** (par défaut) : pose `Content-Type: application/json`.
    * - **Multipart** (si `init.body` est un `FormData`) : n'injecte pas de Content-Type
-   *   afin de laisser le navigateur générer lui-même le header avec la `boundary` correcte,
-   *   indispensable pour que le serveur puisse parser le formulaire multipart.
+   *   afin de laisser le navigateur générer lui-même le header avec la `boundary` correcte.
    *
-   * Déclenche automatiquement {@link logout} si le serveur répond `401 Unauthorized`.
-   *
-   * @param input - URL ou objet `Request` de la ressource cible.
-   * @param init  - Options `fetch` standard (method, body, headers…). Optionnel.
-   * @returns La `Response` HTTP brute.
+   * Comportements automatiques sur les codes d'erreur :
+   * - **401** → déconnexion immédiate (token expiré ou invalide).
+   * - **403** → si l'utilisateur courant se croyait admin, rafraîchit son profil
+   *   en base pour refléter une éventuelle révocation de rôle sans reconnexion.
    */
   const authFetch = async (
     input: RequestInfo,
     init: RequestInit = {},
   ): Promise<Response> => {
-    // Si le body est un FormData (upload multipart), ne pas poser Content-Type :
-    // le navigateur le génère lui-même avec la boundary correcte.
     const isFormData = init.body instanceof FormData;
+    const current    = authResponseRef.current;
 
     const res = await fetch(input, {
       ...init,
       headers: {
         ...(isFormData ? {} : { "Content-Type": "application/json" }),
         ...(init.headers ?? {}),
-        ...(authResponse?.token
-          ? { Authorization: `Bearer ${authResponse.token}` }
+        ...(current?.token
+          ? { Authorization: `Bearer ${current.token}` }
           : {}),
       },
     });
-    if (res.status === 401) logout();
+
+    if (res.status === 401) {
+      logout();
+      return res;
+    }
+
+    // Sur un 403 : si le contexte indique encore isAdmin = true, le rôle a
+    // probablement été révoqué par un autre admin depuis la dernière connexion.
+    // On relit le profil en base pour mettre à jour le contexte immédiatement,
+    // ce qui masque le lien "Administration" sans attendre une reconnexion.
+    if (res.status === 403 && current?.user?.isAdmin) {
+      try {
+        const userId     = current.user.id;
+        const profileRes = await fetch(
+          `${API_CONFIG.API_PREFIX}/users/${userId}`,
+          { headers: { Authorization: `Bearer ${current.token}` } },
+        );
+        if (profileRes.ok) {
+          const json = await profileRes.json();
+          const raw  = json?.data ?? json;
+          // Normalise "admin" → "isAdmin" (Jackson strip du préfixe "is")
+          const freshUser: User = {
+            ...raw,
+            isAdmin: raw.isAdmin ?? raw.admin ?? false,
+          };
+          updateUser(freshUser);
+        }
+      } catch {
+        // Silencieux : le rafraîchissement du profil est best-effort
+      }
+    }
+
     return res;
   };
 
   return {
-    user:     authResponse?.user ?? null,
-    token:    authResponse?.token ?? null,
-    isLogged: authResponse !== null,
+    user:       authResponse?.user ?? null,
+    token:      authResponse?.token ?? null,
+    isLogged:   authResponse !== null,
     login,
     logout,
+    updateUser,
     authFetch,
   };
 }

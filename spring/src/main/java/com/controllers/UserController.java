@@ -19,6 +19,11 @@ import java.util.List;
 /**
  * Contrôleur REST exposant les endpoints de gestion des utilisateurs.
  * Préfixe de route : {@code /users}
+ *
+ * <p>L'en-tête {@code X-User-Id} injecté par le proxy Deno est transmis
+ * au service sur chaque opération sensible. Le service relit systématiquement
+ * le rôle du requester en base de données afin qu'une révocation de droits
+ * soit effective immédiatement, sans attendre l'expiration du JWT.</p>
  */
 @RestController
 @RequestMapping("/users")
@@ -30,29 +35,36 @@ public class UserController {
 
     /**
      * Récupère la liste de tous les utilisateurs.
+     * Réservé aux administrateurs.
      *
+     * @param requesterId l'identifiant de l'utilisateur connecté, fourni par Deno
      * @return une liste de {@link UserDTO} avec statut HTTP 200
      */
     @Operation(summary = "Lister tous les utilisateurs")
     @GetMapping
-    public ResponseEntity<List<UserDTO>> getAllUsers() {
-        return ResponseEntity.ok(userService.getAllUsers());
+    public ResponseEntity<List<UserDTO>> getAllUsers(
+            @RequestHeader("X-User-Id") Long requesterId) {
+        return ResponseEntity.ok(userService.getAllUsers(requesterId));
     }
 
     /**
      * Récupère un utilisateur par son identifiant.
+     * Accessible par l'utilisateur lui-même ou par un administrateur.
      *
-     * @param id l'identifiant de l'utilisateur
+     * @param id          l'identifiant de l'utilisateur cible
+     * @param requesterId l'identifiant de l'utilisateur connecté, fourni par Deno
      * @return le {@link UserDTO} avec statut HTTP 200
      */
     @Operation(summary = "Récupérer un utilisateur par ID")
     @GetMapping("/{id}")
-    public ResponseEntity<UserDTO> getUserById(@PathVariable Long id) {
-        return ResponseEntity.ok(userService.getUserById(id));
+    public ResponseEntity<UserDTO> getUserById(
+            @PathVariable Long id,
+            @RequestHeader("X-User-Id") Long requesterId) {
+        return ResponseEntity.ok(userService.getUserById(id, requesterId));
     }
 
     /**
-     * Crée un nouvel utilisateur.
+     * Crée un nouvel utilisateur (inscription libre).
      *
      * @param dto les données du nouvel utilisateur
      * @return le {@link UserDTO} créé avec statut HTTP 201
@@ -66,63 +78,79 @@ public class UserController {
 
     /**
      * Met à jour un utilisateur existant.
+     * Accessible par l'utilisateur lui-même ou par un administrateur.
+     * La modification de {@code isAdmin} est réservée aux administrateurs.
      *
-     * @param id  l'identifiant de l'utilisateur à modifier
-     * @param dto les nouvelles données
+     * @param id          l'identifiant de l'utilisateur à modifier
+     * @param requesterId l'identifiant de l'utilisateur connecté, fourni par Deno
+     * @param dto         les nouvelles données
      * @return le {@link UserDTO} mis à jour avec statut HTTP 200
      */
     @Operation(summary = "Mettre à jour un utilisateur")
     @PutMapping("/{id}")
-    public ResponseEntity<UserDTO> updateUser(@PathVariable Long id, @RequestBody UserDTO dto) {
-        return ResponseEntity.ok(userService.updateUser(id, dto));
+    public ResponseEntity<UserDTO> updateUser(
+            @PathVariable Long id,
+            @RequestHeader("X-User-Id") Long requesterId,
+            @RequestBody UserDTO dto) {
+        return ResponseEntity.ok(userService.updateUser(id, requesterId, dto));
     }
-
 
     /**
      * Change le mot de passe d'un utilisateur.
+     * Accessible par l'utilisateur lui-même uniquement.
      *
-     * @param id  l'identifiant de l'utilisateur
-     * @param dto contient l'ancien et le nouveau mot de passe
+     * @param id          l'identifiant de l'utilisateur
+     * @param requesterId l'identifiant de l'utilisateur connecté, fourni par Deno
+     * @param dto         contient l'ancien et le nouveau mot de passe
      * @return statut HTTP 204 sans contenu
      */
     @Operation(summary = "Changer le mot de passe d'un utilisateur")
     @PatchMapping("/{id}/password")
-    public ResponseEntity<Void> changePassword(@PathVariable Long id,
-                                               @RequestBody UserPasswordDTO dto) {
-        userService.changePassword(id, dto);
+    public ResponseEntity<Void> changePassword(
+            @PathVariable Long id,
+            @RequestHeader("X-User-Id") Long requesterId,
+            @RequestBody UserPasswordDTO dto) {
+        userService.changePassword(id, requesterId, dto);
         return ResponseEntity.noContent().build();
     }
 
     /**
      * Supprime un utilisateur par son identifiant.
+     * Réservé aux administrateurs.
      *
-     * @param id l'identifiant de l'utilisateur à supprimer
+     * @param id          l'identifiant de l'utilisateur à supprimer
+     * @param requesterId l'identifiant de l'utilisateur connecté, fourni par Deno
      * @return statut HTTP 204 sans contenu
      */
     @Operation(summary = "Supprimer un utilisateur")
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> deleteUser(@PathVariable Long id) {
-        userService.deleteUser(id);
+    public ResponseEntity<Void> deleteUser(
+            @PathVariable Long id,
+            @RequestHeader("X-User-Id") Long requesterId) {
+        userService.deleteUser(id, requesterId);
         return ResponseEntity.noContent().build();
     }
 
     /**
      * Upload un avatar pour un utilisateur.
-     * Le fichier est stocké sur disque et le chemin est enregistré dans la base.
+     * Accessible par l'utilisateur lui-même ou par un administrateur.
      *
-     * @param id   l'identifiant de l'utilisateur
-     * @param file le fichier image uploadé
+     * @param id          l'identifiant de l'utilisateur
+     * @param requesterId l'identifiant de l'utilisateur connecté, fourni par Deno
+     * @param file        le fichier image uploadé
      * @return le {@link UserDTO} mis à jour avec statut HTTP 200
      */
     @Operation(summary = "Uploader un avatar")
     @PostMapping(value = "/{id}/avatar", consumes = "multipart/form-data")
-    public ResponseEntity<UserDTO> uploadAvatar(@PathVariable Long id,
-                                                @RequestParam("file") MultipartFile file) {
-        return ResponseEntity.ok(userService.uploadAvatar(id, file));
+    public ResponseEntity<UserDTO> uploadAvatar(
+            @PathVariable Long id,
+            @RequestHeader("X-User-Id") Long requesterId,
+            @RequestParam("file") MultipartFile file) {
+        return ResponseEntity.ok(userService.uploadAvatar(id, requesterId, file));
     }
 
     /**
-     * Télécharge l'avatar d'un utilisateur.
+     * Télécharge l'avatar d'un utilisateur (accès public).
      *
      * @param id l'identifiant de l'utilisateur
      * @return le contenu de l'image avec statut HTTP 200
@@ -131,7 +159,6 @@ public class UserController {
     @GetMapping("/{id}/avatar")
     public ResponseEntity<Resource> getAvatar(@PathVariable Long id) {
         Resource resource = userService.getAvatar(id);
-        // Détecte le type MIME réel du fichier (PNG, JPEG, WebP…)
         MediaType mediaType = MediaType.IMAGE_JPEG;
         try {
             String filename = resource.getFilename();

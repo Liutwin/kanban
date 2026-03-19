@@ -2,7 +2,6 @@ import React, { useState, useEffect, useRef, useCallback, useLayoutEffect } from
 import { useParams, useNavigate } from "react-router-dom";
 import { extractErrorMessage } from "../utils/apiHelpers";
 import Layout from "../components/Layout";
-import { getAvatarStyle } from "../utils/avatarColor";
 import { ROUTES_API } from "../config/api";
 import { useAuth } from "../hooks/useAuth";
 import type { Board, Column, Task, Priority, User, Member } from "../model/interfaces";

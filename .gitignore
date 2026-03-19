@@ -102,3 +102,4 @@ spring/build/tmp/compileJava/compileTransaction/stash-dir/UtilisateurServiceImpl
 .idea/modules.xml
 .idea/vcs.xml
 spring/.gradle/8.12.1/gc.properties
+.env

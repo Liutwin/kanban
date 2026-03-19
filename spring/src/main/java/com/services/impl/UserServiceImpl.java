@@ -4,6 +4,7 @@ import com.dtos.UserCreateDTO;
 import com.dtos.UserDTO;
 import com.dtos.UserPasswordDTO;
 import com.entities.User;
+import com.exceptions.ForbiddenException;
 import com.mappers.UserMapper;
 import com.repositories.UserRepository;
 import com.services.MailService;
@@ -27,6 +28,11 @@ import java.util.stream.Collectors;
  * Implémentation de {@link UserService}.
  * Orchestre les appels au {@link UserRepository}
  * et les conversions via le {@link UserMapper}.
+ *
+ * <p>Toutes les vérifications d'autorisation relisent le rôle du requester
+ * <strong>en base de données</strong>, jamais depuis le JWT. Cela garantit
+ * qu'une révocation de droits admin est effective immédiatement, sans
+ * attendre l'expiration du token.</p>
  */
 @Service
 @RequiredArgsConstructor
@@ -40,28 +46,59 @@ public class UserServiceImpl implements UserService {
     @Value("${app.upload.dir}")
     private String uploadDir;
 
+    // ─────────────────────────────────────────────────────────────────────────
+    // Helpers d'autorisation
+    // ─────────────────────────────────────────────────────────────────────────
+
     /**
-     * {@inheritDoc}
+     * Charge le requester et vérifie qu'il est administrateur.
+     * Le chargement depuis la BDD est intentionnel : si son rôle a été révoqué
+     * depuis l'émission de son JWT, la vérification échoue immédiatement.
      */
+    private User requireAdmin(Long requesterId) {
+        User requester = userRepository.findById(requesterId)
+                .orElseThrow(() -> new RuntimeException("Requester introuvable : " + requesterId));
+        if (!requester.isAdmin()) {
+            throw new ForbiddenException("Action réservée aux administrateurs.");
+        }
+        return requester;
+    }
+
+    /**
+     * Charge le requester et vérifie qu'il est la cible ou un administrateur.
+     */
+    private User requireSelfOrAdmin(Long targetId, Long requesterId) {
+        if (requesterId.equals(targetId)) {
+            return userRepository.findById(requesterId)
+                    .orElseThrow(() -> new RuntimeException("Requester introuvable : " + requesterId));
+        }
+        return requireAdmin(requesterId);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Opérations
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /** {@inheritDoc} */
     @Override
-    public List<UserDTO> getAllUsers() {
+    public List<UserDTO> getAllUsers(Long requesterId) {
+        requireAdmin(requesterId);
         return userRepository.findAll()
                 .stream()
                 .map(userMapper::toDTO)
                 .collect(Collectors.toList());
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /** {@inheritDoc} */
     @Override
-    public UserDTO getUserById(Long id) {
+    public UserDTO getUserById(Long id, Long requesterId) {
+        requireSelfOrAdmin(id, requesterId);
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Utilisateur introuvable : " + id));
         return userMapper.toDTO(user);
     }
 
-    /** Fonction utilitaire pour mettre la première lettre en majuscule **/
+    /** Fonction utilitaire pour mettre la première lettre en majuscule. */
     private String capitalize(String s) {
         if (s == null || s.isBlank()) return s;
         return Character.toUpperCase(s.charAt(0)) + s.substring(1);
@@ -73,23 +110,28 @@ public class UserServiceImpl implements UserService {
         if (userRepository.existsByEmail(dto.getEmail())) {
             throw new RuntimeException("Email déjà utilisé : " + dto.getEmail());
         }
-
         dto.setFirstName(capitalize(dto.getFirstName()));
         dto.setLastName(capitalize(dto.getLastName()));
-
         User user = userMapper.toEntityFromCreate(dto);
         UserDTO saved = userMapper.toDTO(userRepository.save(user));
-
         mailService.sendWelcome(saved.getEmail(), saved.getFirstName());
-
         return saved;
     }
 
     /** {@inheritDoc} */
     @Override
-    public UserDTO updateUser(Long id, UserDTO dto) {
+    public UserDTO updateUser(Long id, Long requesterId, UserDTO dto) {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Utilisateur introuvable : " + id));
+
+        // Modification des champs personnels : soi-même ou admin
+        requireSelfOrAdmin(id, requesterId);
+
+        // Modification du rôle admin : admin exclusivement, vérifié en base
+        if (dto.isAdmin() != user.isAdmin()) {
+            requireAdmin(requesterId);
+        }
+
         user.setEmail(dto.getEmail());
         user.setLastName(dto.getLastName());
         user.setFirstName(dto.getFirstName());
@@ -99,7 +141,11 @@ public class UserServiceImpl implements UserService {
 
     /** {@inheritDoc} */
     @Override
-    public void changePassword(Long id, UserPasswordDTO dto) {
+    public void changePassword(Long id, Long requesterId, UserPasswordDTO dto) {
+        // Changement de mot de passe : soi-même uniquement
+        if (!requesterId.equals(id)) {
+            throw new ForbiddenException("Vous ne pouvez modifier que votre propre mot de passe.");
+        }
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Utilisateur introuvable : " + id));
         if (!user.getPassword().equals(dto.getOldPassword())) {
@@ -111,7 +157,8 @@ public class UserServiceImpl implements UserService {
 
     /** {@inheritDoc} */
     @Override
-    public void deleteUser(Long id) {
+    public void deleteUser(Long id, Long requesterId) {
+        requireAdmin(requesterId);
         if (!userRepository.existsById(id)) {
             throw new RuntimeException("Utilisateur introuvable : " + id);
         }
@@ -120,29 +167,26 @@ public class UserServiceImpl implements UserService {
 
     /** {@inheritDoc} */
     @Override
-    public UserDTO uploadAvatar(Long id, MultipartFile file) {
+    public UserDTO uploadAvatar(Long id, Long requesterId, MultipartFile file) {
+        requireSelfOrAdmin(id, requesterId);
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Utilisateur introuvable : " + id));
 
-        // Vérification du type MIME
         String contentType = file.getContentType();
         if (contentType == null || !contentType.startsWith("image/")) {
             throw new RuntimeException("Le fichier doit être une image (JPEG, PNG, GIF, WebP…)");
         }
 
         try {
-            // Crée le dossier avatars si nécessaire
             Path dir = Paths.get(uploadDir, "avatars");
             Files.createDirectories(dir);
 
-            // Supprime l'ancien avatar physique s'il existe
             if (user.getAvatarURL() != null && !user.getAvatarURL().isBlank()) {
                 try {
                     Files.deleteIfExists(Paths.get(user.getAvatarURL()));
                 } catch (IOException ignored) { }
             }
 
-            // Préfixe UUID pour éviter les collisions
             String original = file.getOriginalFilename();
             String ext      = (original != null && original.contains("."))
                     ? original.substring(original.lastIndexOf(".")).toLowerCase()
@@ -151,7 +195,6 @@ public class UserServiceImpl implements UserService {
             Path destination = dir.resolve(filename);
             file.transferTo(destination);
 
-            // Sauvegarde le chemin dans l'entité
             user.setAvatarURL(destination.toString());
             return userMapper.toDTO(userRepository.save(user));
 

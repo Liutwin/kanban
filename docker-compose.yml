@@ -18,11 +18,9 @@ services:
       context: ./client          # dossier contenant le Dockerfile React
     container_name: kanban-nginx
     ports:
-      - "80:80"                  # HTTP  → redirigé vers HTTPS par nginx
-      - "443:443"                # HTTPS → point d'entrée principal
+      - "80:80"                  # HTTP uniquement pour les tests
     depends_on:
-      deno:
-        condition: service_healthy
+      - deno
     restart: unless-stopped
 
   # ── Deno (auth JWT + proxy) ────────────────────────────────
@@ -38,7 +36,7 @@ services:
       HOST: "0.0.0.0"
       PORT: "8080"
       # URL interne vers Spring (nom du service Docker Compose)
-      SPRING_URL: "http://spring:8080"
+      SPRING_URL: "http://spring:8081"
       # Connexion MariaDB externe
       DB_HOST: "${DB_HOST}"
       DB_PORT: "${DB_PORT}"
@@ -58,7 +56,7 @@ services:
     container_name: kanban-spring
     # Pas de ports exposés : seul Deno communique avec Spring
     expose:
-      - "8080"
+      - "8081"
     environment:
       SPRING_PROFILES_ACTIVE: "prod"
       # Connexion MariaDB externe
@@ -70,8 +68,8 @@ services:
       # Config mail
       SPRING_MAIL_HOST: "${MAIL_HOST}"
       SPRING_MAIL_PORT: "${MAIL_PORT}"
-      SPRING_MAIL_USERNAME: "${MAIL_USERNAME}"
-      SPRING_MAIL_PASSWORD: "${MAIL_PASSWORD}"
+      MAIL_USERNAME: "${MAIL_USERNAME}"
+      MAIL_PASSWORD: "${MAIL_PASSWORD}"
       # Dossier des uploads (doit correspondre au volume ci-dessous)
       APP_UPLOAD_DIR: "/app/uploads"
     volumes:

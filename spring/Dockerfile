@@ -4,24 +4,21 @@
 # ============================================================
 
 # ── Stage 1 : build ─────────────────────────────────────────
-FROM eclipse-temurin:21-jdk-alpine AS builder
+# Utilise l'image Gradle officielle correspondant à gradle-wrapper.properties
+# (gradle 8.12.1 + JDK 21) — évite de dépendre du gradle-wrapper.jar
+FROM gradle:8.12-jdk21-alpine AS builder
 
 WORKDIR /app
 
-# Copie du wrapper Gradle et des fichiers de config en premier
-# → permet à Docker de mettre en cache le téléchargement de Gradle
-# si build.gradle n'a pas changé
-COPY gradlew .
-COPY gradle ./gradle
-COPY build.gradle .
-COPY settings.gradle .
+# Copie des fichiers de config en premier pour mettre en cache
+# le téléchargement des dépendances si build.gradle n'a pas changé
+COPY build.gradle settings.gradle ./
 
-# Pré-téléchargement des dépendances (optimise les rebuilds)
-RUN chmod +x gradlew && ./gradlew dependencies -q --no-daemon
+RUN gradle dependencies -q --no-daemon
 
 # Copie des sources puis build
 COPY src ./src
-RUN ./gradlew bootJar -q --no-daemon
+RUN gradle bootJar -q --no-daemon
 
 # ── Stage 2 : runtime ───────────────────────────────────────
 FROM eclipse-temurin:21-jre-alpine

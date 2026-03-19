@@ -327,7 +327,7 @@ function DeleteConfirmModal({ user, submitting, error, onConfirm, onCancel }: De
  * (`[]`) et ne soient jamais recréés entre deux renders.
  */
 export default function Admin() {
-  const { user, authFetch } = useAuth();
+  const { user, authFetch, updateUser } = useAuth();
   const navigate = useNavigate();
 
   /**
@@ -337,8 +337,15 @@ export default function Admin() {
    * ce qui rejoue le `useEffect`, ce qui appelle `setState`, ce qui re-rend —
    * boucle infinie.
    */
-  const authFetchRef = useRef(authFetch);
-  useEffect(() => { authFetchRef.current = authFetch; }, [authFetch]);
+  const authFetchRef  = useRef(authFetch);
+  useEffect(() => { authFetchRef.current  = authFetch;  }, [authFetch]);
+
+  const updateUserRef = useRef(updateUser);
+  useEffect(() => { updateUserRef.current = updateUser; }, [updateUser]);
+
+  // Ref stable vers l'utilisateur courant, pour éviter de l'ajouter aux deps
+  const currentUserRef = useRef(user);
+  useEffect(() => { currentUserRef.current = user; }, [user]);
 
   // ── Utilisateurs ──────────────────────────────────────────────────────────
   const [users,        setUsers]        = useState<AdminUser[]>([]);
@@ -554,10 +561,25 @@ export default function Admin() {
           email:     target.email,
           firstName: target.firstName,
           lastName:  target.lastName,
-          admin:     newValue,
+          isAdmin:   newValue,
         }),
       });
       if (!res.ok) throw new Error(await extractErrorMessage(res));
+
+      // Si l'utilisateur modifié est l'utilisateur courant, mettre à jour
+      // immédiatement le contexte d'auth (et le localStorage) pour que son
+      // rôle reflète la réalité sans attendre une reconnexion.
+      const freshRes = await authFetchRef.current(ROUTES_API.user(target.id));
+      if (freshRes.ok) {
+        const freshJson = await freshRes.json();
+        const freshUser = Array.isArray(freshJson) ? freshJson[0] : (freshJson?.data ?? freshJson);
+        // Mettre à jour la liste locale avec les données fraîches
+        setUsers(prev => prev.map(u => u.id === target.id ? { ...u, ...freshUser } : u));
+        // Si c'est l'utilisateur courant, synchroniser le contexte d'auth
+        if (target.id === currentUserRef.current?.id) {
+          updateUserRef.current(freshUser);
+        }
+      }
 
       setStats(prev => prev
         ? { ...prev, adminCount: prev.adminCount + (newValue ? 1 : -1) }
