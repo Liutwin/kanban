@@ -948,7 +948,7 @@ export default function Dashboard() {
                       <div
                         className={`task-card ${dropTarget?.beforeTaskId === task.id && dragTaskRef.current?.boardColumnId === col.id ? "drag-over-task" : ""}`}
                         draggable={!isReadOnly}
-                        style={{ cursor: "pointer", ...(dragTask?.id === task.id ? { display: "none" } : {}) }}
+                        style={{ cursor: "pointer", ...(dragTask?.id === task.id ? { visibility: "hidden" } : {}) }}
                         onClick={() => setDetailTask(task)}
                         onDragStart={e => {
                         if (isReadOnly) return;

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { ROUTES_AUTH } from "../config/api";
 import AuthIcon from "../assets/kanban-icon-auth.svg";
@@ -22,9 +22,17 @@ export default function ResetPassword() {
   const [searchParams]          = useSearchParams();
   const [status, setStatus]     = useState<"pending" | "success" | "error">("pending");
   const [errorMsg, setErrorMsg] = useState("");
+  // En React StrictMode (dev), le composant est monté deux fois.
+  // Ce ref garantit qu'un seul appel réseau est émis, quelle que soit
+  // la vitesse de la connexion (contrairement à AbortController seul,
+  // qui ne bloque pas un fetch déjà parti).
+  const called = useRef(false);
 
   useEffect(() => {
     document.title = "Kanban — Réinitialisation du mot de passe";
+
+    if (called.current) return;
+    called.current = true;
 
     const token = searchParams.get("token");
 
@@ -34,11 +42,6 @@ export default function ResetPassword() {
       return;
     }
 
-    // AbortController : en dev (React StrictMode), le composant est monté deux
-    // fois. Le cleanup annule le premier fetch avant qu'il n'atteigne le serveur,
-    // garantissant qu'un seul appel effectif est émis.
-    const controller = new AbortController();
-
     (async () => {
       try {
         let res: Response;
@@ -47,10 +50,8 @@ export default function ResetPassword() {
             method:  "POST",
             headers: { "Content-Type": "application/json" },
             body:    JSON.stringify({ token }),
-            signal:  controller.signal,
           });
-        } catch (err) {
-          if (err instanceof DOMException && err.name === "AbortError") return;
+        } catch {
           throw new Error("Serveur indisponible.");
         }
 
@@ -63,13 +64,10 @@ export default function ResetPassword() {
 
         setStatus("success");
       } catch (err: unknown) {
-        if (err instanceof DOMException && err.name === "AbortError") return;
         setErrorMsg(err instanceof Error ? err.message : "Erreur du serveur.");
         setStatus("error");
       }
     })();
-
-    return () => controller.abort();
   }, [searchParams]);
 
   // ── Chargement ───────────────────────────────────────────────────────────
