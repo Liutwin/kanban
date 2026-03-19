@@ -761,8 +761,20 @@ export default function Dashboard() {
               <h1 className="board-name-title">{boardName}</h1>
             )}
 
-            {/* Boutons export PDF + journal d'activité */}
+            {/* Boutons journal d'activité + export PDF */}
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <Tooltip text="Voir l'historique des actions sur ce tableau">
+                <button
+                  className="btn btn-ghost"
+                  onClick={() => navigate(`/logs/boards/${boardId}`)}
+                  style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13 }}
+                >
+                  <svg width="14" height="14" viewBox="0 0 20 20" fill="none">
+                    <path d="M4 5h12M4 10h8M4 15h5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                  </svg>
+                  Journal d'activité
+                </button>
+              </Tooltip>
               <Tooltip text="Télécharger le tableau en PDF">
                 <button
                   className="btn btn-ghost"
@@ -783,16 +795,6 @@ export default function Dashboard() {
                   {exporting ? "Export…" : "Exporter PDF"}
                 </button>
               </Tooltip>
-              <button
-                className="btn btn-ghost"
-                onClick={() => navigate(`/logs/boards/${boardId}`)}
-                style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13 }}
-              >
-                <svg width="14" height="14" viewBox="0 0 20 20" fill="none">
-                  <path d="M4 5h12M4 10h8M4 15h5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-                </svg>
-                Journal d'activité
-              </button>
             </div>
 
             {exportError && (

@@ -2,7 +2,7 @@
 import { useEffect, useRef } from "react";
 import type { BoardUpdateMessage } from "../model/websockets";
 
-const WS_BASE = `ws://localhost:8080`;
+const WS_BASE = `${window.location.protocol === "https:" ? "wss" : "ws"}://${window.location.host}`;
 
 /**
  * Hook qui ouvre un WebSocket sur le canal d'un tableau

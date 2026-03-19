@@ -41,7 +41,7 @@ router.get("/boards/:boardId", async (ctx) => {
   // ── Upgrade HTTP → WebSocket ──────────────────────────────────────────────
   // À partir d'ici, la réponse HTTP est engagée : toute erreur doit être
   // gérée directement sur l'objet `ws`, pas via des exceptions Oak.
-  const ws: WebSocket = ctx.upgrade();
+  const ws: WebSocket = ctx.upgrade(token ? { protocol: token } : undefined);
 
   ws.onopen  = () => { subscribe(ws, boardId); };
   ws.onclose = () => { unsubscribe(ws, boardId); };

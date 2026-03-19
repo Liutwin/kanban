@@ -3,8 +3,8 @@ import { useParams, useNavigate } from "react-router-dom";
 import Layout from "../components/Layout";
 import { useAuth } from "../hooks/useAuth";
 import { ROUTES_API } from "../config/api";
-import { getAvatarStyle } from "../utils/avatarColor";
 import { extractErrorMessage } from "../utils/apiHelpers";
+import UserAvatar from "../components/UserAvatar";
 import { toSlug } from "../utils/slug";
 import type { UserProfileDTO, Log, User } from "../model/interfaces";
 import "../styles/logs.css";
@@ -215,11 +215,6 @@ export default function Logs() {
       ? `Activités de ${profile.firstName} ${profile.lastName}`
       : "Activités";
 
-  const av       = profile ? getAvatarStyle(profile.id) : getAvatarStyle(0);
-  const initials = profile
-    ? `${profile.firstName.charAt(0)}${profile.lastName.charAt(0)}`.toUpperCase()
-    : "?";
-
   // ─────────────────────────────────────────────────────────────────────────
   // Rendu — erreur de résolution
   // ─────────────────────────────────────────────────────────────────────────
@@ -258,13 +253,14 @@ export default function Logs() {
             {loadingProfile ? (
               <div className="admin-skeleton" style={{ width: 56, height: 56, borderRadius: "50%", flexShrink: 0 }} />
             ) : (
-              <div
+              <UserAvatar
+                userId={profile?.id ?? 0}
+                firstName={profile?.firstName ?? ""}
+                lastName={profile?.lastName ?? ""}
+                hasAvatar={!!profile?.avatarURL}
+                size={56}
                 className="logs-profile-avatar"
-                style={{ background: av.background, color: av.color }}
-                aria-hidden="true"
-              >
-                {initials}
-              </div>
+              />
             )}
             <div className="logs-profile-text">
               {loadingProfile ? (
