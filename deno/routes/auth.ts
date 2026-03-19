@@ -15,7 +15,7 @@ import { isLoginRequest } from "../model/guards.ts";
 
 const router   = new Router({ prefix: "/api/v1/auth" });
 const SPRING   = Deno.env.get("SPRING_URL")   ?? "http://spring:8080";
-const BASE_URL = Deno.env.get("APP_BASE_URL") ?? "http://localhost:5173";
+const BASE_URL = Deno.env.get("APP_BASE_URL") ?? "http://localhost:3000";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Authentification

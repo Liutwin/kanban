@@ -55,7 +55,7 @@ interface LayoutProps {
 interface AvatarInfo { userId: number; firstName: string; lastName: string; email: string; role: "admin" | "editeur" | "lecteur"; avatar?: string; }
 
 export default function Layout({ children, title, boardId, boardRole, boardCreatorId, onlineUserIds = [] }: LayoutProps) {
-  const { user, logout, authFetch, updateUser } = useAuth();
+  const { user, logout, authFetch } = useAuth();
   const navigate  = useNavigate();
   const location  = useLocation();
 
@@ -79,40 +79,6 @@ export default function Layout({ children, title, boardId, boardRole, boardCreat
       });
     return () => controller.abort();
   }, [user?.id]);
-
-  /**
-   * Polling du profil utilisateur toutes les 30 secondes.
-   *
-   * Permet de refléter un changement de rôle admin (attribution ou révocation)
-   * effectué par un autre administrateur, sans que l'utilisateur ait à se
-   * reconnecter. Le lien "Administration" apparaît ou disparaît automatiquement.
-   *
-   * Note : la révocation est aussi détectée immédiatement via le 403 intercepté
-   * dans authFetch — le polling couvre principalement le cas de l'attribution.
-   */
-  useEffect(() => {
-    if (!user?.id) return;
-    const POLL_INTERVAL_MS = 30_000;
-
-    const poll = async () => {
-      try {
-        const res = await authFetch(`/api/v1/users/${user.id}`);
-        if (!res.ok) return;
-        const json = await res.json();
-        const raw  = json?.data ?? json;
-        // Normalise "admin" → "isAdmin" (Jackson strip du préfixe "is")
-        const freshIsAdmin: boolean = raw.isAdmin ?? raw.admin ?? false;
-        if (freshIsAdmin !== user.isAdmin) {
-          updateUser({ ...user, isAdmin: freshIsAdmin });
-        }
-      } catch {
-        // Silencieux : le polling est best-effort
-      }
-    };
-
-    const intervalId = setInterval(poll, POLL_INTERVAL_MS);
-    return () => clearInterval(intervalId);
-  }, [user?.id, user?.isAdmin]);
 
   const fullName =
     `${user?.firstName ?? ""}${user?.firstName ? " " : ""}${user?.lastName ?? ""}`.trim() || "Utilisateur";

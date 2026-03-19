@@ -26,9 +26,7 @@ export default function App() {
         <Route path="/forgot-password" element={
           <PublicRoute><ForgotPassword /></PublicRoute>
         } />
-        <Route path="/reset-password" element={
-          <PublicRoute><ResetPassword /></PublicRoute>
-        } />
+        <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/boards" element={
           <ProtectedRoute><Boards /></ProtectedRoute>
         } />

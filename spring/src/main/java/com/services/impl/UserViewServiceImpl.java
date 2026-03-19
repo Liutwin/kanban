@@ -64,7 +64,12 @@ public class UserViewServiceImpl implements UserViewService {
     /** {@inheritDoc} */
     @Override
     public UserViewDTO getProfileById(Long id, Long requesterId) {
-        requireSelfOrAdmin(id, requesterId);
+        // Tout utilisateur authentifié peut lire le profil d'un autre utilisateur.
+        // Nécessaire pour afficher les noms/avatars des membres d'un tableau
+        // (le requester n'est pas forcément admin ni la cible elle-même).
+        // On vérifie uniquement que le requester existe bien en base.
+        userRepository.findById(requesterId)
+                .orElseThrow(() -> new RuntimeException("Requester introuvable : " + requesterId));
         return userViewRepository.findById(id)
                 .map(userViewMapper::toDTO)
                 .orElseThrow(() -> new RuntimeException("Utilisateur introuvable : " + id));

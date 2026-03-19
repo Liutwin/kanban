@@ -34,7 +34,11 @@ export default function ResetPassword() {
       return;
     }
 
-    // Appel automatique au montage — pas besoin d'action utilisateur
+    // AbortController : en dev (React StrictMode), le composant est monté deux
+    // fois. Le cleanup annule le premier fetch avant qu'il n'atteigne le serveur,
+    // garantissant qu'un seul appel effectif est émis.
+    const controller = new AbortController();
+
     (async () => {
       try {
         let res: Response;
@@ -43,8 +47,10 @@ export default function ResetPassword() {
             method:  "POST",
             headers: { "Content-Type": "application/json" },
             body:    JSON.stringify({ token }),
+            signal:  controller.signal,
           });
-        } catch {
+        } catch (err) {
+          if (err instanceof DOMException && err.name === "AbortError") return;
           throw new Error("Serveur indisponible.");
         }
 
@@ -57,10 +63,13 @@ export default function ResetPassword() {
 
         setStatus("success");
       } catch (err: unknown) {
+        if (err instanceof DOMException && err.name === "AbortError") return;
         setErrorMsg(err instanceof Error ? err.message : "Erreur du serveur.");
         setStatus("error");
       }
     })();
+
+    return () => controller.abort();
   }, [searchParams]);
 
   // ── Chargement ───────────────────────────────────────────────────────────
