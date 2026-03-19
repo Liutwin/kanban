@@ -18,7 +18,8 @@ services:
       context: ./client          # dossier contenant le Dockerfile React
     container_name: kanban-nginx
     ports:
-      - "80:80"                  # HTTP uniquement pour les tests
+      - "8080:8080"              # HTTP  → redirigé vers HTTPS
+      - "8443:8443"              # HTTPS → point d'entrée principal
     depends_on:
       - deno
     restart: unless-stopped
