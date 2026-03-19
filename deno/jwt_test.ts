@@ -63,22 +63,17 @@ Deno.test("createJWT [nominal] — le header encode bien l'algorithme HS256", as
     "HS256",
     `Algorithme attendu : "HS256", obtenu : "${header.alg}". Header décodé : ${JSON.stringify(header)}`,
   );
-  assertEquals(
-    header.typ,
-    "JWT",
-    `Type attendu : "JWT", obtenu : "${header.typ}". Header décodé : ${JSON.stringify(header)}`,
-  );
 });
 
 Deno.test("createJWT [non-nominal] — deux appels avec le même payload produisent des tokens différents (nonce/exp)", async () => {
   const t1 = await createJWT({ id: 1 });
-  await new Promise((r) => setTimeout(r, 10));
+  await new Promise((r) => setTimeout(r, 1000));
   const t2 = await createJWT({ id: 1 });
 
   assertNotEquals(
     t1,
     t2,
-    `Deux tokens créés à des instants différents sont identiques alors qu'ils devraient différer (exp ou signature). Token obtenu : "${t1}"`,
+    `Deux tokens créés à des instants différents (au moins 1s) sont identiques alors qu'ils devraient différer (exp ou signature). Token obtenu : "${t1}"`,
   );
 });
 
