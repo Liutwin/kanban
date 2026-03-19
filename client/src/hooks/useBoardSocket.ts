@@ -70,6 +70,7 @@ export function useBoardSocket(
     ws.onmessage = (e) => {
       try {
         const msg = JSON.parse(e.data);
+        console.log("[WS] message reçu:", msg);
 
         if (msg.type === "presence_update") {
           onPresenceRef.current?.(msg.onlineUserIds as number[]);

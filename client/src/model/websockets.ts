@@ -8,7 +8,9 @@ export type BoardAction =
   | "column_updated"
   | "column_deleted"
   | "column_moved"
-  | "member_updated";
+  | "member_updated"
+  | "comment_updated"
+  | "file_updated";
 
 /**
  * Message diffusé par le serveur à tous les clients connectés à un tableau.

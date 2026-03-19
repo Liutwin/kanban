@@ -161,6 +161,8 @@ export default function Dashboard() {
   // Présence temps réel : userId des membres actuellement connectés au tableau
   const [onlineUserIds, setOnlineUserIds] = useState<number[]>([]);
 
+
+
   /* ── Chargement ──────────────────────────────────────────── */
 
   const fetchBoard = async (signal?: AbortSignal) => {
@@ -678,6 +680,15 @@ export default function Dashboard() {
       })
     );
     setColumns(updated);
+    // Si une modale de détail est ouverte, la synchroniser avec la version
+    // fraîche de la tâche (modification en temps réel par un autre utilisateur).
+    setDetailTask(prev => {
+      if (!prev) return null;
+      const fresh = updated.flatMap(c => c.tasks).find(t => t.id === prev.id);
+      return fresh ?? prev;
+    });
+    // Notifie la modale des nouveaux commentaires/fichiers (comment_updated / file_updated).
+    window.dispatchEvent(new CustomEvent("kanban:modal-refresh"));
   }, [boardFetch]);
 
   /**
@@ -719,6 +730,12 @@ export default function Dashboard() {
         break;
       case "member_updated":
         fetchBoard();
+        break;
+      case "comment_updated":
+      case "file_updated":
+        // Même traitement que task_updated : fetchTasks recharge les colonnes
+        // ET synchronise detailTask si une modale est ouverte.
+        fetchTasks();
         break;
     }
   }, [fetchTasks, fetchColumns, fetchBoard]);
@@ -1102,6 +1119,7 @@ export default function Dashboard() {
           task={detailTask}
           columnName={columns.find(c => c.id === detailTask.boardColumnId)?.name ?? ""}
           members={members}
+          boardId={boardId}
           onClose={() => setDetailTask(null)}
           onEdit={saved => {
             setColumns(cols => cols.map(col => ({ ...col, tasks: col.tasks.map(t => t.id === saved.id ? saved : t) })));

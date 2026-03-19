@@ -14,6 +14,10 @@ interface Props {
   onEdit:       (task: Task) => void;
   onDelete:     (taskId: number) => void;
   currentRole?: Member["role"];
+  /** Identifiant du tableau — injecté dans X-Board-Id pour que Deno
+   *  puisse broadcaster les mutations vers les autres membres. */
+  boardId?: number;
+
 }
 
 /* ── Helpers ── */
@@ -64,8 +68,24 @@ function Label({ children }: { children: React.ReactNode }) {
 }
 
 /* ── Composant principal ── */
-export default function TaskDetailModal({ task, columnName, members = [], onClose, onEdit, onDelete, currentRole = "editeur" }: Props) {
+export default function TaskDetailModal({ task, columnName, members = [], onClose, onEdit, onDelete, currentRole = "editeur", boardId }: Props) {
   const { authFetch, user } = useAuth();
+
+  /**
+   * Wrapper autour de `authFetch` qui injecte `X-Board-Id` sur les requêtes
+   * de mutation, permettant à Deno d'identifier le tableau et de broadcaster
+   * l'événement WebSocket aux autres membres connectés.
+   * Identique au `boardFetch` de Dashboard — les routes /tasks, /comments
+   * et /files n'exposent pas le boardId dans l'URL.
+   */
+  const boardFetch = (url: RequestInfo, init: RequestInit = {}) =>
+    authFetch(url, {
+      ...init,
+      headers: {
+        ...(init.headers ?? {}),
+        ...(boardId != null ? { "X-Board-Id": String(boardId) } : {}),
+      },
+    });
 
   // Lecteur → lecture seule partout
   const canEdit = currentRole !== "lecteur";
@@ -163,7 +183,7 @@ export default function TaskDetailModal({ task, columnName, members = [], onClos
       form.append("file",  picked);
       form.append("tskId", String(task.id));
       form.append("usrId", String(user!.id));
-      const res = await authFetch(ROUTES_API.files, { method: "POST", body: form });
+      const res = await boardFetch(ROUTES_API.files, { method: "POST", body: form });
       if (!res.ok) return;
       const created: FileAttachment = await res.json();
       setFiles(prev => [...prev, created]);
@@ -176,7 +196,7 @@ export default function TaskDetailModal({ task, columnName, members = [], onClos
 
 
   const handleDeleteFile = async (id: string) => {
-    const res = await authFetch(ROUTES_API.file(String(id)), { method: "DELETE" });
+    const res = await boardFetch(ROUTES_API.file(String(id)), { method: "DELETE" });
     if (res.ok) {
       setFiles(prev => prev.filter(f => String(f.id) !== id));
       setBlobUrls(prev => { const next = { ...prev }; delete next[id]; return next; });
@@ -189,7 +209,7 @@ export default function TaskDetailModal({ task, columnName, members = [], onClos
   /* Commentaires */
   const [comments,      setComments]      = useState<Comment[]>([]);
   const [commentText,   setCommentText]   = useState("");
-  const [editingCom,    setEditingCom]    = useState<{ id: number; text: string } | null>(null);
+  const [editingCom,    setEditingCom]    = useState<{ id: string; text: string } | null>(null);
   const [comLoading,    setComLoading]    = useState(false);
   const [comSending,    setComSending]    = useState(false);
   // Fichier en attente pour le nouveau commentaire (joint avant envoi)
@@ -206,11 +226,32 @@ export default function TaskDetailModal({ task, columnName, members = [], onClos
       .finally(() => setComLoading(false));
   }, [task.id]);
 
+  // Rechargement déclenché par le bus d'événements DOM quand le WS reçoit
+  // comment_updated ou file_updated — même pattern que kanban:search dans Layout.
+  useEffect(() => {
+    const handler = () => {
+      authFetch(ROUTES_API.commentsByTask(task.id))
+        .then(r => r.ok ? r.json() : [])
+        .then((data: Comment[]) => setComments(data))
+        .catch(() => {});
+      authFetch(ROUTES_API.filesByTask(task.id))
+        .then(r => r.ok ? r.json() : [])
+        .then((data: FileAttachment[]) => {
+          setFiles(data);
+          data.filter((f: FileAttachment) => f.type?.startsWith("image/")).forEach(loadBlobUrl);
+        })
+        .catch(() => {});
+    };
+    window.addEventListener("kanban:modal-refresh", handler);
+    return () => window.removeEventListener("kanban:modal-refresh", handler);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [task.id]);
+
   const handleAddComment = async () => {
     if (!commentText.trim()) return;
     setComSending(true);
     try {
-      const res = await authFetch(ROUTES_API.comments, {
+      const res = await boardFetch(ROUTES_API.comments, {
         method: "POST",
         body: JSON.stringify({ content: commentText.trim(), tskId: task.id, usrId: user!.id }),
       });
@@ -226,7 +267,7 @@ export default function TaskDetailModal({ task, columnName, members = [], onClos
         form.append("tskId", String(task.id));
         form.append("usrId", String(user!.id));
         form.append("comId", String(created.id));
-        const fileRes = await authFetch(ROUTES_API.files, { method: "POST", body: form });
+        const fileRes = await boardFetch(ROUTES_API.files, { method: "POST", body: form });
         if (fileRes.ok) {
           const createdFile: FileAttachment = await fileRes.json();
           setFiles(prev => [...prev, createdFile]);
@@ -242,9 +283,9 @@ export default function TaskDetailModal({ task, columnName, members = [], onClos
     }
   };
 
-  const handleUpdateComment = async (id: number, content: string) => {
+  const handleUpdateComment = async (id: string, content: string) => {
     if (!content.trim()) return;
-    const res = await authFetch(ROUTES_API.comment(id), {
+    const res = await boardFetch(ROUTES_API.comment(id as unknown as number), {
       method: "PUT",
       body: JSON.stringify({ content: content.trim(), tskId: task.id, usrId: user!.id }),
     });
@@ -254,12 +295,12 @@ export default function TaskDetailModal({ task, columnName, members = [], onClos
     setEditingCom(null);
   };
 
-  const handleDeleteComment = async (id: number) => {
-    const res = await authFetch(ROUTES_API.comment(id), { method: "DELETE" });
-    if (res.ok) setComments(prev => prev.filter(c => c.id !== id));
+  const handleDeleteComment = async (id: string) => {
+    const res = await boardFetch(ROUTES_API.comment(id as unknown as number), { method: "DELETE" });
+    if (res.ok) setComments(prev => prev.filter(c => String(c.id) !== id));
   };
 
-  const askDeleteComment = (id: number, preview: string) =>
+  const askDeleteComment = (id: string, preview: string) =>
     setPendingConfirm({ kind: "comment", id: String(id), label: preview.length > 60 ? preview.slice(0, 60) + "…" : preview });
 
   /* Résolution créateur */
@@ -310,6 +351,26 @@ export default function TaskDetailModal({ task, columnName, members = [], onClos
     setError("");
   }, [task.id]);
 
+  /* Resynchronise les champs quand la même tâche est modifiée en temps réel
+     par un autre utilisateur (broadcast WS → fetchTasks → prop task mise à jour).
+     Utilise un ref pour saveStatus afin de ne pas déclencher de reconnexion WS
+     à chaque changement d'état de sauvegarde.
+     La mise à jour est ignorée si l'utilisateur est en train d'éditer
+     (saveStatus pending/saving) pour éviter d'écraser sa saisie en cours. */
+  const saveStatusRef = useRef(saveStatus);
+  useEffect(() => { saveStatusRef.current = saveStatus; }, [saveStatus]);
+
+  useEffect(() => {
+    if (saveStatusRef.current === "pending" || saveStatusRef.current === "saving") return;
+    setTitle(task.title);
+    setDetails(task.details ?? "");
+    setDueDate(task.dueDate ? task.dueDate.slice(0, 16) : "");
+    setPriority(task.priority);
+    setAssigneeId(task.assignedId ?? null);
+    setValidated(task.validated ?? false);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [task.title, task.details, task.dueDate, task.priority, task.assignedId, task.validated]);
+
   /* Fermer les dropdowns si clic à l'extérieur */
   useEffect(() => {
     const close = () => { setPriorityOpen(false); setAssigneeOpen(false); };
@@ -344,7 +405,7 @@ export default function TaskDetailModal({ task, columnName, members = [], onClos
         creatorId:     task.creatorId,
         validated:     val,
       };
-      const res = await authFetch(ROUTES_API.task(task.id), { method: "PUT", body: JSON.stringify(body) });
+      const res = await boardFetch(ROUTES_API.task(task.id), { method: "PUT", body: JSON.stringify(body) });
       if (!res.ok) throw new Error("Erreur lors de la sauvegarde.");
       const saved: Task = await res.json();
       onEdit(saved);
@@ -375,7 +436,7 @@ export default function TaskDetailModal({ task, columnName, members = [], onClos
       const url = newId != null
         ? `${ROUTES_API.taskAssign(task.id)}?userId=${newId}`
         : ROUTES_API.taskAssign(task.id);
-      const res = await authFetch(url, { method: "PATCH", body: "{}" });
+      const res = await boardFetch(url, { method: "PATCH", body: "{}" });
       if (!res.ok) throw new Error("Erreur lors de l'assignation.");
       const saved: Task = await res.json();
       if (!isClosing.current) {
@@ -428,7 +489,7 @@ export default function TaskDetailModal({ task, columnName, members = [], onClos
               >Annuler</button>
               <button
                 onClick={() => {
-                  if (pendingConfirm.kind === "comment") handleDeleteComment(Number(pendingConfirm.id));
+                  if (pendingConfirm.kind === "comment") handleDeleteComment(pendingConfirm.id);
                   else handleDeleteFile(pendingConfirm.id);
                   setPendingConfirm(null);
                 }}
@@ -574,7 +635,7 @@ export default function TaskDetailModal({ task, columnName, members = [], onClos
                               style={{ ...inputBase, fontSize: 13, lineHeight: 1.55, resize: "none", background: "rgba(255,255,255,0.05)", borderRadius: 8, padding: "6px 8px", border: "1px solid rgba(255,255,255,0.1)" }}
                             />
                             <div style={{ display: "flex", gap: 6 }}>
-                              <button onClick={() => handleUpdateComment(com.id, editingCom.text)} style={{ fontSize: 11, padding: "3px 10px", borderRadius: 6, border: "none", background: "rgba(176,166,255,0.18)", color: "#b0a6ff", cursor: "pointer", fontFamily: "inherit", fontWeight: 600 }}>Enregistrer</button>
+                              <button onClick={() => handleUpdateComment(String(com.id), editingCom.text)} style={{ fontSize: 11, padding: "3px 10px", borderRadius: 6, border: "none", background: "rgba(176,166,255,0.18)", color: "#b0a6ff", cursor: "pointer", fontFamily: "inherit", fontWeight: 600 }}>Enregistrer</button>
                               <button onClick={() => setEditingCom(null)} style={{ fontSize: 11, padding: "3px 10px", borderRadius: 6, border: "none", background: "rgba(255,255,255,0.06)", color: "#7a7288", cursor: "pointer", fontFamily: "inherit" }}>Annuler</button>
                             </div>
                           </div>
@@ -585,10 +646,10 @@ export default function TaskDetailModal({ task, columnName, members = [], onClos
                               {isOwn && canEdit && (
                                 <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
                                   <Tooltip text="Modifier" position="top">
-                                    <button onClick={() => setEditingCom({ id: com.id, text: com.content })} style={{ background: "none", border: "none", color: "#7a7288", cursor: "pointer", fontSize: 12, padding: "2px 5px", borderRadius: 5 }}>✎</button>
+                                    <button onClick={() => setEditingCom({ id: String(com.id), text: com.content })} style={{ background: "none", border: "none", color: "#7a7288", cursor: "pointer", fontSize: 12, padding: "2px 5px", borderRadius: 5 }}>✎</button>
                                   </Tooltip>
                                   <Tooltip text="Supprimer" position="top">
-                                    <button onClick={() => askDeleteComment(com.id, com.content)} style={{ background: "none", border: "none", color: "#7a7288", cursor: "pointer", fontSize: 12, padding: "2px 5px", borderRadius: 5 }}>✕</button>
+                                    <button onClick={() => askDeleteComment(String(com.id), com.content)} style={{ background: "none", border: "none", color: "#7a7288", cursor: "pointer", fontSize: 12, padding: "2px 5px", borderRadius: 5 }}>✕</button>
                                   </Tooltip>
                                 </div>
                               )}

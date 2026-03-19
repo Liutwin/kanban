@@ -8,7 +8,7 @@ import { broadcast } from "../services/board-ws.ts";
 import type { BoardAction } from "../model/websockets.ts";
 
 /** URL de base du serveur Tomcat (backend Spring Boot). */
-const TOMCAT_URL = "http://localhost:8081";
+const TOMCAT_URL = Deno.env.get("SPRING_URL") ?? "http://spring:8080";
 
 const router = new Router({ prefix: "/api/v1" });
 
@@ -172,6 +172,8 @@ router.all("/(.*)", authMiddleware, async (ctx: AuthContext) => {
     const boardId = extractBoardId(ctx, path);
     const action  = detectAction(path, method);
 
+    console.log(`[DEBUG] method=${method} path=${path} status=${status} boardId=${boardId} action=${action}`);
+
     if (boardId && action) {
       broadcast(boardId, {
         type: "board_update",
@@ -214,10 +216,12 @@ function extractBoardId(ctx: AuthContext, path: string): number | null {
  * @returns Le type d'action pour le broadcast WebSocket, ou `null` si non pertinent.
  */
 function detectAction(path: string, method: string): BoardAction | null {
-  const isTasks   = /\/tasks/.test(path);
-  const isCols    = /\/columns/.test(path);
-  const isMembers = /\/members/.test(path);
-  const isMove    = /\/move/.test(path);
+  const isTasks    = /\/tasks/.test(path);
+  const isCols     = /\/columns/.test(path);
+  const isMembers  = /\/members/.test(path);
+  const isComments = /\/comments/.test(path);
+  const isFiles    = /\/files/.test(path);
+  const isMove     = /\/move/.test(path);
 
   if (isTasks) {
     if (isMove)              return "task_moved";
@@ -231,7 +235,9 @@ function detectAction(path: string, method: string): BoardAction | null {
     if (method === "DELETE") return "column_deleted";
     return "column_updated";
   }
-  if (isMembers) return "member_updated";
+  if (isMembers)  return "member_updated";
+  if (isComments) return "comment_updated";
+  if (isFiles)    return "file_updated";
   return null;
 }
 

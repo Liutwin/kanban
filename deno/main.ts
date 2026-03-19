@@ -9,9 +9,9 @@ import wsRouter from "./routes/websockets.ts";
 
 // Configuration réseau
 const PROTOCOL = "http";
-const PORT     = 8080;
+const PORT     = Number(Deno.env.get("PORT") ?? 8080);
 const HOSTNAME = Deno.env.get("HOST") ?? "0.0.0.0"
-const ADDRESS = `${PROTOCOL}://${HOSTNAME}:${PORT}`;
+const ADDRESS  = `${PROTOCOL}://${HOSTNAME}:${PORT}`;
 
 const app = new Application();
 

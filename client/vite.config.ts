@@ -6,7 +6,7 @@ export default defineConfig({
   server: {
     host: true,
     port: 3000,
-    allowedHosts: ["localhost", "info-m24-012", "liutwin-pc"],
+    allowedHosts: ["localhost", "info-m24-012", "liutwin-pc","23hp041"],
     proxy: {
       "/api/v1/auth": "http://localhost:8080",
       "/api/v1":      "http://localhost:8080",
