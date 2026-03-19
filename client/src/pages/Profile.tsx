@@ -506,6 +506,7 @@ export default function Profile() {
                     />
                     <button
                       type="button"
+                      tabIndex={-1}
                       onClick={() => setShowPwd(s => ({ ...s, [key]: !s[key] }))}
                       style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", color: "var(--text-3)", fontSize: 14, padding: 4, lineHeight: 1 }}
                       aria-label={visible ? "Masquer" : "Afficher"}

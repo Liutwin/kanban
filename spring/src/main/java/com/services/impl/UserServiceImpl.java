@@ -92,7 +92,10 @@ public class UserServiceImpl implements UserService {
     /** {@inheritDoc} */
     @Override
     public UserDTO getUserById(Long id, Long requesterId) {
-        requireSelfOrAdmin(id, requesterId);
+        // Tout utilisateur authentifié peut lire le profil basique d'un autre
+        // (prénom, nom, avatar) — nécessaire pour afficher les membres d'un tableau.
+        userRepository.findById(requesterId)
+                .orElseThrow(() -> new RuntimeException("Requester introuvable : " + requesterId));
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Utilisateur introuvable : " + id));
         return userMapper.toDTO(user);
@@ -223,5 +226,21 @@ public class UserServiceImpl implements UserService {
         } catch (MalformedURLException e) {
             throw new RuntimeException("Chemin avatar invalide : " + user.getAvatarURL(), e);
         }
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public void resetPassword(String email, String hashedPassword, String tempPassword) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("Utilisateur introuvable : " + email));
+        user.setPassword(hashedPassword);
+        userRepository.save(user);
+        mailService.sendPasswordResetConfirm(user.getEmail(), user.getFirstName(), tempPassword);
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public void sendResetEmail(String email, String firstName, String resetLink) {
+        mailService.sendPasswordResetRequest(email, firstName, resetLink);
     }
 }

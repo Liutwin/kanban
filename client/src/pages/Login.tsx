@@ -137,6 +137,16 @@ export default function Login() {
               onChange={e => setMdp(e.target.value)}
               autoComplete="current-password"
             />
+            <div style={{ textAlign: "right", marginTop: "2px" }}>
+              <Link
+                to="/forgot-password"
+                style={{ fontSize: "12px", color: "#7a7288", textDecoration: "none" }}
+                onMouseOver={e => (e.currentTarget.style.color = "#b0a6ff")}
+                onMouseOut={e  => (e.currentTarget.style.color = "#7a7288")}
+              >
+                Mot de passe oublié ?
+              </Link>
+            </div>
           </div>
 
           <button type="submit" className="btn btn-primary auth-submit" disabled={loading}>

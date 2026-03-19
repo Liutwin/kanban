@@ -487,4 +487,186 @@ public class MailServiceImpl implements MailService {
                 </html>
                 """.formatted(firstName, commenterName, taskTitle, boardName, preview, baseUrl);
     }
+
+    // ─────────────────────────────────────────────────────────────
+    // Étape 1 : envoi du lien de confirmation
+    // ─────────────────────────────────────────────────────────────
+
+    @Async
+    @Override
+    public void sendPasswordResetRequest(String toEmail, String firstName, String resetLink) {
+        try {
+            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+
+            helper.setFrom(fromAddress);
+            helper.setTo(toEmail);
+            helper.setSubject("Réinitialisation de votre mot de passe");
+            helper.setText(buildPasswordResetRequestHtml(firstName, resetLink), true);
+
+            mailSender.send(message);
+            log.info("[Mail] Lien de réinitialisation envoyé à {}", toEmail);
+
+        } catch (MessagingException e) {
+            log.error("[Mail] Échec d'envoi du lien de reset à {} : {}", toEmail, e.getMessage());
+        }
+    }
+
+    private String buildPasswordResetRequestHtml(String firstName, String resetLink) {
+        return """
+                <!DOCTYPE html>
+                <html lang="fr">
+                <head><meta charset="UTF-8"/>
+                  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+                </head>
+                <body style="margin:0;padding:0;background:#f4f4f5;font-family:'Segoe UI',Arial,sans-serif;">
+                  <table width="100%%" cellpadding="0" cellspacing="0" style="background:#f4f4f5;padding:40px 0;">
+                    <tr><td align="center">
+                      <table width="560" cellpadding="0" cellspacing="0"
+                             style="background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.08);">
+                        <tr>
+                          <td style="background:#1c1b1f;padding:28px 36px;text-align:center;">
+                            <span style="font-family:'DM Mono',monospace;font-size:13px;font-weight:600;
+                                         letter-spacing:0.12em;color:#e8e0f0;text-transform:uppercase;">
+                              ▦ KANBAN
+                            </span>
+                          </td>
+                        </tr>
+                        <tr>
+                          <td style="padding:36px 36px 28px;">
+                            <p style="margin:0 0 8px;font-size:22px;font-weight:600;color:#1c1b1f;">
+                              Bonjour %s&nbsp;🔑
+                            </p>
+                            <p style="margin:0 0 24px;font-size:15px;color:#555;line-height:1.6;">
+                              Vous avez demandé la réinitialisation de votre mot de passe.
+                              Cliquez sur le bouton ci-dessous pour confirmer.
+                              Ce lien est valable <strong>15 minutes</strong>.
+                            </p>
+                            <table cellpadding="0" cellspacing="0" style="margin:0 0 28px;">
+                              <tr>
+                                <td style="background:#b0a6ff;border-radius:8px;">
+                                  <a href="%s"
+                                     style="display:inline-block;padding:12px 28px;font-size:14px;
+                                            font-weight:600;color:#1c1b1f;text-decoration:none;">
+                                    Réinitialiser mon mot de passe →
+                                  </a>
+                                </td>
+                              </tr>
+                            </table>
+                            <p style="margin:0;font-size:13px;color:#888;line-height:1.5;">
+                              Si vous n'êtes pas à l'origine de cette demande, ignorez cet e-mail —
+                              votre mot de passe reste inchangé.
+                            </p>
+                          </td>
+                        </tr>
+                        <tr>
+                          <td style="background:#f4f4f5;padding:16px 36px;text-align:center;
+                                     border-top:1px solid #e8e8e8;">
+                            <p style="margin:0;font-size:11px;color:#aaa;">
+                              Cet e-mail a été envoyé automatiquement — merci de ne pas y répondre.
+                            </p>
+                          </td>
+                        </tr>
+                      </table>
+                    </td></tr>
+                  </table>
+                </body>
+                </html>
+                """.formatted(firstName, resetLink);
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // Étape 2 : envoi du mot de passe temporaire
+    // ─────────────────────────────────────────────────────────────
+
+    @Async
+    @Override
+    public void sendPasswordResetConfirm(String toEmail, String firstName, String tempPassword) {
+        try {
+            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+
+            helper.setFrom(fromAddress);
+            helper.setTo(toEmail);
+            helper.setSubject("Votre nouveau mot de passe temporaire");
+            helper.setText(buildPasswordResetConfirmHtml(firstName, tempPassword), true);
+
+            mailSender.send(message);
+            log.info("[Mail] Mot de passe temporaire envoyé à {}", toEmail);
+
+        } catch (MessagingException e) {
+            log.error("[Mail] Échec d'envoi du mdp temporaire à {} : {}", toEmail, e.getMessage());
+        }
+    }
+
+    private String buildPasswordResetConfirmHtml(String firstName, String tempPassword) {
+        return """
+                <!DOCTYPE html>
+                <html lang="fr">
+                <head><meta charset="UTF-8"/>
+                  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+                </head>
+                <body style="margin:0;padding:0;background:#f4f4f5;font-family:'Segoe UI',Arial,sans-serif;">
+                  <table width="100%%" cellpadding="0" cellspacing="0" style="background:#f4f4f5;padding:40px 0;">
+                    <tr><td align="center">
+                      <table width="560" cellpadding="0" cellspacing="0"
+                             style="background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.08);">
+                        <tr>
+                          <td style="background:#1c1b1f;padding:28px 36px;text-align:center;">
+                            <span style="font-family:'DM Mono',monospace;font-size:13px;font-weight:600;
+                                         letter-spacing:0.12em;color:#e8e0f0;text-transform:uppercase;">
+                              ▦ KANBAN
+                            </span>
+                          </td>
+                        </tr>
+                        <tr>
+                          <td style="padding:36px 36px 28px;">
+                            <p style="margin:0 0 8px;font-size:22px;font-weight:600;color:#1c1b1f;">
+                              Bonjour %s&nbsp;✅
+                            </p>
+                            <p style="margin:0 0 24px;font-size:15px;color:#555;line-height:1.6;">
+                              Votre mot de passe a bien été réinitialisé.
+                              Voici votre mot de passe temporaire :
+                            </p>
+                            <table cellpadding="0" cellspacing="0" width="100%%" style="margin:0 0 24px;">
+                              <tr>
+                                <td style="background:#f8f7ff;border-left:4px solid #b0a6ff;
+                                           border-radius:0 8px 8px 0;padding:14px 18px;">
+                                  <p style="margin:0;font-size:20px;font-weight:700;color:#1c1b1f;
+                                            font-family:'DM Mono',monospace;letter-spacing:0.1em;">%s</p>
+                                </td>
+                              </tr>
+                            </table>
+                            <p style="margin:0 0 24px;font-size:14px;color:#888;line-height:1.5;">
+                              Connectez-vous avec ce mot de passe temporaire puis changez-le
+                              immédiatement depuis vos paramètres de compte.
+                            </p>
+                            <table cellpadding="0" cellspacing="0" style="margin:0 0 28px;">
+                              <tr>
+                                <td style="background:#b0a6ff;border-radius:8px;">
+                                  <a href="%s"
+                                     style="display:inline-block;padding:12px 28px;font-size:14px;
+                                            font-weight:600;color:#1c1b1f;text-decoration:none;">
+                                    Se connecter →
+                                  </a>
+                                </td>
+                              </tr>
+                            </table>
+                          </td>
+                        </tr>
+                        <tr>
+                          <td style="background:#f4f4f5;padding:16px 36px;text-align:center;
+                                     border-top:1px solid #e8e8e8;">
+                            <p style="margin:0;font-size:11px;color:#aaa;">
+                              Cet e-mail a été envoyé automatiquement — merci de ne pas y répondre.
+                            </p>
+                          </td>
+                        </tr>
+                      </table>
+                    </td></tr>
+                  </table>
+                </body>
+                </html>
+                """.formatted(firstName, tempPassword, baseUrl);
+    }
 }

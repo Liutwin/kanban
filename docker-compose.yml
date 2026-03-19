@@ -2,7 +2,7 @@
 # docker-compose.yml – Kanban SI-SOR 2026
 #
 # 3 services construits localement :
-#   nginx   → point d'entrée unique (80/443), sert React, proxy vers Deno
+#   nginx   → point d'entrée unique (8080/8443), sert React, proxy vers Deno
 #   deno    → auth JWT + proxy vers Spring (interne uniquement)
 #   spring  → API REST métier (interne uniquement)
 #
@@ -18,7 +18,7 @@ services:
       context: ./client          # dossier contenant le Dockerfile React
     container_name: kanban-nginx
     ports:
-      - "8080:8080"              # HTTP  → redirigé vers HTTPS
+      - "8080:8080"              # HTTP  → redirigé vers HTTPS par nginx
       - "8443:8443"              # HTTPS → point d'entrée principal
     depends_on:
       - deno
@@ -38,6 +38,7 @@ services:
       PORT: "8080"
       # URL interne vers Spring (nom du service Docker Compose)
       SPRING_URL: "http://spring:8081"
+      APP_BASE_URL: "http://localhost:8443"
       # Connexion MariaDB externe
       DB_HOST: "${DB_HOST}"
       DB_PORT: "${DB_PORT}"

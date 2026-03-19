@@ -30,11 +30,11 @@ COPY nginx.conf /etc/nginx/nginx.conf
 # Copie les fichiers statiques du build React
 COPY --from=builder /app/dist /usr/share/nginx/html
 
-# Copie les certificats SSL (générés à l'avance, voir README)
-#COPY certs/cert.pem /etc/nginx/ssl/cert.pem
-#COPY certs/key.pem  /etc/nginx/ssl/key.pem
+# Copie les certificats SSL
+COPY certs/cert.pem /etc/nginx/ssl/cert.pem
+COPY certs/key.pem  /etc/nginx/ssl/key.pem
 
-# nginx écoute sur 80 (HTTP) et 443 (HTTPS)
-EXPOSE 80 443
+# nginx écoute sur 8080 (HTTP→HTTPS) et 8443 (HTTPS)
+EXPOSE 8080 8443
 
 CMD ["nginx", "-g", "daemon off;"]

@@ -174,4 +174,44 @@ public class UserController {
                 .contentType(mediaType)
                 .body(resource);
     }
+
+    /**
+     * Réinitialise le mot de passe d'un utilisateur (étape 2 du flux "mot de passe oublié").
+     *
+     * <p>Appelé exclusivement par le proxy Deno après validation du token de reset.
+     * Aucun {@code X-User-Id} requis : l'utilisateur n'est pas encore authentifié.</p>
+     *
+     * @param body contient {@code email}, {@code hashedPassword} et {@code tempPassword}
+     * @return statut HTTP 204 sans contenu
+     */
+    @Operation(summary = "Réinitialiser le mot de passe (appelé par Deno après validation du token)")
+    @PostMapping("/reset-password")
+    public ResponseEntity<Void> resetPassword(@RequestBody java.util.Map<String, String> body) {
+        userService.resetPassword(
+                body.get("email"),
+                body.get("hashedPassword"),
+                body.get("tempPassword")
+        );
+        return ResponseEntity.noContent().build();
+    }
+
+    /**
+     * Envoie le mail de demande de réinitialisation (étape 1).
+     *
+     * <p>Appelé exclusivement par Deno après insertion du token en base.
+     * Ne modifie pas le mot de passe — se contente d'envoyer le mail.</p>
+     *
+     * @param body contient {@code email}, {@code firstName} et {@code resetLink}
+     * @return statut HTTP 204 sans contenu
+     */
+    @Operation(summary = "Envoyer le mail de demande de réinitialisation (appelé par Deno)")
+    @PostMapping("/send-reset-email")
+    public ResponseEntity<Void> sendResetEmail(@RequestBody java.util.Map<String, String> body) {
+        userService.sendResetEmail(
+                body.get("email"),
+                body.get("firstName"),
+                body.get("resetLink")
+        );
+        return ResponseEntity.noContent().build();
+    }
 }

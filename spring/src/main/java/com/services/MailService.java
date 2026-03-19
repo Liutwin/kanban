@@ -7,23 +7,8 @@ import com.entities.BoardMember;
  */
 public interface MailService {
 
-    /**
-     * Envoie un e-mail de bienvenue à un nouvel utilisateur après son inscription.
-     *
-     * @param toEmail     adresse de l'utilisateur inscrit
-     * @param firstName   prénom de l'utilisateur
-     */
     void sendWelcome(String toEmail, String firstName);
 
-    /**
-     * Notifie un utilisateur qu'il vient d'être ajouté à un tableau Kanban.
-     *
-     * @param toEmail       adresse de l'utilisateur invité
-     * @param toFirstName   prénom de l'utilisateur invité
-     * @param boardName     nom du tableau
-     * @param inviterName   nom complet de la personne qui a fait l'invitation
-     * @param role          rôle attribué dans le tableau
-     */
     void sendBoardInvitation(
             String toEmail,
             String toFirstName,
@@ -32,15 +17,6 @@ public interface MailService {
             BoardMember.Role role
     );
 
-    /**
-     * Notifie un utilisateur qu'une tâche vient de lui être assignée.
-     *
-     * @param toEmail       adresse de l'utilisateur assigné
-     * @param toFirstName   prénom de l'utilisateur assigné
-     * @param taskTitle     titre de la tâche
-     * @param boardName     nom du tableau contenant la tâche
-     * @param assignerName  nom complet de la personne qui a effectué l'assignation
-     */
     void sendTaskAssigned(
             String toEmail,
             String toFirstName,
@@ -49,16 +25,6 @@ public interface MailService {
             String assignerName
     );
 
-    /**
-     * Notifie l'assigné·e d'une tâche qu'un nouveau commentaire y a été posté.
-     *
-     * @param toEmail         adresse de l'utilisateur assigné
-     * @param toFirstName     prénom de l'utilisateur assigné
-     * @param taskTitle       titre de la tâche commentée
-     * @param boardName       nom du tableau contenant la tâche
-     * @param commenterName   nom complet de l'auteur du commentaire
-     * @param commentPreview  extrait du commentaire (tronqué si nécessaire)
-     */
     void sendTaskCommented(
             String toEmail,
             String toFirstName,
@@ -67,4 +33,23 @@ public interface MailService {
             String commenterName,
             String commentPreview
     );
+
+    /**
+     * Envoie le lien de confirmation de réinitialisation (étape 1).
+     * Le mot de passe n'est pas encore modifié à ce stade.
+     *
+     * @param toEmail    adresse de l'utilisateur
+     * @param firstName  prénom de l'utilisateur
+     * @param resetLink  lien complet (baseUrl/reset-password?token=...)
+     */
+    void sendPasswordResetRequest(String toEmail, String firstName, String resetLink);
+
+    /**
+     * Envoie le mot de passe temporaire après confirmation du token (étape 2).
+     *
+     * @param toEmail      adresse de l'utilisateur
+     * @param firstName    prénom de l'utilisateur
+     * @param tempPassword mot de passe temporaire en clair
+     */
+    void sendPasswordResetConfirm(String toEmail, String firstName, String tempPassword);
 }

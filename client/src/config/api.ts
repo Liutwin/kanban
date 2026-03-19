@@ -8,9 +8,11 @@ const AUTH = API_CONFIG.AUTH_PREFIX;
 
 // Routes pour l'authentification (serveur Deno)
 export const ROUTES_AUTH = {
-  login:    `${AUTH}/login`,
-  validate: `${AUTH}/validate`,
-  logout:   `${AUTH}/logout`,
+  login:              `${AUTH}/login`,
+  validate:           `${AUTH}/validate`,
+  logout:             `${AUTH}/logout`,
+  resetPassword:      `${AUTH}/reset-password`,
+  resetPasswordConfirm: `${AUTH}/reset-password/confirm`,
 } as const;
 
 // Routes pour le restant de l'API (côté Spring, en passant par le proxy Deno)
@@ -40,17 +42,12 @@ export const ROUTES_API = {
   // ── Board members ─────────────────────────────────────────────────────────
   boardMembers:       (id: number)                    => `${BASE}/boards/${id}/members`,
   boardMember:        (boardId: number, userId: number) => `${BASE}/boards/${boardId}/members/${userId}`,
-  /** Invitations en attente d'un tableau (admin du tableau). */
   boardPendingInvitations: (boardId: number) => `${BASE}/boards/${boardId}/members/pending`,
 
   // ── Invitations ───────────────────────────────────────────────────────────
-  /** Retourne les invitations en attente de l'utilisateur connecté. */
   myPendingInvitations:  `${BASE}/boards/invitations/me`,
-  /** Accepter sa propre invitation à un tableau. */
   acceptInvitation:   (boardId: number) => `${BASE}/boards/${boardId}/members/me/accept`,
-  /** Refuser sa propre invitation à un tableau. */
   declineInvitation:  (boardId: number) => `${BASE}/boards/${boardId}/members/me/decline`,
-  /** Valider manuellement l'invitation d'un membre (admin). */
   validateInvitation: (boardId: number, userId: number) => `${BASE}/boards/${boardId}/members/${userId}/validate`,
 
   // ── Columns ───────────────────────────────────────────────────────────────

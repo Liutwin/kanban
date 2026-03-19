@@ -1,8 +1,10 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { PublicRoute } from "./components/PublicRoute";
-import Login       from "./pages/Login";
-import Register    from "./pages/Register";
+import Login           from "./pages/Login";
+import Register        from "./pages/Register";
+import ForgotPassword  from "./pages/ForgotPassword";
+import ResetPassword   from "./pages/ResetPassword";
 import Boards      from "./pages/Boards";
 import Dashboard   from "./pages/Dashboard";
 import LogsUsers   from "./pages/LogsUsers";
@@ -20,6 +22,12 @@ export default function App() {
         } />
         <Route path="/register" element={
           <PublicRoute><Register /></PublicRoute>
+        } />
+        <Route path="/forgot-password" element={
+          <PublicRoute><ForgotPassword /></PublicRoute>
+        } />
+        <Route path="/reset-password" element={
+          <PublicRoute><ResetPassword /></PublicRoute>
         } />
         <Route path="/boards" element={
           <ProtectedRoute><Boards /></ProtectedRoute>
