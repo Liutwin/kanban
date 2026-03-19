@@ -41,9 +41,13 @@ router.get("/boards/:boardId", async (ctx) => {
   // ── Upgrade HTTP → WebSocket ──────────────────────────────────────────────
   // À partir d'ici, la réponse HTTP est engagée : toute erreur doit être
   // gérée directement sur l'objet `ws`, pas via des exceptions Oak.
+  // Le token est renvoyé comme protocole sélectionné (requis par RFC 6455
+  // lorsque le client en propose un).
   const ws: WebSocket = ctx.upgrade(token ? { protocol: token } : undefined);
 
-  ws.onopen  = () => { subscribe(ws, boardId); };
+  // payload.id est l'userId extrait du JWT — transmis à subscribe pour
+  // alimenter la liste de présence diffusée à tous les clients du tableau.
+  ws.onopen  = () => { subscribe(ws, boardId, payload.id); };
   ws.onclose = () => { unsubscribe(ws, boardId); };
   ws.onerror = () => { unsubscribe(ws, boardId); };
 

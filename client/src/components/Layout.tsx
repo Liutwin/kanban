@@ -35,6 +35,8 @@ interface LayoutProps {
   boardRole?: "admin" | "editeur" | "lecteur";
   /** Identifiant du créateur du tableau (protège son compte dans MembersPanel). */
   boardCreatorId?: number;
+  /** IDs des membres actuellement connectés au tableau (WebSocket presence). */
+  onlineUserIds?: number[];
 }
 
 /**
@@ -52,7 +54,7 @@ interface LayoutProps {
  */
 interface AvatarInfo { userId: number; firstName: string; lastName: string; email: string; role: "admin" | "editeur" | "lecteur"; avatar?: string; }
 
-export default function Layout({ children, title, boardId, boardRole, boardCreatorId }: LayoutProps) {
+export default function Layout({ children, title, boardId, boardRole, boardCreatorId, onlineUserIds = [] }: LayoutProps) {
   const { user, logout, authFetch } = useAuth();
   const navigate  = useNavigate();
   const location  = useLocation();
@@ -510,6 +512,7 @@ export default function Layout({ children, title, boardId, boardRole, boardCreat
                   {avatarMembers.map((m, i) => {
                     const c = getAvatarStyle(m.userId);
                     const total = avatarMembers.length;
+                    const isOnline = onlineUserIds.includes(m.userId);
                     return (
                       <div key={m.userId} className="avatar-wrapper" style={{
                         marginRight: i < total - 1 ? -6 : 0,
@@ -558,6 +561,15 @@ export default function Layout({ children, title, boardId, boardRole, boardCreat
                             width: 9, height: 9, borderRadius: "50%",
                             background: "#b0c8ff", border: "2px solid var(--surface)",
                             pointerEvents: "none", zIndex: 1,
+                          }} />
+                        )}
+                        {/* Point vert de présence — visible si connecté au tableau */}
+                        {isOnline && (
+                          <span style={{
+                            position: "absolute", bottom: 0, right: 0,
+                            width: 9, height: 9, borderRadius: "50%",
+                            background: "#4ade80", border: "2px solid var(--surface)",
+                            pointerEvents: "none", zIndex: 2,
                           }} />
                         )}
                       </div>

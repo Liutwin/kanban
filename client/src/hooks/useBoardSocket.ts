@@ -6,7 +6,8 @@ const WS_BASE = `${window.location.protocol === "https:" ? "wss" : "ws"}://${win
 
 /**
  * Hook qui ouvre un WebSocket sur le canal d'un tableau
- * et appelle `onUpdate` à chaque message de type `board_update`.
+ * et appelle `onUpdate` à chaque message de type `board_update`,
+ * et `onPresence` à chaque message de type `presence_update`.
  *
  * Calqué sur `useVoteSocket` du TP 4 :
  * - instanciation du WS au montage du composant (useEffect)
@@ -16,30 +17,37 @@ const WS_BASE = `${window.location.protocol === "https:" ? "wss" : "ws"}://${win
  * Authentification : le token JWT est passé via `Sec-WebSocket-Protocol`,
  * seul header que le navigateur autorise lors d'un handshake WebSocket.
  *
- * Stabilité : `onUpdate` est stocké dans un ref mis à jour à chaque render.
- * Le `useEffect` qui gère la connexion ne dépend donc que de `boardId` —
- * toute évolution de `onUpdate` (nouvelle closure, nouveau useCallback)
- * ne provoque pas de reconnexion.
+ * Stabilité : `onUpdate` et `onPresence` sont stockés dans des refs mis à
+ * jour à chaque render. Le `useEffect` qui gère la connexion ne dépend donc
+ * que de `boardId` — toute évolution des callbacks ne provoque pas de
+ * reconnexion.
  */
 export function useBoardSocket(
   boardId: number | undefined,
   {
     onUpdate,
     currentUserId,
+    onPresence,
   }: {
     onUpdate: (msg: BoardUpdateMessage) => void;
-    /** Si fourni, les messages émis par cet utilisateur sont ignorés
-     *  (l'UI optimiste les a déjà appliqués). */
+    /** Si fourni, les messages board_update émis par cet utilisateur sont
+     *  ignorés (l'UI optimiste les a déjà appliqués). */
     currentUserId?: number;
+    /** Appelé à chaque changement de présence avec la liste des userId
+     *  actuellement connectés au tableau. */
+    onPresence?: (onlineUserIds: number[]) => void;
   }
 ) {
-  const socketRef   = useRef<WebSocket | null>(null);
+  const socketRef = useRef<WebSocket | null>(null);
 
-  // Ref vers le callback courant : toujours à jour sans être une dépendance
-  // du useEffect de connexion. Évite de reconnecter le WS à chaque render
-  // du composant parent qui recrée handleBoardUpdate.
-  const onUpdateRef = useRef(onUpdate);
+  // Refs vers les callbacks courants : toujours à jour sans être des
+  // dépendances du useEffect de connexion. Évite de reconnecter le WS
+  // à chaque render du composant parent.
+  const onUpdateRef   = useRef(onUpdate);
   useEffect(() => { onUpdateRef.current = onUpdate; }, [onUpdate]);
+
+  const onPresenceRef = useRef(onPresence);
+  useEffect(() => { onPresenceRef.current = onPresence; }, [onPresence]);
 
   const currentUserIdRef = useRef(currentUserId);
   useEffect(() => { currentUserIdRef.current = currentUserId; }, [currentUserId]);
@@ -61,14 +69,24 @@ export function useBoardSocket(
 
     ws.onmessage = (e) => {
       try {
-        const msg: BoardUpdateMessage = JSON.parse(e.data);
+        const msg = JSON.parse(e.data);
+
+        if (msg.type === "presence_update") {
+          onPresenceRef.current?.(msg.onlineUserIds as number[]);
+          return;
+        }
+
         if (msg.type !== "board_update") return;
 
         // Ignorer les mises à jour que cet utilisateur a lui-même déclenchées
         // (l'UI optimiste les a déjà appliquées localement)
-        if (currentUserIdRef.current && msg.originUserId === currentUserIdRef.current) return;
+        if (
+          currentUserIdRef.current &&
+          msg.originUserId === currentUserIdRef.current
+        )
+          return;
 
-        onUpdateRef.current(msg);
+        onUpdateRef.current(msg as BoardUpdateMessage);
       } catch {
         // message mal formé — on ignore
       }

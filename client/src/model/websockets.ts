@@ -21,3 +21,14 @@ export interface BoardUpdateMessage {
   /** Identifiant de l'utilisateur à l'origine de la modification */
   originUserId?: number;
 }
+
+/**
+ * Message diffusé à chaque connexion/déconnexion WebSocket.
+ * Contient la liste complète des utilisateurs actuellement connectés au tableau.
+ */
+export interface PresenceUpdateMessage {
+  type: "presence_update";
+  boardId: number;
+  /** IDs des utilisateurs actuellement connectés à ce tableau */
+  onlineUserIds: number[];
+}

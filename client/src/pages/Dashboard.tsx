@@ -158,6 +158,9 @@ export default function Dashboard() {
   const [editingPosTaskId, setEditingPosTaskId] = useState<number | null>(null);
   const [posDraft,         setPosDraft]         = useState("");
 
+  // Présence temps réel : userId des membres actuellement connectés au tableau
+  const [onlineUserIds, setOnlineUserIds] = useState<number[]>([]);
+
   /* ── Chargement ──────────────────────────────────────────── */
 
   const fetchBoard = async (signal?: AbortSignal) => {
@@ -723,12 +726,13 @@ export default function Dashboard() {
   useBoardSocket(boardId, {
     onUpdate: handleBoardUpdate,
     currentUserId: user?.id,
+    onPresence: useCallback((ids: number[]) => setOnlineUserIds(ids), []),
   });
 
   /* ── Rendu ───────────────────────────────────────────────── */
 
   return (
-    <Layout title={boardName || "Tableau"} boardId={boardId} boardRole={currentRole} boardCreatorId={board_creatorId ?? undefined}>
+    <Layout title={boardName || "Tableau"} boardId={boardId} boardRole={currentRole} boardCreatorId={board_creatorId ?? undefined} onlineUserIds={onlineUserIds}>
       <div className="dashboard-page">
         <button className="back-btn" onClick={() => navigate("/boards")}>
           ← Retour aux tableaux
