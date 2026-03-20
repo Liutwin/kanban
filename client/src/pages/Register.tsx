@@ -42,6 +42,21 @@ export default function Register() {
   const [password2, setPassword2] = useState("");
   /** Message d'erreur à afficher dans le formulaire, vide si aucune erreur. */
   const [error, setError]         = useState("");
+
+  /** Indicateur visuel de force du mot de passe (0–3). */
+  const pwdStrength = (() => {
+    const p = password;
+    if (!p) return 0;
+    let score = 0;
+    if (p.length >= 8)                        score++;
+    if (/[A-Z]/.test(p) && /[a-z]/.test(p))  score++;
+    if (/[0-9]/.test(p))                      score++;
+    if (/[^A-Za-z0-9]/.test(p))               score++;
+    return Math.min(score, 3) as 0 | 1 | 2 | 3;
+  })();
+
+  const pwdStrengthLabel = ["", "Faible", "Moyen", "Fort"][pwdStrength];
+  const pwdStrengthColor = ["", "#f28b82", "#fdd663", "#81c995"][pwdStrength];
   /** Indique si une requête de création de compte est en cours (désactive le bouton submit). */
   const [loading, setLoading]     = useState(false);
 
@@ -203,6 +218,14 @@ export default function Register() {
               autoComplete="new-password"
               required
             />
+            {password && (
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 6 }}>
+                <div style={{ flex: 1, height: 3, borderRadius: 99, background: "var(--surface3, #2a2833)", overflow: "hidden" }}>
+                  <div style={{ height: "100%", width: `${(pwdStrength / 3) * 100}%`, background: pwdStrengthColor, borderRadius: 99, transition: "width 0.3s ease, background 0.3s ease" }} />
+                </div>
+                <span style={{ fontSize: 11, color: pwdStrengthColor, fontWeight: 600, minWidth: 36 }}>{pwdStrengthLabel}</span>
+              </div>
+            )}
           </div>
 
           <div className="form-group">
