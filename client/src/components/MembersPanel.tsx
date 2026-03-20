@@ -162,7 +162,9 @@ export default function MembersPanel({ boardId, currentUserId, currentRole, boar
   // ── Tous les utilisateurs pour l'autocomplétion ────────────
   useEffect(() => {
     if (!isAdmin) return;
-    authFetch(ROUTES_API.users)
+    // ROUTES_API.userProfiles est accessible à tous les membres authentifiés,
+    // contrairement à ROUTES_API.users qui est réservé aux admins globaux.
+    authFetch(ROUTES_API.userProfiles)
       .then(r => r.ok ? r.json() : null)
       .then(json => { if (json) setAllUsers(unwrap<User[]>(json)); })
       .catch(() => {});
