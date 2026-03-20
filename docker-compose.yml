@@ -61,6 +61,7 @@ services:
       - "8081"
     environment:
       SPRING_PROFILES_ACTIVE: "prod"
+      APP_BASE_URL: "http://localhost:8443"
       # Connexion MariaDB externe
       SPRING_DATASOURCE_URL: "${DB_MARIA_URL}"
       SPRING_DATASOURCE_USERNAME: "${DB_MARIA_USER}"
@@ -68,8 +69,8 @@ services:
       # Connexion MongoDB externe
       SPRING_DATA_MONGODB_URI: "${DB_MONGO_URL}"
       # Config mail
-      SPRING_MAIL_HOST: "${MAIL_HOST}"
-      SPRING_MAIL_PORT: "${MAIL_PORT}"
+      MAIL_HOST: "${MAIL_HOST}"
+      MAIL_PORT: "${MAIL_PORT}"
       MAIL_USERNAME: "${MAIL_USERNAME}"
       MAIL_PASSWORD: "${MAIL_PASSWORD}"
       # Dossier des uploads (doit correspondre au volume ci-dessous)

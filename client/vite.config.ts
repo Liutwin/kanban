@@ -8,10 +8,10 @@ export default defineConfig({
     port: 3000,
     allowedHosts: ["localhost", "info-m24-012", "liutwin-pc","23hp041"],
     proxy: {
-      "/api/v1/auth": "http://localhost:8080",
-      "/api/v1":      "http://localhost:8080",
+      "/api/v1/auth": "http://localhost:8000",
+      "/api/v1":      "http://localhost:8000",
       "/ws": {
-        target: "ws://localhost:8080",
+        target: "ws://localhost:8000",
         ws: true,
       },
     },
