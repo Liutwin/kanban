@@ -98,10 +98,10 @@ jobs:
             DB_PASSWORD=${{ secrets.DB_PASSWORD }}
             DB_ROOT_PASSWORD=${{ secrets.DB_ROOT_PASSWORD }}
             JWT_SECRET=${{ secrets.JWT_SECRET }}
-            MAIL_HOST=${{ secrets.MAIL_HOST }}
-            MAIL_PORT=${{ secrets.MAIL_PORT }}
-            MAIL_USERNAME=${{ secrets.MAIL_USERNAME }}
-            MAIL_PASSWORD=${{ secrets.MAIL_PASSWORD }}
+            MAIL_HOST=${{ secrets.SMTP_HOST }}
+            MAIL_PORT=${{ secrets.SMTP_PORT }}
+            MAIL_USERNAME=${{ secrets.SMTP_USERNAME }}
+            MAIL_PASSWORD=${{ secrets.SMTP_PASSWORD }}
             MAIL_FROM=${{ secrets.MAIL_FROM }}
             EOF
             chmod 600 .env

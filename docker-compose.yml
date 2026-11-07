@@ -85,10 +85,10 @@ services:
       # Connexion MongoDB (nom du service Docker Compose)
       SPRING_DATA_MONGODB_URI: "mongodb://mongo:27017/e22408439_kanban"
       # Config mail (relais SMTP)
-      MAIL_HOST: "${SMTP_HOST}"
-      MAIL_PORT: "${SMTP_PORT}"
-      MAIL_USERNAME: "${SMTP_USERNAME}"
-      MAIL_PASSWORD: "${SMTP_PASSWORD}"
+      MAIL_HOST: "${MAIL_HOST}"
+      MAIL_PORT: "${MAIL_PORT}"
+      MAIL_USERNAME: "${MAIL_USERNAME}"
+      MAIL_PASSWORD: "${MAIL_PASSWORD}"
       # Adresse d'expédition : avec un relais SMTP, l'identifiant de
       # connexion n'est pas une adresse valable pour le champ From
       APP_MAIL_FROM: "${MAIL_FROM}"
