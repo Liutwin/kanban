@@ -7,3 +7,4 @@ spring/gradle/
 client/node_modules/
 .idea/
 .env
+PROCEDURE.md

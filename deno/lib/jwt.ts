@@ -1,10 +1,13 @@
 import { randomBytes, scrypt } from "node:crypto";
 import { jwtVerify, SignJWT } from "@panva/jose";
+import "jsr:@std/dotenv/load";
 
 import { type AuthPayload, isAuthPayload } from "../model/interfaces.ts";
 
-/** Clef secrète — à externaliser en variable d'environnement plus tard */
-const JWT_SECRET = "***REMOVED***";
+const JWT_SECRET = Deno.env.get("JWT_SECRET");
+if (!JWT_SECRET) {
+  throw new Error("La variable d'environnement JWT_SECRET est requise.");
+}
 const JWT_KEY    = new TextEncoder().encode(JWT_SECRET);
 
 /**

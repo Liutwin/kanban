@@ -1,0 +1,111 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
+  PROJECT_PATH: /srv/kanban
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: deno
+    steps:
+      - uses: actions/checkout@v5
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.3.x
+      # main_test.ts n'est pas lancé : main.ts se connecte à MariaDB dès son import.
+      - run: deno test --allow-env --allow-read --allow-net jwt_test.ts
+        env:
+          JWT_SECRET: secret-de-test
+
+  build:
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      matrix:
+        include:
+          - service: nginx
+            context: ./client
+          - service: deno
+            context: ./deno
+          - service: spring
+            context: ./spring
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Set owner name lowercase
+        run: echo "OWNER=$(echo ${{ github.repository_owner }} | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push ${{ matrix.service }}
+        uses: docker/build-push-action@v5
+        with:
+          context: ${{ matrix.context }}
+          push: true
+          tags: ${{ env.REGISTRY }}/${{ env.OWNER }}/kanban-${{ matrix.service }}:latest
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v5
+
+      # Le compose et les scripts d'initialisation des bases (montés par docker-compose.yml).
+      - name: Copy compose file and database scripts
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_PORT }}
+          source: "docker-compose.yml,Documentation/*.sql,Documentation/*.js"
+          target: ${{ env.PROJECT_PATH }}/
+
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_PORT }}
+          envs: GITHUB_TOKEN,GITHUB_ACTOR,PROJECT_PATH
+          script: |
+            echo "$GITHUB_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+            cd "$PROJECT_PATH"
+
+            # Générer le .env avec les secrets ('EOF' entre guillemets : un $ dans
+            # un mot de passe n'est pas interprété par le shell du VPS)
+            cat > .env <<'EOF'
+            APP_BASE_URL=https://kanban.liutwin.com
+            DB_PASSWORD=${{ secrets.DB_PASSWORD }}
+            DB_ROOT_PASSWORD=${{ secrets.DB_ROOT_PASSWORD }}
+            JWT_SECRET=${{ secrets.JWT_SECRET }}
+            MAIL_HOST=${{ secrets.MAIL_HOST }}
+            MAIL_PORT=${{ secrets.MAIL_PORT }}
+            MAIL_USERNAME=${{ secrets.MAIL_USERNAME }}
+            MAIL_PASSWORD=${{ secrets.MAIL_PASSWORD }}
+            MAIL_FROM=${{ secrets.MAIL_FROM }}
+            EOF
+            chmod 600 .env
+
+            docker compose pull
+            docker compose up -d --no-build
+            docker image prune -f

@@ -8,7 +8,7 @@
  *   4. verifyPassword — vérification d'un mot de passe contre son hash
  *
  * Exécution :
- *   deno test --allow-read jwt_test.ts
+ *   deno test --allow-read --allow-env --config deno/deno.json deno/jwt_test.ts
  *
  * Remarque : les imports utilisent des chemins relatifs à adapter
  * selon l'emplacement réel du fichier de test dans le projet.

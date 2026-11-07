@@ -1,86 +1,159 @@
 # ============================================================
 # docker-compose.yml – Kanban SI-SOR 2026
 #
-# 3 services construits localement :
-#   nginx   → point d'entrée unique (8080/8443), sert React, proxy vers Deno
-#   deno    → auth JWT + proxy vers Spring (interne uniquement)
-#   spring  → API REST métier (interne uniquement)
+# 5 services :
+#   nginx    → point d'entrée unique, sert React, proxy vers Deno
+#   deno     → auth JWT + proxy vers Spring (interne uniquement)
+#   spring   → API REST métier (interne uniquement)
+#   mariadb  → base relationnelle (interne uniquement)
+#   mongo    → commentaires et pièces jointes (interne uniquement)
 #
-# Les bases de données (MariaDB + MongoDB) sont externalisées
-# sur obiwan.univ-brest.fr — aucun service BDD ici.
+# En production, le HTTPS est géré par le Nginx de l'hôte (Certbot),
+# qui relaie vers le conteneur nginx sur 127.0.0.1:3010.
+#
+# Images : construites par GitHub Actions et publiées sur ghcr.io.
+#   - sur le VPS : docker compose pull && docker compose up -d --no-build
+#   - en local   : docker compose up --build (utilise les lignes build:)
+#
+# Les secrets (mots de passe, JWT, SMTP) sont lus dans le fichier .env,
+# généré par le workflow sur le VPS et jamais versionné.
 # ============================================================
 
 services:
 
   # ── nginx + React ─────────────────────────────────────────
   nginx:
+    image: ghcr.io/liutwin/kanban-nginx:latest
     build:
       context: ./client          # dossier contenant le Dockerfile React
     container_name: kanban-nginx
     ports:
-      - "8080:8080"              # HTTP  → redirigé vers HTTPS par nginx
-      - "8443:8443"              # HTTPS → point d'entrée principal
+      # Lié à 127.0.0.1 : seul le Nginx de l'hôte peut l'atteindre.
+      # Un port publié sur 0.0.0.0 contournerait le pare-feu iptables,
+      # car Docker insère ses propres règles avant celles de l'hôte.
+      - "127.0.0.1:3010:8080"
     depends_on:
       - deno
     restart: unless-stopped
 
   # ── Deno (auth JWT + proxy) ────────────────────────────────
   deno:
+    image: ghcr.io/liutwin/kanban-deno:latest
     build:
       context: ./deno            # dossier contenant le Dockerfile Deno
     container_name: kanban-deno
-    # Pas de ports exposés : seul nginx communique avec Deno
-    expose:
-      - "8080"
+    # Pas de ports publiés : seul nginx communique avec Deno
     environment:
       # Écoute sur toutes les interfaces du container (obligatoire sous Docker)
       HOST: "0.0.0.0"
       PORT: "8080"
       # URL interne vers Spring (nom du service Docker Compose)
       SPRING_URL: "http://spring:8081"
-      APP_BASE_URL: "https://info-m24-012:8443"
-      # Connexion MariaDB externe
-      DB_HOST: "${DB_HOST}"
-      DB_PORT: "${DB_PORT}"
-      DB_NAME: "${DB_NAME}"
-      DB_USER: "${DB_USER}"
+      # URL publique, utilisée dans les liens envoyés par e-mail
+      APP_BASE_URL: "${APP_BASE_URL}"
+      # Connexion MariaDB (nom du service Docker Compose)
+      DB_HOST: "mariadb"
+      DB_PORT: "3306"
+      DB_NAME: "kanban"
+      DB_USER: "kanban"
       DB_PASSWORD: "${DB_PASSWORD}"
       # Clé secrète JWT
       JWT_SECRET: "${JWT_SECRET}"
     depends_on:
-      - spring
+      # Deno quitte au démarrage si MariaDB ne répond pas :
+      # on attend que la base soit réellement prête (healthcheck)
+      mariadb:
+        condition: service_healthy
+      spring:
+        condition: service_started
     restart: unless-stopped
 
   # ── Spring Boot (API REST métier) ─────────────────────────
   spring:
+    image: ghcr.io/liutwin/kanban-spring:latest
     build:
       context: ./spring          # dossier contenant le Dockerfile Spring
     container_name: kanban-spring
-    # Pas de ports exposés : seul Deno communique avec Spring
-    expose:
-      - "8081"
+    # Pas de ports publiés : seul Deno (et nginx pour Swagger) communique avec Spring
     environment:
       SPRING_PROFILES_ACTIVE: "prod"
-      APP_BASE_URL: "https://info-m24-012:8443"
-      # Connexion MariaDB externe
-      SPRING_DATASOURCE_URL: "${DB_MARIA_URL}"
-      SPRING_DATASOURCE_USERNAME: "${DB_MARIA_USER}"
-      SPRING_DATASOURCE_PASSWORD: "${DB_MARIA_PASSWORD}"
-      # Connexion MongoDB externe
-      SPRING_DATA_MONGODB_URI: "${DB_MONGO_URL}"
-      # Config mail
-      MAIL_HOST: "${MAIL_HOST}"
-      MAIL_PORT: "${MAIL_PORT}"
-      MAIL_USERNAME: "${MAIL_USERNAME}"
-      MAIL_PASSWORD: "${MAIL_PASSWORD}"
+      APP_BASE_URL: "${APP_BASE_URL}"
+      # Connexion MariaDB (nom du service Docker Compose)
+      SPRING_DATASOURCE_URL: "jdbc:mariadb://mariadb:3306/kanban"
+      SPRING_DATASOURCE_USERNAME: "kanban"
+      SPRING_DATASOURCE_PASSWORD: "${DB_PASSWORD}"
+      # Connexion MongoDB (nom du service Docker Compose)
+      SPRING_DATA_MONGODB_URI: "mongodb://mongo:27017/e22408439_kanban"
+      # Config mail (relais SMTP)
+      MAIL_HOST: "${SMTP_HOST}"
+      MAIL_PORT: "${SMTP_PORT}"
+      MAIL_USERNAME: "${SMTP_USERNAME}"
+      MAIL_PASSWORD: "${SMTP_PASSWORD}"
+      # Adresse d'expédition : avec un relais SMTP, l'identifiant de
+      # connexion n'est pas une adresse valable pour le champ From
+      APP_MAIL_FROM: "${MAIL_FROM}"
       # Dossier des uploads (doit correspondre au volume ci-dessous)
       APP_UPLOAD_DIR: "/app/uploads"
+      # Limite la mémoire de la JVM pour cohabiter avec les autres sites du VPS
+      JAVA_TOOL_OPTIONS: "-Xmx512m"
     volumes:
       # Les fichiers uploadés survivent aux redémarrages du container
       - uploads_data:/app/uploads
+    depends_on:
+      mariadb:
+        condition: service_healthy
+      mongo:
+        condition: service_started
+    restart: unless-stopped
+
+  # ── MariaDB ────────────────────────────────────────────────
+  mariadb:
+    image: mariadb:11
+    container_name: kanban-mariadb
+    # Pas de ports publiés : la base n'est accessible que depuis le réseau Docker
+    environment:
+      # Base et utilisateur applicatif créés au premier démarrage
+      MARIADB_DATABASE: "kanban"
+      MARIADB_USER: "kanban"
+      MARIADB_PASSWORD: "${DB_PASSWORD}"
+      MARIADB_ROOT_PASSWORD: "${DB_ROOT_PASSWORD}"
+    volumes:
+      # Données persistantes
+      - mariadb_data:/var/lib/mysql
+      # Scripts exécutés automatiquement au PREMIER démarrage uniquement
+      # (volume vide), dans l'ordre alphabétique : schéma puis données.
+      # Pour les rejouer : docker compose down -v (efface toutes les données).
+      - "./db/mariadb/schema.sql:/docker-entrypoint-initdb.d/schema.sql:ro"
+      - "./db/mariadb/data.sql:/docker-entrypoint-initdb.d/data.sql:ro"
+    healthcheck:
+      # Script fourni par l'image officielle : vérifie que le serveur
+      # accepte les connexions et que le moteur InnoDB est initialisé
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  # ── MongoDB ────────────────────────────────────────────────
+  mongo:
+    image: mongo:7
+    container_name: kanban-mongo
+    # Pas de ports publiés ni d'authentification : la base n'est
+    # accessible que depuis le réseau Docker du projet
+    volumes:
+      # Données persistantes
+      - mongo_data:/data/db
+      # Scripts exécutés automatiquement au PREMIER démarrage uniquement
+      # (volume vide), dans l'ordre alphabétique : collections puis données
+      - "./db/mongodb/schema.js:/docker-entrypoint-initdb.d/schema.js:ro"
+      - "./db/mongodb/data.js:/docker-entrypoint-initdb.d/data.js:ro"
     restart: unless-stopped
 
 # ── Volumes persistants ────────────────────────────────────
 volumes:
   uploads_data:
+    driver: local
+  mariadb_data:
+    driver: local
+  mongo_data:
     driver: local
