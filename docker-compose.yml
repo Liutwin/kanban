@@ -85,10 +85,10 @@ services:
       # Connexion MongoDB (nom du service Docker Compose)
       SPRING_DATA_MONGODB_URI: "mongodb://mongo:27017/e22408439_kanban"
       # Config mail (relais SMTP)
-      MAIL_HOST: "${MAIL_HOST}"
-      MAIL_PORT: "${MAIL_PORT}"
-      MAIL_USERNAME: "${MAIL_USERNAME}"
-      MAIL_PASSWORD: "${MAIL_PASSWORD}"
+      MAIL_HOST: "${SMTP_HOST}"
+      MAIL_PORT: "${SMTP_PORT}"
+      MAIL_USERNAME: "${SMTP_USERNAME}"
+      MAIL_PASSWORD: "${SMTP_PASSWORD}"
       # Adresse d'expédition : avec un relais SMTP, l'identifiant de
       # connexion n'est pas une adresse valable pour le champ From
       APP_MAIL_FROM: "${MAIL_FROM}"
@@ -123,8 +123,8 @@ services:
       # Scripts exécutés automatiquement au PREMIER démarrage uniquement
       # (volume vide), dans l'ordre alphabétique : schéma puis données.
       # Pour les rejouer : docker compose down -v (efface toutes les données).
-      - "./db/mariadb/schema.sql:/docker-entrypoint-initdb.d/schema.sql:ro"
-      - "./db/mariadb/data.sql:/docker-entrypoint-initdb.d/data.sql:ro"
+      - "./db/mariadb/01-schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro"
+      - "./db/mariadb/02-data.sql:/docker-entrypoint-initdb.d/02-data.sql:ro"
     healthcheck:
       # Script fourni par l'image officielle : vérifie que le serveur
       # accepte les connexions et que le moteur InnoDB est initialisé
@@ -145,8 +145,8 @@ services:
       - mongo_data:/data/db
       # Scripts exécutés automatiquement au PREMIER démarrage uniquement
       # (volume vide), dans l'ordre alphabétique : collections puis données
-      - "./db/mongodb/schema.js:/docker-entrypoint-initdb.d/schema.js:ro"
-      - "./db/mongodb/data.js:/docker-entrypoint-initdb.d/data.js:ro"
+      - "./db/mongodb/01-schema.js:/docker-entrypoint-initdb.d/01-schema.js:ro"
+      - "./db/mongodb/02-data.js:/docker-entrypoint-initdb.d/02-data.js:ro"
     restart: unless-stopped
 
 # ── Volumes persistants ────────────────────────────────────
