@@ -617,3 +617,26 @@ BEGIN
 END$$
 
 DELIMITER ;
+
+-- ============================================================
+-- Vue : vue_profil_utilisateur
+-- Statistiques d'activité par utilisateur (page « Mes activités »,
+-- profil, administration). Lue par l'entité JPA UserView.
+-- Sous-requêtes corrélées : chaque compteur est calculé
+-- indépendamment, sans multiplication de lignes par les jointures.
+-- ============================================================
+CREATE OR REPLACE VIEW vue_profil_utilisateur AS
+SELECT
+    u.usr_id,
+    u.usr_prenom,
+    u.usr_nom,
+    u.usr_mail,
+    u.usr_avatar,
+    u.usr_admin,
+    (SELECT COUNT(*) FROM tableau_tab t       WHERE t.usr_createur    = u.usr_id) AS nb_tableaux_crees,
+    (SELECT COUNT(*) FROM participation_ptp p WHERE p.usr_participant = u.usr_id) AS nb_participations,
+    (SELECT COUNT(*) FROM tache_tsk k         WHERE k.usr_createur    = u.usr_id) AS nb_taches_creees,
+    (SELECT COUNT(*) FROM tache_tsk k         WHERE k.usr_assignee    = u.usr_id) AS nb_taches_assignees,
+    (SELECT COUNT(*) FROM journal_log l       WHERE l.usr_auteur      = u.usr_id) AS nb_actions,
+    (SELECT MAX(l.log_date) FROM journal_log l WHERE l.usr_auteur     = u.usr_id) AS derniere_activite
+FROM utilisateur_usr u;
