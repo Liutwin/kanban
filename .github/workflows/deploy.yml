@@ -76,7 +76,7 @@ jobs:
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
           port: ${{ secrets.VPS_PORT }}
-          source: "docker-compose.yml,Documentation/*.sql,Documentation/*.js"
+          source: "docker-compose.yml,db"
           target: ${{ env.PROJECT_PATH }}/
 
       - name: Deploy via SSH
@@ -98,10 +98,10 @@ jobs:
             DB_PASSWORD=${{ secrets.DB_PASSWORD }}
             DB_ROOT_PASSWORD=${{ secrets.DB_ROOT_PASSWORD }}
             JWT_SECRET=${{ secrets.JWT_SECRET }}
-            MAIL_HOST=${{ secrets.SMTP_HOST }}
-            MAIL_PORT=${{ secrets.SMTP_PORT }}
-            MAIL_USERNAME=${{ secrets.SMTP_USERNAME }}
-            MAIL_PASSWORD=${{ secrets.SMTP_PASSWORD }}
+            SMTP_HOST=${{ secrets.SMTP_HOST }}
+            SMTP_PORT=${{ secrets.SMTP_PORT }}
+            SMTP_USERNAME=${{ secrets.SMTP_USERNAME }}
+            SMTP_PASSWORD=${{ secrets.SMTP_PASSWORD }}
             MAIL_FROM=${{ secrets.MAIL_FROM }}
             EOF
             chmod 600 .env
